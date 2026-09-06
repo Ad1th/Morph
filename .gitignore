@@ -2,14 +2,6 @@
 .DS_Store
 Thumbs.db
 
-# Go
-/morph
-/bin/
-/dist/
-*.test
-*.out
-/vendor/
-
 # Python
 __pycache__/
 *.py[cod]
