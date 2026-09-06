@@ -12,8 +12,9 @@ python -m morph.tui
 
 ## Home
 
-Four ways in, keyboard-first. `e` Experiment · `t` Threshold · `n` Environment ·
-`r` Regressions · `esc` back · `F2` light/dark · `Ctrl+P` command palette.
+Five ways in, keyboard-first. `e` Experiment · `m` Monitor · `t` Threshold ·
+`n` Environment · `r` Regressions · `esc` back · `F2` light/dark ·
+`Ctrl+P` command palette.
 
 ## Experiment — causal isolation
 
@@ -31,6 +32,26 @@ When every condition has run, the **verdict card** states the diagnosis in plain
 language — `ENVIRONMENT-CAUSED` / `ENVIRONMENT-EXPOSED` / `APPLICATION BUG` /
 `NO EFFECT` — and, for a latency+loss target, a **2×2 interaction matrix**
 resolves from the same four batches: three cells green, "both" red.
+
+## Monitor — live tuning
+
+A task-manager view, not a statistical test. Four **sliders** (latency, loss,
+cpu cores, ram) — `←/→` nudge, `Shift+←/→` jump, `Tab` between them. Moving one
+re-runs the command under the new conditions (debounced, one at a time; `Space`
+toggles auto-run, `Ctrl+R` runs once).
+
+The right pane is a rolling graph of the last ~60 runs: **duration**, **CPU**,
+**peak memory** sparklines with a current-value readout, plus a pass/fail strip.
+
+When a slider crosses a boundary the runs have revealed, it gets a red `⚠` and
+the panel names the condition, its value, and the reason — taken from the last
+failing run (e.g. `LockLostException: lock expired mid-payment`). A boundary is
+only attributed to a slider when the runs actually split on it, so a failure
+caused by latency isn't blamed on the CPU/RAM values that were set at the time.
+
+Each slider shows its reconcile badge: on a host that can't cgroup-limit CPU or
+RAM, those read `APPROXIMATED` / `UNAVAILABLE` rather than pretending. `--demo`
+uses a synthetic performance model so it runs with no target app.
 
 ## Threshold — failure boundary
 
