@@ -30,6 +30,7 @@ class ProxyServer:
         self.latency_ms = latency_ms
         self.packet_loss_percent = packet_loss_percent
         self._server: asyncio.base_events.Server | None = None
+        self._connections: set[asyncio.Task] = set()
 
     @property
     def port(self) -> int:
@@ -46,6 +47,13 @@ class ProxyServer:
     async def stop(self) -> None:
         if self._server is not None:
             self._server.close()
+            # wait_closed() waits for in-flight handlers. When packet loss is
+            # being injected, a relay can legitimately be parked forever waiting
+            # on bytes that were dropped and will never arrive, so the handlers
+            # must be cancelled or stop() never returns.
+            for task in list(self._connections):
+                task.cancel()
+            self._connections.clear()
             await self._server.wait_closed()
             self._server = None
 
@@ -59,22 +67,31 @@ class ProxyServer:
     async def _handle_client(
         self, client_reader: asyncio.StreamReader, client_writer: asyncio.StreamWriter
     ) -> None:
+        task = asyncio.current_task()
+        if task is not None:
+            self._connections.add(task)
+
         try:
             upstream_reader, upstream_writer = await asyncio.open_connection(
                 self.upstream_host, self.upstream_port
             )
         except OSError:
             client_writer.close()
+            if task is not None:
+                self._connections.discard(task)
             return
 
-        await asyncio.gather(
-            self._pump(client_reader, upstream_writer),
-            self._pump(upstream_reader, client_writer),
-            return_exceptions=True,
-        )
-
-        for writer in (client_writer, upstream_writer):
-            writer.close()
+        try:
+            await asyncio.gather(
+                self._pump(client_reader, upstream_writer),
+                self._pump(upstream_reader, client_writer),
+                return_exceptions=True,
+            )
+        finally:
+            if task is not None:
+                self._connections.discard(task)
+            for writer in (client_writer, upstream_writer):
+                writer.close()
 
     async def _pump(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         """Relay chunks from reader to writer, injecting latency and packet loss."""
@@ -82,6 +99,12 @@ class ProxyServer:
             while True:
                 chunk = await reader.read(4096)
                 if not chunk:
+                    # End of stream: forward the half-close. Without this the
+                    # peer never learns the body ended, so any response whose
+                    # length is not known in advance (no Content-Length) hangs
+                    # until the client's read timeout fires.
+                    if writer.can_write_eof():
+                        writer.write_eof()
                     break
                 if self.latency_ms:
                     await asyncio.sleep(self.latency_ms / 1000)
