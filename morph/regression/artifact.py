@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
-from typing import List, Optional, Union
 
 from morph.schema.profile import EnvironmentProfile
 from morph.schema.regression import RegressionArtifact
@@ -15,7 +14,7 @@ DEFAULT_REGRESSIONS_DIR = Path(".morph/regressions")
 
 def save_regression(
     artifact: RegressionArtifact,
-    base_dir: Optional[Union[Path, str]] = None,
+    base_dir: Path | str | None = None,
 ) -> Path:
     """Save a RegressionArtifact as a structured directory bundle under base_dir/regression_id."""
     target_base = Path(base_dir) if base_dir is not None else DEFAULT_REGRESSIONS_DIR
@@ -50,8 +49,8 @@ def save_regression(
 
 
 def load_regression(
-    path_or_id: Union[Path, str],
-    base_dir: Optional[Union[Path, str]] = None,
+    path_or_id: Path | str,
+    base_dir: Path | str | None = None,
 ) -> RegressionArtifact:
     """Load and reconstruct a RegressionArtifact from a bundle directory or regression ID."""
     target_base = Path(base_dir) if base_dir is not None else DEFAULT_REGRESSIONS_DIR
@@ -88,15 +87,15 @@ def load_regression(
 
 
 def list_regressions(
-    base_dir: Optional[Union[Path, str]] = None,
-) -> List[RegressionArtifact]:
+    base_dir: Path | str | None = None,
+) -> list[RegressionArtifact]:
     """Scan base_dir and return all valid RegressionArtifact bundles."""
     target_base = Path(base_dir) if base_dir is not None else DEFAULT_REGRESSIONS_DIR
     p = target_base
     if not p.exists() or not p.is_dir():
         return []
 
-    results: List[RegressionArtifact] = []
+    results: list[RegressionArtifact] = []
     for item in sorted(p.iterdir()):
         if item.is_dir() and (item / "environment.json").exists():
             try:
@@ -107,8 +106,8 @@ def list_regressions(
 
 
 def delete_regression(
-    path_or_id: Union[Path, str],
-    base_dir: Optional[Union[Path, str]] = None,
+    path_or_id: Path | str,
+    base_dir: Path | str | None = None,
 ) -> bool:
     """Delete a regression bundle directory."""
     target_base = Path(base_dir) if base_dir is not None else DEFAULT_REGRESSIONS_DIR

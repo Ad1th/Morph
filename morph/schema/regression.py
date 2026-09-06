@@ -1,11 +1,13 @@
-from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+from datetime import UTC, datetime
+from typing import Any
+
 from pydantic import BaseModel, Field
+
 from morph.schema.profile import EnvironmentProfile
 
 
 def _default_created_at() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 class RegressionArtifact(BaseModel):
@@ -14,7 +16,7 @@ class RegressionArtifact(BaseModel):
     command: str
     expected_exit_code: int = 0
     expected_max_failure_rate: float = 0.0
-    failure_signature: Optional[str] = None
+    failure_signature: str | None = None
     created_at: str = Field(default_factory=_default_created_at)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 

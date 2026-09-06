@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Union
 
 from morph.regression.artifact import load_regression
 from morph.schema.regression import RegressionArtifact
@@ -15,8 +14,8 @@ def _safe_identifier(name: str) -> str:
 
 
 def export_ci_test(
-    regression: Union[RegressionArtifact, Path, str],
-    output_path: Union[Path, str] = "test_morph_invariant.py",
+    regression: RegressionArtifact | Path | str,
+    output_path: Path | str = "test_morph_invariant.py",
 ) -> Path:
     """Generate a standalone pytest file that verifies an environment regression invariant."""
     if isinstance(regression, (str, Path)):
@@ -26,7 +25,8 @@ def export_ci_test(
 
     out = Path(output_path)
     safe_name = _safe_identifier(artifact.regression_id)
-    target_ref = str(Path(regression).resolve()) if isinstance(regression, (str, Path)) and Path(regression).is_dir() else artifact.regression_id
+    is_dir = isinstance(regression, (str, Path)) and Path(regression).is_dir()
+    target_ref = str(Path(regression).resolve()) if is_dir else artifact.regression_id
 
     code = f'''"""Standalone Morph Invariant CI Test.
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-from typing import Optional
 
 from morph.runtime.adapters.base import BaseAdapter, ProxyAdapter
 

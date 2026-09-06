@@ -2,8 +2,8 @@ import os
 import shlex
 import sys
 
-from morph.schema.telemetry import RunResult
 from morph.runtime.runner import execute_command
+from morph.schema.telemetry import RunResult
 
 
 def _py(code: str) -> str:

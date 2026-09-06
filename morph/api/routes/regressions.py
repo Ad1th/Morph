@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import List
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -24,8 +23,8 @@ class ReplayRequest(BaseModel):
     timeout: float = 30.0
 
 
-@router.get("", response_model=List[RegressionArtifact])
-def get_all_regressions() -> List[RegressionArtifact]:
+@router.get("", response_model=list[RegressionArtifact])
+def get_all_regressions() -> list[RegressionArtifact]:
     """List all saved regression artifacts."""
     return list_regressions()
 
