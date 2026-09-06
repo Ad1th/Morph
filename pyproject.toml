@@ -26,6 +26,12 @@ dependencies = [
 [project.scripts]
 morph = "morph.cli.main:app"
 
+[tool.setuptools.packages.find]
+# Package only the library. `apps/` is a demo failure corpus (test fixtures),
+# not part of the distribution; without this, setuptools flat-layout autodiscovery
+# fails with "Multiple top-level packages discovered: ['apps', 'morph']".
+include = ["morph*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
