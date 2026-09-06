@@ -280,5 +280,17 @@ def serve(
     uvicorn.run("morph.api.app:app", host=host, port=port, reload=reload)
 
 
+@app.command()
+def tui(
+    demo: bool = typer.Option(
+        False, "--demo", help="Replay a recorded experiment (no root / network / target app needed)"
+    ),
+):
+    """Open the full-screen Morph console: capture, experiment, threshold, replay."""
+    from morph.tui import run
+
+    run(demo=demo)
+
+
 if __name__ == "__main__":
     app()
