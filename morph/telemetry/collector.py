@@ -128,27 +128,33 @@ def run_with_telemetry(
     environment. Callers wanting os.environ + overrides should go through
     `morph.runtime.runner.execute_command`, which does the merge.
     """
-    # posix=True always, matching shlex.join() (used by every caller to build
-    # `command`): shlex.join() emits POSIX-style quoting unconditionally, it
-    # does not adapt to os.name, so the split side must not either. Splitting
-    # posix=False on Windows corrupted quoted paths (the executable's own
-    # quote characters became part of the literal argv[0]), causing every
-    # subprocess launch to fail with FileNotFoundError.
-    args = shlex.split(command, posix=True)
-    if not args:
+    if not command.strip():
         raise ValueError("command is empty")
 
     popen_kwargs = dict(
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=cwd, env=env
     )
     if os.name == "nt":
+        # Windows' CreateProcess takes the whole command line as one string
+        # and does its own native quoting/backslash parsing -- passing it
+        # through untouched is both correct AND what a real Windows path or
+        # a manually-typed command already assumes. Re-splitting with shlex
+        # (a POSIX-shell concept) previously mismatched real-world command
+        # strings: `posix=False` corrupted shlex.join()-built commands, and
+        # `posix=True` corrupted raw Windows paths (their backslashes are
+        # POSIX escape characters), breaking one calling style or the other.
+        popen_target: str | list[str] = command
         popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
     else:
+        # POSIX Popen (shell=False) requires an argv list; shlex.split with
+        # posix=True is the correct, standard way to tokenize a shell-style
+        # command string here.
+        popen_target = shlex.split(command, posix=True)
         popen_kwargs["start_new_session"] = True
 
     start = time.perf_counter()
     try:
-        proc = subprocess.Popen(args, **popen_kwargs)
+        proc = subprocess.Popen(popen_target, **popen_kwargs)
     except FileNotFoundError as exc:
         return _early_result(exit_code=127, stderr=str(exc),
                              duration_ms=(time.perf_counter() - start) * 1000,
