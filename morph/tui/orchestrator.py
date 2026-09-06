@@ -10,15 +10,20 @@ on its own.
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
-from morph.engine.experiment import RunFn, run_experiment
+from morph.engine.experiment import RunFn, run_experiment, run_trials
 from morph.engine.progress import OnEvent
 from morph.engine.threshold import search_threshold
+from morph.regression import load_regression
+from morph.regression.replay import ReplayResult
 from morph.runtime.controller import RuntimeController
 from morph.runtime.runner import execute_command
 from morph.schema.comparison import ThresholdResult
+from morph.schema.events import TrialEvent
 from morph.schema.experiment import ExperimentResult
 from morph.schema.profile import EnvironmentProfile
+from morph.schema.regression import RegressionArtifact
 from morph.schema.telemetry import RunResult
 
 # Parameters the threshold search knows how to vary on a profile.
@@ -130,4 +135,48 @@ def run_threshold_live(
 
     return search_threshold(
         parameter=parameter, run_at=run_at, low=low, high=high, trials=trials, on_event=on_event
+    )
+
+
+def run_replay_live(
+    regression: RegressionArtifact | Path | str,
+    trials: int,
+    timeout: float,
+    on_event: OnEvent,
+    controller: RuntimeController | None = None,
+) -> ReplayResult:
+    """Re-run a saved regression bundle under its own environment, emitting a
+    trial event per run, then check the failure rate against its tolerance."""
+    artifact = (
+        regression
+        if isinstance(regression, RegressionArtifact)
+        else load_regression(regression)
+    )
+    ctrl = controller or RuntimeController()
+    runner = make_result_runner(artifact.command, artifact.environment, timeout, ctrl)
+    batch = run_trials(runner, trials, f"replay:{artifact.regression_id}", on_event=on_event)
+
+    matches = batch.failure_rate <= artifact.expected_max_failure_rate
+    summary = (
+        f"{batch.failures}/{trials} failed ({batch.failure_rate:.0%}); "
+        f"tolerance ≤ {artifact.expected_max_failure_rate:.0%}"
+    )
+    on_event(
+        TrialEvent(
+            kind="verdict",
+            condition=artifact.regression_id,
+            classification="compliant" if matches else "violation",
+            extra={"summary": summary},
+        )
+    )
+    return ReplayResult(
+        regression_id=artifact.regression_id,
+        passed=matches,
+        matches_expected=matches,
+        failure_rate=batch.failure_rate or 0.0,
+        total_runs=trials,
+        failures=batch.failures,
+        runs=batch.run_results,
+        regression=artifact,
+        summary=summary,
     )

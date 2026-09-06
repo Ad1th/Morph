@@ -28,6 +28,16 @@ _VERDICTS = {
         "No condition produced a statistically significant increase in failures.",
         "grey50",
     ),
+    "compliant": (
+        "REGRESSION LOCKED",
+        "Replayed within tolerance. The fix holds under the recorded environment.",
+        "green",
+    ),
+    "violation": (
+        "REGRESSION OPEN",
+        "Replay exceeded the allowed failure rate. The invariant is not satisfied.",
+        "red3",
+    ),
 }
 
 

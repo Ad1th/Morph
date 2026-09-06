@@ -17,7 +17,11 @@ from morph.schema.profile import (
 )
 from morph.tui.app import MorphApp
 from morph.tui.messages import EngineEvent, RunFinished
-from morph.tui.orchestrator import build_isolation_runners, set_profile_parameter
+from morph.tui.orchestrator import (
+    build_isolation_runners,
+    run_replay_live,
+    set_profile_parameter,
+)
 from morph.tui.screens.environment import apply_template
 
 
@@ -58,6 +62,31 @@ def test_set_profile_parameter_sets_nested_value():
 def test_set_profile_parameter_rejects_bad_path():
     with pytest.raises(ValueError):
         set_profile_parameter(_profile(), "network.nonsense", 1.0)
+
+
+def test_run_replay_live_emits_trials_and_verdict(tmp_path):
+    import sys
+
+    from morph.regression.artifact import save_regression
+    from morph.schema.regression import RegressionArtifact
+
+    art = RegressionArtifact(
+        regression_id="tui-replay-test",
+        environment=_profile(0.0, 0.0),
+        command=f'{sys.executable} -c "print(1)"',
+        expected_exit_code=0,
+        expected_max_failure_rate=0.0,
+    )
+    save_regression(art, base_dir=tmp_path)
+
+    events: list[TrialEvent] = []
+    result = run_replay_live(art, trials=3, timeout=15.0, on_event=events.append)
+
+    assert result.matches_expected is True
+    assert result.failures == 0
+    assert [e.kind for e in events].count("trial") == 3
+    assert events[-1].kind == "verdict"
+    assert events[-1].classification == "compliant"
 
 
 def test_apply_template_high_latency_and_constrained():

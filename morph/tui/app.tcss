@@ -236,3 +236,43 @@ ExperimentScreen.significant {
     padding: 0 2;
     background: $surface;
 }
+
+/* ---------- Regressions ---------- */
+
+#reg-table {
+    height: 1fr;
+    margin: 0 2;
+}
+
+#reg-bar {
+    height: auto;
+    padding: 1;
+    background: $panel;
+}
+
+#reg-bar Input {
+    width: 10;
+}
+
+#reg-bar Button {
+    margin-left: 2;
+}
+
+#reg-log {
+    height: 8;
+    border-top: solid $panel-lighten-2;
+    padding: 0 2;
+    background: $surface;
+}
+
+#reg-status {
+    dock: bottom;
+    height: 1;
+    padding: 0 2;
+    background: $panel;
+    color: $text-muted;
+}
+
+RegressionsScreen .lane {
+    padding: 0 2;
+}
