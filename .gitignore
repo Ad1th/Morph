@@ -1,1 +1,33 @@
 .DS_Store
+
+# Go
+/morph
+/bin/
+/dist/
+*.test
+*.out
+/vendor/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Morph local state — transient run output only.
+# NOTE: .morph/regressions/ is intentionally NOT ignored — regression artifacts
+# (PRD Section 21) are committed and replayed by CI.
+.morph/runs/
+.morph/cache/
+*.log
+
+# Env / secrets
+.env
+.env.local
