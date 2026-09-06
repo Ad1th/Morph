@@ -13,9 +13,13 @@ def collect_cpu() -> CPUInfo:
     if freq is not None:
         clock_mhz = round(freq.max or freq.current)
 
+    physical_cores = psutil.cpu_count(logical=False) or psutil.cpu_count()
+
     return CPUInfo(
         architecture=ProfileField(value=platform.machine(), status=FieldStatus.CAPTURED),
-        cores=ProfileField(value=psutil.cpu_count(logical=False) or psutil.cpu_count(), status=FieldStatus.CAPTURED),
-        logical_processors=ProfileField(value=psutil.cpu_count(logical=True), status=FieldStatus.CAPTURED),
+        cores=ProfileField(value=physical_cores, status=FieldStatus.CAPTURED),
+        logical_processors=ProfileField(
+            value=psutil.cpu_count(logical=True), status=FieldStatus.CAPTURED
+        ),
         clock_mhz=ProfileField(value=clock_mhz, status=FieldStatus.CAPTURED),
     )

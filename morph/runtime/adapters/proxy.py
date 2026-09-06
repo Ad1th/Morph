@@ -127,7 +127,7 @@ async def _self_check() -> None:
         try:
             await asyncio.wait_for(reader.read(4096), timeout=0.3)
             raise AssertionError("100% packet loss should have dropped the chunk")
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass  # expected: nothing arrives
         writer.close()
 

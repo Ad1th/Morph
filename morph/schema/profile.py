@@ -1,12 +1,12 @@
 """EnvironmentProfile: the portable JSON description of a machine's conditions."""
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel
 
 
-class FieldStatus(str, Enum):
+class FieldStatus(StrEnum):
     CAPTURED = "captured"
     REQUESTED = "requested"
     REPRODUCED = "reproduced"
