@@ -1,3 +1,5 @@
+import sys
+
 from morph.runtime.adapters.base import BaseAdapter
 from morph.runtime.controller import (
     RuntimeController,
@@ -12,6 +14,7 @@ from morph.schema.profile import (
     MemoryInfo,
     NetworkInfo,
     OSInfo,
+    ProcessInfo,
     ProfileField,
 )
 from morph.schema.telemetry import RunResult
@@ -120,3 +123,21 @@ def test_runtime_controller_guarantees_cleanup_on_error():
     assert res.passed is False
     assert res.error_type == "RuntimeError"
     assert mock_adapter.cleanup_called is True
+
+
+def test_runtime_controller_process_timeout_overrides_argument():
+    profile = make_test_profile()
+    profile.process = ProcessInfo(
+        timeout_s=ProfileField(value=0.3, status=FieldStatus.REQUESTED)
+    )
+    controller = RuntimeController(adapter=MockAdapter())
+
+    res = controller.run(
+        profile,
+        f'{sys.executable} -c "import time; time.sleep(10)"',
+        timeout=30.0,  # profile's 0.3s should win, not this
+    )
+
+    assert res.passed is False
+    assert res.error_type == "TimeoutExpired"
+    assert res.duration_ms < 5000

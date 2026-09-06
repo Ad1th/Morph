@@ -83,3 +83,18 @@ def test_cwd_propagates(tmp_path):
         _py("import os; print(os.path.realpath(os.getcwd()))"), cwd=str(tmp_path)
     )
     assert r.stdout.strip() == os.path.realpath(str(tmp_path))
+
+
+def test_fd_limit_is_posix_only():
+    if os.name != "posix":
+        # No pywin32 dependency: must be silently ignored, never crash the run.
+        r = execute_command(_py("print('ok')"), max_processes=64, fd_limit=256)
+        assert r.passed is True
+        return
+
+    r = execute_command(
+        _py("import resource; print(resource.getrlimit(resource.RLIMIT_NOFILE)[0])"),
+        fd_limit=256,
+    )
+    assert r.passed is True
+    assert r.stdout.strip() == "256"

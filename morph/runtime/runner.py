@@ -13,12 +13,17 @@ def execute_command(
     env_overrides: dict | None = None,
     timeout: float = 30.0,
     cwd: str | None = None,
+    max_processes: int | None = None,
+    fd_limit: int | None = None,
 ) -> RunResult:
     """Execute `command` under a copy of the current environment plus `env_overrides`.
 
     Override values are coerced to str (ints like ports work). A value of None
     removes that key from the child environment. Typical keys: LC_ALL, LANG, TZ,
     MORPH_PROXY_URL / MORPH_PROXY_* for the network-shaping proxy.
+
+    `max_processes`/`fd_limit` are POSIX-only process resource limits; see
+    `morph.telemetry.collector.run_with_telemetry`.
     """
     merged = dict(os.environ)
     for key, value in (env_overrides or {}).items():
@@ -28,4 +33,7 @@ def execute_command(
         else:
             merged[key] = str(value)
 
-    return run_with_telemetry(command, env=merged, timeout=timeout, cwd=cwd)
+    return run_with_telemetry(
+        command, env=merged, timeout=timeout, cwd=cwd,
+        max_processes=max_processes, fd_limit=fd_limit,
+    )

@@ -98,6 +98,17 @@ def _kill_tree(pid: int) -> None:
             pass
 
 
+def _limit_resources(max_processes: int | None, fd_limit: int | None) -> None:
+    """preexec_fn: applies POSIX rlimits in the child, before exec. Never
+    called on Windows -- subprocess.Popen rejects preexec_fn there outright."""
+    import resource
+
+    if max_processes is not None:
+        resource.setrlimit(resource.RLIMIT_NPROC, (max_processes, max_processes))
+    if fd_limit is not None:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (fd_limit, fd_limit))
+
+
 def _early_result(*, exit_code: int, stderr: str, duration_ms: float,
                   error_type: str, error_message: str) -> RunResult:
     return RunResult(
@@ -120,12 +131,18 @@ def run_with_telemetry(
     env: dict | None = None,
     timeout: float = 30.0,
     cwd: str | None = None,
+    max_processes: int | None = None,
+    fd_limit: int | None = None,
 ) -> RunResult:
     """Run `command`, returning a populated RunResult.
 
     `env`, if given, is passed verbatim to the child and fully replaces its
     environment. Callers wanting os.environ + overrides should go through
     `morph.runtime.runner.execute_command`, which does the merge.
+
+    `max_processes`/`fd_limit` apply POSIX rlimits (RLIMIT_NPROC/RLIMIT_NOFILE)
+    to the child before exec. Silently ignored on Windows: there is no direct
+    equivalent without a pywin32 dependency this project doesn't have.
     """
     if not command.strip():
         raise ValueError("command is empty")
@@ -133,6 +150,9 @@ def run_with_telemetry(
     popen_kwargs = dict(
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=cwd, env=env
     )
+    if os.name != "nt" and (max_processes is not None or fd_limit is not None):
+        popen_kwargs["preexec_fn"] = lambda: _limit_resources(max_processes, fd_limit)
+
     if os.name == "nt":
         # Windows' CreateProcess takes the whole command line as one string
         # and does its own native quoting/backslash parsing -- passing it

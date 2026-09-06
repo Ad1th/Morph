@@ -144,11 +144,29 @@ class RuntimeController:
         timeout: float = 30.0,
         cwd: str | None = None,
     ) -> RunResult:
-        """Apply environment conditions, execute the command, capture telemetry, and guarantee cleanup."""
+        """Apply environment conditions, execute the command, capture telemetry, and guarantee cleanup.
+
+        `profile.process.timeout_s`, if requested, overrides the `timeout`
+        argument; `max_processes`/`fd_limit` are POSIX-only rlimits applied
+        to the child (see `morph.telemetry.collector.run_with_telemetry`).
+        """
         try:
             self.apply_conditions(profile)
             env_overrides = self.adapter.get_env_overrides()
-            result = execute_command(command, env_overrides=env_overrides, timeout=timeout, cwd=cwd)
-            return result
+
+            effective_timeout = timeout
+            max_processes = fd_limit = None
+            if profile.process:
+                if profile.process.timeout_s and profile.process.timeout_s.value is not None:
+                    effective_timeout = float(profile.process.timeout_s.value)
+                if profile.process.max_processes and profile.process.max_processes.value is not None:
+                    max_processes = int(profile.process.max_processes.value)
+                if profile.process.fd_limit and profile.process.fd_limit.value is not None:
+                    fd_limit = int(profile.process.fd_limit.value)
+
+            return execute_command(
+                command, env_overrides=env_overrides, timeout=effective_timeout, cwd=cwd,
+                max_processes=max_processes, fd_limit=fd_limit,
+            )
         finally:
             self.adapter.cleanup()
