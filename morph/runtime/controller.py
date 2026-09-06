@@ -110,6 +110,13 @@ class RuntimeController:
                 if profile.network.bandwidth_mbps and profile.network.bandwidth_mbps.value
                 else None
             )
+            # "Offline" has no dedicated mechanism: it reuses the existing
+            # proxy path with loss forced to 100%, which genuinely drops
+            # every packet rather than approximating disconnection some
+            # other way (ui-spec.md section 5: "Network availability =
+            # Offline -> latency/bandwidth/loss/jitter greyed and ignored").
+            if profile.network.available and profile.network.available.value is False:
+                loss = 100.0
             self.adapter.apply_network(
                 latency_ms=latency,
                 packet_loss_percent=loss,
@@ -120,7 +127,12 @@ class RuntimeController:
         if profile.cpu and profile.cpu.cores:
             try:
                 cores = int(profile.cpu.cores.value)
-                self.adapter.apply_cpu(max_cores=cores)
+                quota = (
+                    float(profile.cpu.quota_percent.value)
+                    if profile.cpu.quota_percent and profile.cpu.quota_percent.value is not None
+                    else None
+                )
+                self.adapter.apply_cpu(max_cores=cores, quota_percent=quota)
             except (ValueError, TypeError):
                 pass
 
@@ -153,6 +165,10 @@ class RuntimeController:
         try:
             self.apply_conditions(profile)
             env_overrides = self.adapter.get_env_overrides()
+            if profile.env_vars:
+                # Explicit user-requested variables take precedence over the
+                # adapter's own (locale/proxy) overrides.
+                env_overrides = {**env_overrides, **profile.env_vars}
 
             effective_timeout = timeout
             max_processes = fd_limit = None

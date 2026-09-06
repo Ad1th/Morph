@@ -5,9 +5,11 @@ class DummyAdapter(BaseAdapter):
     def apply_network(self, latency_ms=0.0, packet_loss_percent=0.0, bandwidth_mbps=None):
         self._env_overrides["NET_LATENCY"] = str(latency_ms)
 
-    def apply_cpu(self, max_cores=None):
+    def apply_cpu(self, max_cores=None, quota_percent=None):
         if max_cores:
             self._env_overrides["MAX_CORES"] = str(max_cores)
+        if quota_percent:
+            self._env_overrides["CPU_QUOTA_PERCENT"] = str(quota_percent)
 
     def apply_memory(self, limit_mb=None):
         if limit_mb:

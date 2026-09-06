@@ -27,8 +27,8 @@ class BaseAdapter(ABC):
         pass
 
     @abstractmethod
-    def apply_cpu(self, max_cores: int | None = None) -> None:
-        """Apply CPU core count or throttle restrictions."""
+    def apply_cpu(self, max_cores: int | None = None, quota_percent: float | None = None) -> None:
+        """Apply CPU core count and/or usage quota restrictions."""
         pass
 
     @abstractmethod
@@ -131,7 +131,7 @@ class ProxyAdapter(BaseAdapter):
         self._thread.start()
         ready_event.wait(timeout=5.0)
 
-    def apply_cpu(self, max_cores: int | None = None) -> None:
+    def apply_cpu(self, max_cores: int | None = None, quota_percent: float | None = None) -> None:
         pass
 
     def apply_memory(self, limit_mb: int | None = None) -> None:
