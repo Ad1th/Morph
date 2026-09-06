@@ -1,130 +1,143 @@
 # Morph Build Progress
 
-> Living status file for the current implementation pass. Update this after every
-> commit so a fresh agent/session can pick up exactly where the last one left off.
-> Also re-run `/graphify` after this task is complete (or after major structural
-> changes) to refresh `graphify-out/`.
+> Living status file. Update this after any future work on this codebase so a
+> fresh agent or session can pick up with full context. Re-run `/graphify`
+> after structural changes to refresh `graphify-out/`.
 
-## Task scope (per user request, do not expand)
+## Task scope (per user request, kept intentionally narrow)
 
-Only these are in scope for this pass:
+Only these were in scope for this pass:
 
-1. `morph/profiler/` — environment collectors for CPU, RAM, OS, Locale, Filesystem
-2. `morph/engine/` — experiment loop, baseline/treatment runner, threshold search,
+1. `morph/profiler/`: environment collectors for CPU, RAM, OS, Locale, Filesystem
+2. `morph/engine/`: experiment loop, baseline/treatment runner, threshold search,
    Fisher exact test, causal classification
-3. `morph/runtime/adapters/proxy.py` — async TCP proxy for cross-platform latency
+3. `morph/runtime/adapters/proxy.py`: async TCP proxy for cross-platform latency
    and packet-loss simulation
 4. `tests/test_profiler.py`, `tests/test_engine.py`, `tests/test_comparison.py`
 
 Everything else in `docs/architecture.md` (CLI, API server, frontend, telemetry
 subprocess runner, regression artifacts, macOS/Windows/Linux native adapters,
 network.py/runtime_env.py collectors) is explicitly OUT of scope for this pass.
-The minimal `morph/schema/` layer was added anyway because profiler/engine
-cannot type their data without it — this is a required dependency, not scope
-creep.
-
-After all four features are in: ~30 small commits total, then a sanity-check
-pass (run the full test suite, fix anything broken, confirm imports work).
+A minimal `morph/schema/` layer was added anyway since profiler/engine cannot
+type their data without it; that is a required dependency, not scope creep.
 
 Git identity for all commits: `parth-garg01` / `parth.garg2024@vitstudent.ac.in`,
-no Claude co-author line (per user's global CLAUDE.md instruction).
+no Claude co-author line (per the user's global CLAUDE.md instruction).
 
-## Status: IN PROGRESS
+## Status: COMPLETE (this pass's scope)
 
-### Done (committed)
+All four features are built, tested, linted clean, and committed. 25/25 tests
+pass (`py -3 -m pytest tests/ -q`), the proxy self-check passes
+(`py -3 -m morph.runtime.adapters.proxy`), and `ruff check morph/ tests/`
+reports no findings. A `code-review` pass was also run and its one real
+finding (see below) was fixed with a regression test.
 
-- [x] Removed `/morph` from `.gitignore` (was a leftover Go-language gitignore
-      rule that would have silently blocked every commit in this task — project
-      settled on Python per `requirements.txt`).
-- [x] Scaffolded package dirs: `morph/{schema,profiler/collectors,engine,runtime/adapters}`,
-      `tests/`, all with `__init__.py`.
-- [x] `morph/schema/profile.py` — `FieldStatus`, `ProfileField`, `OSInfo`, `CPUInfo`,
-      `MemoryInfo`, `LocaleInfo`, `FilesystemInfo`, `NetworkInfo`, `EnvironmentProfile`.
-- [x] `morph/schema/telemetry.py` — `RunResult` (minimal: exit_code, stdout,
-      stderr, duration_ms, passed, error_type, error_message — dropped run_id/
-      timestamp from the architecture doc's version since nothing in this pass's
-      scope needs them).
-- [x] `morph/schema/comparison.py` — `ComparisonResult` (with
-      `baseline_failure_rate`/`treatment_failure_rate` as computed properties,
-      not stored fields), `ThresholdResult`.
-- [x] `morph/schema/experiment.py` — `TrialBatch` (failure_rate computed
-      property), `ExperimentResult`.
-- [x] `morph/profiler/collectors/cpu.py` — `collect_cpu()` via psutil +
-      platform.machine(). Note: does NOT use py-cpuinfo despite it being in
-      requirements.txt/architecture doc — psutil+platform covers arch/cores/
-      clock without the extra dependency; py-cpuinfo is slow to import (probes
-      via subprocess on some platforms) and unnecessary for this field set.
-      Revisit only if a specific field genuinely needs it.
-- [x] `morph/profiler/collectors/memory.py` — `collect_memory()` via psutil.
-- [x] `morph/profiler/collectors/os_info.py` — `collect_os()`, maps
-      platform.system() to darwin/windows/linux family strings.
-- [x] `morph/profiler/collectors/locale_info.py` — `collect_locale()` via
-      stdlib `locale` + `time.tzname` (no `tzdata`/timezone-database dependency
-      needed for this — that's for *applying* timezones later, not capturing
-      the current one).
-- [x] `morph/profiler/collectors/filesystem.py` — `collect_filesystem()`,
-      detects case sensitivity by probing a temp file's uppercased path.
+### What exists
 
-### Not yet done
+- `morph/schema/`: `profile.py` (`EnvironmentProfile` and friends, with
+  per-field `FieldStatus`), `telemetry.py` (`RunResult`), `comparison.py`
+  (`ComparisonResult`, `ThresholdResult`), `experiment.py` (`TrialBatch`,
+  `ExperimentResult`). Minimal dependency layer, not part of the requested
+  scope but required by it.
+- `morph/profiler/collectors/`: `cpu.py`, `memory.py`, `os_info.py` (uses
+  `distro` for Linux distribution version, not kernel version),
+  `locale_info.py` (uses Win32 `GetUserDefaultLocaleName` on Windows for a
+  proper BCP-47 tag like `en-IN`, since stdlib `locale.getlocale()` only
+  returns a Windows display name there), `filesystem.py` (case-sensitivity
+  probe via a temp file).
+- `morph/profiler/capture.py`: orchestrates the five collectors into one
+  `EnvironmentProfile` (`network` field left `None`: no network collector is
+  in this pass's scope, that's `runtime/adapters/proxy.py`'s job instead).
+- `morph/runtime/adapters/proxy.py`: `ProxyServer` class (asyncio
+  `start_server`/`open_connection`, bidirectional relay with injected
+  `asyncio.sleep` latency and probabilistic chunk drop for packet loss).
+  Supports `async with`. Has an inline `if __name__ == "__main__":`
+  self-check (ponytail's "non-trivial logic needs one runnable check" rule)
+  since no separate `test_proxy.py` was requested; run it directly with
+  `py -3 -m morph.runtime.adapters.proxy`.
+- `morph/engine/comparison.py`: `compare_failure_rates()`, Fisher's exact
+  test via `scipy.stats.fisher_exact`, returns a `ComparisonResult` with
+  `effect_label` in `{no_effect, significant_increase, significant_decrease}`.
+- `morph/engine/threshold.py`: `search_threshold()`, binary search over a
+  continuous parameter range given a known-safe and known-failing bound.
+- `morph/engine/classifier.py`: `classify_failure()`, the three-way rule from
+  `architecture.md` section 5.3 (`application_internal` / `environment_caused`
+  / `environment_exposed`), plus a fourth `no_effect` outcome for when the
+  comparison was not significant or treatment did not actually exceed
+  baseline (see the bug fix below).
+- `morph/engine/experiment.py`: `run_trials()` (batches N calls to a
+  caller-supplied `run_fn: Callable[[], bool]` into a `TrialBatch`),
+  `isolate_variables()` (baseline plus N candidate treatments, each compared),
+  `detect_interaction()` (2x2 design: neither/A/B/both, confirms an
+  interaction only when A alone and B alone show no effect but A+B does),
+  and `run_experiment()` (orchestrates isolation, picks the strongest
+  significant condition, classifies it). Deliberately takes `run_fn`
+  callbacks rather than depending on subprocess/telemetry plumbing:
+  `morph/telemetry/` and `morph/runtime/controller.py` are out of scope for
+  this pass, and coupling the engine to real subprocess execution would make
+  it untestable without a real target app. Wire a real trial runner in when
+  the runtime controller exists.
+- `tests/test_profiler.py`, `tests/test_comparison.py`, `tests/test_engine.py`:
+  25 tests total, all passing.
+- `.gitattributes`: normalizes source files to LF (was causing a CRLF
+  warning on every commit under Git for Windows).
+- `pyproject.toml`: formalizes `pytest` testpaths and `ruff` config (line
+  length 110, target py311, rule selection E/F/W/I/UP/RUF). Previously both
+  tools ran on implicit defaults.
 
-- [ ] `morph/profiler/capture.py` — orchestrator that calls all 5 collectors
-      and returns an `EnvironmentProfile` (network=None since no network
-      collector is in scope this pass).
-- [ ] `tests/test_profiler.py` — exercises capture_environment() end to end,
-      checks every field has status=CAPTURED and sane types/ranges.
-- [ ] `morph/runtime/adapters/proxy.py` — async TCP proxy (asyncio), listens
-      on a local port, forwards to an upstream host:port, injects
-      `asyncio.sleep(latency_ms/1000)` per read and probabilistically drops
-      chunks by `packet_loss_percent`. Needs a `ProxyServer` class with
-      start()/stop(), plus a `if __name__ == "__main__"` self-check per
-      ponytail's "non-trivial logic needs one runnable check" rule (no
-      separate test_proxy.py was requested, so the self-check lives inline
-      instead of as a pytest file).
-- [ ] `morph/engine/comparison.py` — `compare_failure_rates()` using
-      `scipy.stats.fisher_exact`, returns `ComparisonResult`.
-- [ ] `tests/test_comparison.py` — no-effect case, significant-increase case,
-      edge cases (zero totals).
-- [ ] `morph/engine/threshold.py` — binary search `search_threshold()` over a
-      parameter range using repeated trials at each midpoint.
-- [ ] `morph/engine/classifier.py` — `classify_failure()` implementing the
-      3-way rule from architecture.md section 5.3 (application_internal /
-      environment_caused / environment_exposed) based on baseline vs treatment
-      failure rates.
-- [ ] `morph/engine/experiment.py` — main experiment loop: `run_trials()`
-      (batches N calls to a caller-supplied `run_fn: Callable[[], bool]` into
-      a `TrialBatch`), single-variable isolation loop, 2-variable interaction
-      detection (neither/A/B/both), orchestrator tying it to classifier +
-      comparison. Deliberately takes a `run_fn` callback rather than depending
-      on subprocess/telemetry plumbing — `morph/telemetry/` is out of scope
-      for this pass, and coupling the engine to real subprocess execution
-      would make it untestable without a real target app. Revisit when
-      `morph/runtime/controller.py` exists to wire a real trial runner in.
-- [ ] `tests/test_engine.py` — run_trials counts, isolation loop picks the
-      right candidate, interaction detection flags the interacting pair,
-      threshold search converges, classifier picks the right label in all 3
-      cases.
-- [ ] Full commit sequence (~30 total, ~9 done so far — see `git log --oneline`
-      for the authoritative list, this file is a summary not a duplicate).
-- [ ] Final sanity check pass: `pip install -r requirements.txt` (or confirm
-      deps already available), `pytest tests/ -v`, fix anything broken, then
-      re-run `/graphify` to refresh `graphify-out/` with the new modules.
+### Bug fixed during the sanity-check pass
 
-## Resuming this task
+`classify_failure()` accepted a `treatment: TrialBatch` parameter but never
+actually read it: classification was decided purely from `baseline.failure_rate`
+and the caller-supplied `is_significant` flag. The one production call site
+(`run_experiment`) happened to only pass already-filtered `significant_increase`
+comparisons, which masked the defect, but the public function itself had no
+such guarantee. A future or different caller passing `is_significant=True` for
+a *decrease* (for example, verifying a fix) would have been mislabeled
+`environment_caused`. Fixed to require `treatment.failure_rate >
+baseline.failure_rate` before considering `environment_caused` or
+`environment_exposed`; added
+`test_classify_no_effect_when_treatment_did_not_actually_increase` as a
+regression test. See commit `32c62ea`.
 
-1. Read this file, then `git log --oneline -20` to see exactly which commits
-   landed.
-2. Check which files under "Not yet done" above already exist on disk (a
-   session may have written a file but not yet committed it) before writing
-   anything — don't overwrite in-progress work blindly.
-3. Continue down the "Not yet done" list in order — later items depend on
-   earlier ones (engine/experiment.py needs comparison.py and classifier.py
-   first).
-4. Keep committing after each file/logical unit, using the
-   `parth-garg01`/`parth.garg2024@vitstudent.ac.in` identity, no Claude
-   co-author trailer.
-5. Update this file's checkboxes as you go — don't let it drift out of sync
-   with `git log`.
-6. When everything above is checked off and tests pass, run `/graphify` to
-   regenerate `graphify-out/`, then delete or archive this file's "Not yet
-   done" section (or mark the task fully complete) since it will no longer be
-   needed by a future session.
+### Also fixed along the way
+
+- `.gitignore` had `/morph` under a leftover "# Go" section from before the
+  team settled on Python (per `requirements.txt`). That would have silently
+  blocked every commit in this task. Removed.
+- `locale_info.py` originally used `locale.getlocale()[0]` everywhere, which
+  on Windows returns a display name like `English_India` rather than a BCP-47
+  tag. Every example profile in the PRD and architecture doc uses tags like
+  `en-IN`. Fixed to call `GetUserDefaultLocaleName` via `ctypes` on Windows.
+- `os_info.py` originally used `platform.release()` for the Linux version
+  field, which is the kernel version, not the distribution version the PRD's
+  example profiles show (`"22.04"`). Fixed to use the already-declared but
+  previously unused `distro` dependency.
+
+## Resuming or extending this work
+
+1. Read this file, then `git log --oneline` for the authoritative commit list.
+2. The "Not yet done" items below are the next things `architecture.md`
+   describes that were explicitly out of scope for this pass. Do not start
+   them without the user asking; this file exists to give a future session
+   context, not a standing backlog.
+3. If asked to extend the engine to run real subprocess trials, that is where
+   `morph/telemetry/collector.py` and `morph/runtime/controller.py` from
+   `architecture.md` would plug in as the `run_fn` implementation.
+4. Keep committing with the `parth-garg01` / `parth.garg2024@vitstudent.ac.in`
+   identity, no Claude co-author trailer, and no em dashes anywhere in
+   generated content (global CLAUDE.md rule: use commas, parentheses, or
+   colons instead).
+5. Re-run `/graphify` after any structural change so `graphify-out/` stays
+   current.
+
+### Not yet done (out of scope for this pass, listed for context only)
+
+- CLI (`morph/cli/`), API server (`morph/api/`), frontend (`frontend/`)
+- `morph/telemetry/` (real subprocess-based trial runner)
+- `morph/runtime/controller.py` and the macOS/Windows/Linux native adapters
+  (`adapters/macos.py`, `windows.py`, `linux.py`); `proxy.py` is the only
+  adapter built so far
+- `morph/regression/` (`.morph/regressions/` artifacts, replay, CI exporter)
+- `network.py` and `runtime_env.py` profiler collectors
+- Demo failure corpus (`demo_apps/`)
