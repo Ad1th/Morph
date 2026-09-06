@@ -27,7 +27,7 @@ Screen {
 }
 
 #menu {
-    grid-size: 2 2;
+    grid-size: 2 3;
     grid-gutter: 1 2;
     grid-rows: 5;
     grid-columns: 32;
@@ -283,4 +283,83 @@ ExperimentScreen.significant {
 
 RegressionsScreen .lane {
     padding: 0 2;
+}
+
+/* ---------- Monitor ---------- */
+
+#mon-bar {
+    height: auto;
+    padding: 1;
+    background: $panel;
+    align-vertical: middle;
+}
+
+#mon-bar #mon-command {
+    width: 1fr;
+}
+
+#mon-bar Label {
+    padding: 0 1 0 2;
+    color: $text-muted;
+}
+
+#mon-bar #mon-run {
+    margin-left: 2;
+}
+
+#mon-body {
+    height: 1fr;
+}
+
+#mon-sliders {
+    width: 2fr;
+    padding: 1 2;
+}
+
+.slider {
+    height: 1;
+    color: $text;
+}
+
+.slider:focus {
+    background: $boost;
+}
+
+#mon-graph {
+    width: 3fr;
+    padding: 1 2;
+    border-left: solid $panel-lighten-2;
+    background: $surface;
+}
+
+.mon-h {
+    color: $text-muted;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.mon-metric {
+    color: $text-muted;
+    margin-top: 1;
+}
+
+#mon-graph Sparkline {
+    height: 3;
+}
+
+.mon-val {
+    text-style: bold;
+}
+
+#mon-strip {
+    color: $text-muted;
+}
+
+#mon-warn {
+    dock: bottom;
+    height: auto;
+    min-height: 1;
+    padding: 0 2;
+    background: $panel;
+    color: $text;
 }
