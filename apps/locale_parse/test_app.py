@@ -13,8 +13,6 @@ import os
 import subprocess
 import sys
 
-import pytest
-
 from apps.locale_parse import app as locale_app
 
 TRIALS = 5
