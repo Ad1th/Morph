@@ -1,0 +1,670 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {
+    "hyperedges": [
+      {
+        "id": "runtime_adapter_flow",
+        "label": "Cross-Platform Runtime Adapters",
+        "nodes": [
+          "base_adapter",
+          "adapter_windows",
+          "adapter_macos",
+          "adapter_linux",
+          "user_space_proxy"
+        ],
+        "relation": "implement",
+        "confidence": "EXTRACTED",
+        "confidence_score": 1.0,
+        "source_file": "architecture.md"
+      },
+      {
+        "id": "statistical_causal_engine",
+        "label": "Statistical Causal Isolation Loop",
+        "nodes": [
+          "experiment_engine",
+          "baseline_treatment",
+          "threshold_search",
+          "interaction_detection",
+          "fisher_exact_test",
+          "failure_classifier"
+        ],
+        "relation": "form",
+        "confidence": "EXTRACTED",
+        "confidence_score": 1.0,
+        "source_file": "architecture.md"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "label": "Morph Core Platform",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "morph_core",
+      "community": 2,
+      "norm_label": "morph core platform"
+    },
+    {
+      "label": "Environment Twin",
+      "file_type": "document",
+      "source_file": "README.md",
+      "id": "env_twin",
+      "community": 2,
+      "norm_label": "environment twin"
+    },
+    {
+      "label": "Causal Isolation Engine",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "causal_isolation",
+      "community": 3,
+      "norm_label": "causal isolation engine"
+    },
+    {
+      "label": "Flight Recorder (.morph)",
+      "file_type": "document",
+      "source_file": "Morph_PRD.md",
+      "id": "flight_recorder",
+      "community": 3,
+      "norm_label": "flight recorder (.morph)"
+    },
+    {
+      "label": "Environment Profiler",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "profiler",
+      "community": 4,
+      "norm_label": "environment profiler"
+    },
+    {
+      "label": "EnvironmentProfile Schema",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "env_profile_schema",
+      "community": 4,
+      "norm_label": "environmentprofile schema"
+    },
+    {
+      "label": "FieldStatus (Reproduced/Approximated/Unavailable)",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "field_status",
+      "community": 4,
+      "norm_label": "fieldstatus (reproduced/approximated/unavailable)"
+    },
+    {
+      "label": "Runtime Controller",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "runtime_controller",
+      "community": 1,
+      "norm_label": "runtime controller"
+    },
+    {
+      "label": "BaseAdapter Interface",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "base_adapter",
+      "community": 1,
+      "norm_label": "baseadapter interface"
+    },
+    {
+      "label": "Windows Adapter (Clumsy/JobObjects)",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "adapter_windows",
+      "community": 1,
+      "norm_label": "windows adapter (clumsy/jobobjects)"
+    },
+    {
+      "label": "macOS Adapter (dnctl/pfctl)",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "adapter_macos",
+      "community": 1,
+      "norm_label": "macos adapter (dnctl/pfctl)"
+    },
+    {
+      "label": "Linux Adapter (tc/netem/cgroups)",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "adapter_linux",
+      "community": 1,
+      "norm_label": "linux adapter (tc/netem/cgroups)"
+    },
+    {
+      "label": "User-Space TCP Proxy (AsyncIO)",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "user_space_proxy",
+      "community": 1,
+      "norm_label": "user-space tcp proxy (asyncio)"
+    },
+    {
+      "label": "Experiment Engine",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "experiment_engine",
+      "community": 0,
+      "norm_label": "experiment engine"
+    },
+    {
+      "label": "Baseline vs Treatment Runner",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "baseline_treatment",
+      "community": 0,
+      "norm_label": "baseline vs treatment runner"
+    },
+    {
+      "label": "Threshold Search (Binary Search)",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "threshold_search",
+      "community": 0,
+      "norm_label": "threshold search (binary search)"
+    },
+    {
+      "label": "Multi-Variable Interaction Detection",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "interaction_detection",
+      "community": 0,
+      "norm_label": "multi-variable interaction detection"
+    },
+    {
+      "label": "Fisher Exact & Two-Proportion Test",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "fisher_exact_test",
+      "community": 0,
+      "norm_label": "fisher exact & two-proportion test"
+    },
+    {
+      "label": "Failure Classifier (Caused vs Exposed)",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "failure_classifier",
+      "community": 0,
+      "norm_label": "failure classifier (caused vs exposed)"
+    },
+    {
+      "label": "Telemetry Collector",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "telemetry_collector",
+      "community": 1,
+      "norm_label": "telemetry collector"
+    },
+    {
+      "label": "Regression Replay Engine",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "regression_replay",
+      "community": 3,
+      "norm_label": "regression replay engine"
+    },
+    {
+      "label": "CI Invariant Exporter",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "ci_invariant_exporter",
+      "community": 3,
+      "norm_label": "ci invariant exporter"
+    },
+    {
+      "label": "FastAPI API Server",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "fastapi_backend",
+      "community": 2,
+      "norm_label": "fastapi api server"
+    },
+    {
+      "label": "Typer CLI Interface",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "cli_interface",
+      "community": 2,
+      "norm_label": "typer cli interface"
+    },
+    {
+      "label": "React/Vite Dashboard",
+      "file_type": "document",
+      "source_file": "architecture.md",
+      "id": "frontend_dashboard",
+      "community": 2,
+      "norm_label": "react/vite dashboard"
+    },
+    {
+      "label": "Failure A: Simple Timeout",
+      "file_type": "document",
+      "source_file": "Morph_PRD.md",
+      "id": "failure_a_timeout",
+      "community": 5,
+      "norm_label": "failure a: simple timeout"
+    },
+    {
+      "label": "Failure B: Lock TTL vs Network (Flagship)",
+      "file_type": "document",
+      "source_file": "Morph_PRD.md",
+      "id": "failure_b_interaction",
+      "community": 0,
+      "norm_label": "failure b: lock ttl vs network (flagship)"
+    },
+    {
+      "label": "Failure C: CPU Constraint Race Condition",
+      "file_type": "document",
+      "source_file": "Morph_PRD.md",
+      "id": "failure_c_race",
+      "community": 6,
+      "norm_label": "failure c: cpu constraint race condition"
+    },
+    {
+      "label": "Failure D: Locale Date Formatting",
+      "file_type": "document",
+      "source_file": "Morph_PRD.md",
+      "id": "failure_d_locale",
+      "community": 7,
+      "norm_label": "failure d: locale date formatting"
+    },
+    {
+      "label": "Tin Cloud Fallback Worker",
+      "file_type": "document",
+      "source_file": "Morph_PRD.md",
+      "id": "tin_cloud_fallback",
+      "community": 2,
+      "norm_label": "tin cloud fallback worker"
+    },
+    {
+      "label": "n8n CI Workflow Orchestrator",
+      "file_type": "document",
+      "source_file": "Morph_PRD.md",
+      "id": "n8n_ci_orchestration",
+      "community": 2,
+      "norm_label": "n8n ci workflow orchestrator"
+    },
+    {
+      "label": "SGLang Plain-English Reporter",
+      "file_type": "document",
+      "source_file": "Morph_PRD.md",
+      "id": "sglang_plain_prose",
+      "community": 0,
+      "norm_label": "sglang plain-english reporter"
+    },
+    {
+      "label": "ElevenLabs Voice Announcer",
+      "file_type": "document",
+      "source_file": "Morph_PRD.md",
+      "id": "elevenlabs_voice",
+      "community": 0,
+      "norm_label": "elevenlabs voice announcer"
+    }
+  ],
+  "links": [
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "weight": 1.0,
+      "_src": "morph_core",
+      "_tgt": "env_twin",
+      "source": "morph_core",
+      "target": "env_twin"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "morph_core",
+      "_tgt": "profiler",
+      "source": "morph_core",
+      "target": "profiler"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "morph_core",
+      "_tgt": "runtime_controller",
+      "source": "morph_core",
+      "target": "runtime_controller"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "morph_core",
+      "_tgt": "experiment_engine",
+      "source": "morph_core",
+      "target": "experiment_engine"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "fastapi_backend",
+      "_tgt": "morph_core",
+      "source": "morph_core",
+      "target": "fastapi_backend"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "cli_interface",
+      "_tgt": "morph_core",
+      "source": "morph_core",
+      "target": "cli_interface"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.9,
+      "source_file": "Morph_PRD.md",
+      "weight": 1.0,
+      "_src": "morph_core",
+      "_tgt": "tin_cloud_fallback",
+      "source": "morph_core",
+      "target": "tin_cloud_fallback"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.9,
+      "source_file": "Morph_PRD.md",
+      "weight": 1.0,
+      "_src": "morph_core",
+      "_tgt": "n8n_ci_orchestration",
+      "source": "morph_core",
+      "target": "n8n_ci_orchestration"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "causal_isolation",
+      "_tgt": "experiment_engine",
+      "source": "causal_isolation",
+      "target": "experiment_engine"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "Morph_PRD.md",
+      "weight": 1.0,
+      "_src": "causal_isolation",
+      "_tgt": "flight_recorder",
+      "source": "causal_isolation",
+      "target": "flight_recorder"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "flight_recorder",
+      "_tgt": "regression_replay",
+      "source": "flight_recorder",
+      "target": "regression_replay"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "flight_recorder",
+      "_tgt": "ci_invariant_exporter",
+      "source": "flight_recorder",
+      "target": "ci_invariant_exporter"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "profiler",
+      "_tgt": "env_profile_schema",
+      "source": "profiler",
+      "target": "env_profile_schema"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "env_profile_schema",
+      "_tgt": "field_status",
+      "source": "env_profile_schema",
+      "target": "field_status"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "runtime_controller",
+      "_tgt": "base_adapter",
+      "source": "runtime_controller",
+      "target": "base_adapter"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "runtime_controller",
+      "_tgt": "telemetry_collector",
+      "source": "runtime_controller",
+      "target": "telemetry_collector"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "base_adapter",
+      "_tgt": "adapter_windows",
+      "source": "base_adapter",
+      "target": "adapter_windows"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "base_adapter",
+      "_tgt": "adapter_macos",
+      "source": "base_adapter",
+      "target": "adapter_macos"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "base_adapter",
+      "_tgt": "adapter_linux",
+      "source": "base_adapter",
+      "target": "adapter_linux"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "base_adapter",
+      "_tgt": "user_space_proxy",
+      "source": "base_adapter",
+      "target": "user_space_proxy"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "experiment_engine",
+      "_tgt": "baseline_treatment",
+      "source": "experiment_engine",
+      "target": "baseline_treatment"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "experiment_engine",
+      "_tgt": "threshold_search",
+      "source": "experiment_engine",
+      "target": "threshold_search"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "experiment_engine",
+      "_tgt": "interaction_detection",
+      "source": "experiment_engine",
+      "target": "interaction_detection"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "experiment_engine",
+      "_tgt": "fisher_exact_test",
+      "source": "experiment_engine",
+      "target": "fisher_exact_test"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "experiment_engine",
+      "_tgt": "failure_classifier",
+      "source": "experiment_engine",
+      "target": "failure_classifier"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "Morph_PRD.md",
+      "weight": 1.0,
+      "_src": "experiment_engine",
+      "_tgt": "sglang_plain_prose",
+      "source": "experiment_engine",
+      "target": "sglang_plain_prose"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.7,
+      "source_file": "Morph_PRD.md",
+      "weight": 1.0,
+      "_src": "experiment_engine",
+      "_tgt": "elevenlabs_voice",
+      "source": "experiment_engine",
+      "target": "elevenlabs_voice"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "Morph_PRD.md",
+      "weight": 1.0,
+      "_src": "failure_b_interaction",
+      "_tgt": "threshold_search",
+      "source": "threshold_search",
+      "target": "failure_b_interaction"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "Morph_PRD.md",
+      "weight": 1.0,
+      "_src": "failure_b_interaction",
+      "_tgt": "interaction_detection",
+      "source": "interaction_detection",
+      "target": "failure_b_interaction"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md",
+      "weight": 1.0,
+      "_src": "frontend_dashboard",
+      "_tgt": "fastapi_backend",
+      "source": "fastapi_backend",
+      "target": "frontend_dashboard"
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "runtime_adapter_flow",
+      "label": "Cross-Platform Runtime Adapters",
+      "nodes": [
+        "base_adapter",
+        "adapter_windows",
+        "adapter_macos",
+        "adapter_linux",
+        "user_space_proxy"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md"
+    },
+    {
+      "id": "statistical_causal_engine",
+      "label": "Statistical Causal Isolation Loop",
+      "nodes": [
+        "experiment_engine",
+        "baseline_treatment",
+        "threshold_search",
+        "interaction_detection",
+        "fisher_exact_test",
+        "failure_classifier"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "architecture.md"
+    }
+  ]
+}

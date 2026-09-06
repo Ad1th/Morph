@@ -1,4 +1,4 @@
-# Morph — Product Requirements Document
+# Morph ,  Product Requirements Document
 
 > **Test your software in environments you don't physically have.**
 
@@ -18,11 +18,11 @@ This PRD extends the existing Morph README and keeps its positioning, terminolog
 
 - Organizer: ACM VIT
 - Start: **6 September, 3:00 PM IST**
-- Review 1: **7 September, 1:00 AM–5:00 AM IST**
-- Hack resumes: **7 September, 8:00 AM–7:00 PM IST**
-- Review 2 preparation: **9:00 PM–12:00 AM IST**
-- Review 2: **1:00 AM–5:00 AM IST**
-- Finals: **9:00 AM–3:00 PM IST**
+- Review 1: **7 September, 1:00 AM-5:00 AM IST**
+- Hack resumes: **7 September, 8:00 AM-7:00 PM IST**
+- Review 2 preparation: **9:00 PM-12:00 AM IST**
+- Review 2: **1:00 AM-5:00 AM IST**
+- Finals: **9:00 AM-3:00 PM IST**
 
 ### Strategy
 
@@ -34,18 +34,18 @@ The README's intended live story is already:
 
 ### Judging criteria mapping
 
-ACM VIT judges on: Innovation, relevance to the problem, technical complexity, implementation, functionality, UI/UX, scalability, future scope, and presentation. Each phase and feature in this PRD should be traceable to at least one of these — use this table during pitch prep (Section 34) to make sure the story actually hits every criterion instead of over-indexing on the demo alone.
+ACM VIT judges on: Innovation, relevance to the problem, technical complexity, implementation, functionality, UI/UX, scalability, future scope, and presentation. Each phase and feature in this PRD should be traceable to at least one of these ,  use this table during pitch prep (Section 34) to make sure the story actually hits every criterion instead of over-indexing on the demo alone.
 
 | Criterion | Where it's earned |
 |---|---|
-| Innovation | The experiment engine (Sections 15–18): causal isolation over real machine/network conditions, not just environment fingerprinting. Cite the prior-art distinction from the README explicitly here. |
-| Relevance | Section 1's problem framing — "works on my machine" is universal across every judge's own experience. |
-| Technical complexity | Sections 16–17 (statistical comparison, interaction-effect detection), Section 11 (OS-native network/resource shaping across three platforms). |
+| Innovation | The experiment engine (Sections 15-18): causal isolation over real machine/network conditions, not just environment fingerprinting. Cite the prior-art distinction from the README explicitly here. |
+| Relevance | Section 1's problem framing ,  "works on my machine" is universal across every judge's own experience. |
+| Technical complexity | Sections 16-17 (statistical comparison, interaction-effect detection), Section 11 (OS-native network/resource shaping across three platforms). |
 | Implementation | The MVP table (Section 6) and the fact that P0 items are stated as "must work live," not aspirational. |
-| Functionality | Section 39's live-proof sequence — a judge watching it end to end. |
-| UI/UX | Section 27 dashboard — the REPRODUCED/APPROXIMATED/UNAVAILABLE field-level honesty is itself a UX/trust feature worth calling out explicitly, not just a visual. |
-| Scalability | Section 25 (cloud fallback routing) and Section 20 (production-feedback loop) — this is designed to extend past a single laptop. |
-| Future scope | Section 26 sponsor integrations plus Section 37 stretch list — frame as "here's the roadmap," not "here's what we ran out of time for." |
+| Functionality | Section 39's live-proof sequence ,  a judge watching it end to end. |
+| UI/UX | Section 27 dashboard ,  the REPRODUCED/APPROXIMATED/UNAVAILABLE field-level honesty is itself a UX/trust feature worth calling out explicitly, not just a visual. |
+| Scalability | Section 25 (cloud fallback routing) and Section 20 (production-feedback loop) ,  this is designed to extend past a single laptop. |
+| Future scope | Section 26 sponsor integrations plus Section 37 stretch list ,  frame as "here's the roadmap," not "here's what we ran out of time for." |
 | Presentation | Section 39 script + confirmed pitch time box (flagged in Section 34). |
 
 ---
@@ -713,7 +713,7 @@ Strongest condition
 Latency + packet loss
 
 Threshold
-~150–200 ms latency
+~150-200 ms latency
 
 Latency alone
 Not sufficient
@@ -867,22 +867,22 @@ Cloud or sponsor availability must never be required for the core build.
 
 # 23. Recommended stack
 
-**Confirm this in Phase 1 before writing code — it is the single highest-leverage decision in the whole plan.** The choice below is the architecturally "correct" one on paper; it is only correct in practice if the team is actually fast in it. Nobody's stated skills (backend/system-design, ML basics, frontend-shifting-to-fullstack) explicitly include Go proficiency. If nobody on the team already writes Go comfortably, do not choose it for the sake of the pitch — nonfamiliarity here costs hours 1–4 to language friction instead of building, in a plan that has no slack for that.
+**Confirm this in Phase 1 before writing code ,  it is the single highest-leverage decision in the whole plan.** The choice below is the architecturally "correct" one on paper; it is only correct in practice if the team is actually fast in it. Nobody's stated skills (backend/system-design, ML basics, frontend-shifting-to-fullstack) explicitly include Go proficiency. If nobody on the team already writes Go comfortably, do not choose it for the sake of the pitch ,  nonfamiliarity here costs hours 1-4 to language friction instead of building, in a plan that has no slack for that.
 
 **Decision rule:** whoever owns the runtime (Adith) states their actual comfort level with each option below, out loud, at the start of Phase 1. Pick based on that, not on which one sounds most "systems-y."
 
-## Core runtime — pick one
+## Core runtime ,  pick one
 
-**Option A: Go** — best fit *if someone already knows it well*.
+**Option A: Go** ,  best fit *if someone already knows it well*.
 - strong system/process tooling, straightforward concurrency, single-binary distribution, good cross-platform compilation, suitable CLI
 
-**Option B: Python** — best fit if nobody has real Go experience.
+**Option B: Python** ,  best fit if nobody has real Go experience.
 - matches Parth's ML background directly, fastest iteration speed, `subprocess` + shelling out to `tc`/`Clumsy`/network tools works fine for this scope, weaker for a distributable single binary but that doesn't matter for a hackathon demo running from source
 
-**Option C: TypeScript/Node end-to-end** — best fit if minimizing context-switching across a 4-person team matters more than raw systems fit.
+**Option C: TypeScript/Node end-to-end** ,  best fit if minimizing context-switching across a 4-person team matters more than raw systems fit.
 - matches Sarthak's trajectory, one language for backend + frontend, still fine for shelling out to OS-native network/resource tools the same way Python would
 
-Whichever is picked, the CI section below assumes Go — swap the toolchain-specific checks (`Go test`, `Go lint`, module cache) for the equivalent in Python (`pytest`, `ruff`/`flake8`, pip cache) or Node (`vitest`/`jest`, `eslint`, npm cache) if a different option is chosen.
+Whichever is picked, the CI section below assumes Go ,  swap the toolchain-specific checks (`Go test`, `Go lint`, module cache) for the equivalent in Python (`pytest`, `ruff`/`flake8`, pip cache) or Node (`vitest`/`jest`, `eslint`, npm cache) if a different option is chosen.
 
 ## Python
 
@@ -952,9 +952,9 @@ Keep installers/packages for:
 
 ### Realistic size
 
-Approximately **5–15 GB** should be enough for a useful project-specific offline cache.
+Approximately **5-15 GB** should be enough for a useful project-specific offline cache.
 
-50–100 GB is unnecessary unless you intentionally decide to cache large optional toolchains or datasets.
+50-100 GB is unnecessary unless you intentionally decide to cache large optional toolchains or datasets.
 
 ---
 
@@ -964,9 +964,9 @@ Cloud is a fallback.
 
 Recommended minimum worker:
 
-- 2–4 vCPU
-- 8–16 GB RAM
-- 30–50 GB disk
+- 2-4 vCPU
+- 8-16 GB RAM
+- 30-50 GB disk
 - Linux
 - enough network access for required dependencies
 
@@ -984,7 +984,7 @@ A local machine with 8 GB RAM should not pretend to reproduce a 16 GB machine. I
 
 # 26. Sponsor integrations
 
-## Tin Computer — core
+## Tin Computer ,  core
 
 Use Tin as the remote execution target when local hardware cannot satisfy a profile.
 
@@ -1006,7 +1006,7 @@ Return result
 
 **Failure fallback:** local execution continues; cloud results can be prerecorded for the demo.
 
-## n8n — structural
+## n8n ,  structural
 
 Use n8n around the workflow:
 
@@ -1028,13 +1028,13 @@ n8n must not contain the actual causal-analysis logic.
 
 **Failure fallback:** execute the same workflow directly through Morph.
 
-## SGLang — optional
+## SGLang ,  optional
 
 Use only for turning deterministic experiment output into readable prose.
 
 It must not decide the root cause.
 
-## ElevenLabs — optional
+## ElevenLabs ,  optional
 
 Use only as demo polish for a spoken result.
 
@@ -1042,9 +1042,9 @@ Use only as demo polish for a spoken result.
 
 Do not force it into a software-only project.
 
-## codecrafters and DevSwarm — excluded
+## codecrafters and DevSwarm ,  excluded
 
-Neither has a clear structural fit for this architecture: codecrafters is a build-your-own-X learning platform, not an infra/runtime dependency, and DevSwarm's fit is unclear from the sponsor list alone. If either turns out to offer something genuinely useful once sponsor tracks are confirmed at the venue, evaluate then — do not force an integration to check a box.
+Neither has a clear structural fit for this architecture: codecrafters is a build-your-own-X learning platform, not an infra/runtime dependency, and DevSwarm's fit is unclear from the sponsor list alone. If either turns out to offer something genuinely useful once sponsor tracks are confirmed at the venue, evaluate then ,  do not force an integration to check a box.
 
 The README already identifies Tin and n8n as structural integrations and treats SGLang/ElevenLabs as optional.
 
@@ -1114,7 +1114,7 @@ Primary condition:
 Latency + packet loss
 
 Threshold:
-~150–200ms
+~150-200ms
 
 Interaction:
 Confirmed
@@ -1163,7 +1163,7 @@ is visually ambitious but not essential.
 
 ### Fallback decision
 
-By approximately **Hour 5–6**, if the live 3D/scroll implementation is consuming meaningful frontend time, switch immediately to:
+By approximately **Hour 5-6**, if the live 3D/scroll implementation is consuming meaningful frontend time, switch immediately to:
 
 - pre-rendered sequence
 - scroll-triggered transitions
@@ -1177,7 +1177,7 @@ The dashboard is more important than the landing page.
 
 # 29. 24-hour build plan
 
-## Phase 1 — 3:00–5:00 PM
+## Phase 1 ,  3:00-5:00 PM
 
 Everyone:
 - repo/setup
@@ -1203,7 +1203,7 @@ Rishita:
 
 ---
 
-## Phase 2 — 5:00–8:00 PM
+## Phase 2 ,  5:00-8:00 PM
 
 Adith:
 - macOS runtime
@@ -1226,7 +1226,7 @@ Rishita:
 
 ---
 
-## Phase 3 — 8:00–11:00 PM
+## Phase 3 ,  8:00-11:00 PM
 
 Adith:
 - Windows adapter
@@ -1249,7 +1249,7 @@ Rishita:
 
 ---
 
-## Phase 4 — 11:00 PM–1:00 AM
+## Phase 4 ,  11:00 PM-1:00 AM
 
 Everyone:
 - full end-to-end test
@@ -1274,7 +1274,7 @@ cause
 
 ---
 
-# 30. Review 1 — 1:00–5:00 AM
+# 30. Review 1 ,  1:00-5:00 AM
 
 Do not add risky features.
 
@@ -1287,7 +1287,7 @@ Collect:
 
 ---
 
-# 31. Phase 5 — 8:00 AM–12:00 PM
+# 31. Phase 5 ,  8:00 AM-12:00 PM
 
 Adith:
 - Linux/Pi
@@ -1309,7 +1309,7 @@ Rishita:
 
 ---
 
-# 32. Phase 6 — 12:00–3:00 PM
+# 32. Phase 6 ,  12:00-3:00 PM
 
 Only now prioritize:
 - cloud worker
@@ -1321,7 +1321,7 @@ All sponsor integrations must have local fallbacks.
 
 ---
 
-# 33. Phase 7 — 3:00–7:00 PM
+# 33. Phase 7 ,  3:00-7:00 PM
 
 Hardening:
 
@@ -1338,7 +1338,7 @@ Hardening:
 
 ---
 
-# 34. 9:00 PM–12:00 AM
+# 34. 9:00 PM-12:00 AM
 
 No major architecture changes.
 
@@ -1354,17 +1354,17 @@ Work on:
 
 **Open item: get the actual pitch/demo time box from ACM VIT before this phase.** The live-proof script in Section 39 is designed to run in about two minutes, but the full pitch (problem, demo, architecture, Q&A) needs a confirmed total slot length to know how much of it survives. Confirm this as early as possible, ideally before Review 1, not during this phase.
 
-**Submission/IP note:** if ACM VIT requires a public GitHub repo or a public Devpost-style submission, say so here and confirm before finals — this affects whether any part of the experiment engine can be held back if the team later pursues a formal prior-art/patent assessment. Default assumption until confirmed: submission will be public.
+**Submission/IP note:** if ACM VIT requires a public GitHub repo or a public Devpost-style submission, say so here and confirm before finals ,  this affects whether any part of the experiment engine can be held back if the team later pursues a formal prior-art/patent assessment. Default assumption until confirmed: submission will be public.
 
 ---
 
 # 35. Review 2 and finals
 
-## Review 2 — 1:00–5:00 AM
+## Review 2 ,  1:00-5:00 AM
 
 Prototype should be stable enough for reviewers to interact with.
 
-## Finals — 9:00 AM–3:00 PM
+## Finals ,  9:00 AM-3:00 PM
 
 Prioritize:
 - live proof
@@ -1497,7 +1497,7 @@ That establishes:
 - evidence
 - regression verification
 
-**Single point of failure:** the entire live demo depends on the network-shaping step (Section 11's `tc netem` / Clumsy calls) reliably producing the same failure rate every rehearsal. If that one mechanism is flaky on demo hardware, there is no fallback that still proves causation live — a recorded backup of exactly this sequence (Section 6's fallback policy) is not optional, it is required, and it must be captured during Phase 4 rehearsal, not improvised the night before.
+**Single point of failure:** the entire live demo depends on the network-shaping step (Section 11's `tc netem` / Clumsy calls) reliably producing the same failure rate every rehearsal. If that one mechanism is flaky on demo hardware, there is no fallback that still proves causation live ,  a recorded backup of exactly this sequence (Section 6's fallback policy) is not optional, it is required, and it must be captured during Phase 4 rehearsal, not improvised the night before.
 
 ---
 
@@ -1539,3 +1539,30 @@ It is:
 **A failure happens only under a particular environment. Morph recreates that environment, proves the failure, changes conditions systematically, finds the condition or interaction that matters, and replays the same environment after the fix to prove the failure is gone.**
 
 That is the core product.
+
+---
+
+# 42. Codebase Knowledge Graph (Graphify)
+
+> **Token and Context Efficiency Rule:**
+> To conserve LLM context and avoid re-reading the entire codebase repeatedly across development iterations, developers and AI agents must consult the persistent knowledge graph generated by `graphify` before scanning raw files.
+
+### 1. Graph Artifacts Location
+- Interactive Graph Visualizer: `graphify-out/graph.html` (open directly in browser)
+- Structured Knowledge Graph: `graphify-out/graph.json` (GraphRAG-ready node and edge definitions)
+- Plain-Language Architecture Report: `graphify-out/GRAPH_REPORT.md` (community breakdowns and cohesion scores)
+
+### 2. Core Extracted Communities
+1. **Experiment Engine & Causal Statistics:** Baseline vs treatment runner, threshold binary search, interaction detection, Fisher exact test, and failure classification.
+2. **Runtime OS Adapters & Telemetry:** BaseAdapter interface, Windows/macOS/Linux platform adapters, user-space TCP proxy (asyncio), and telemetry collection.
+3. **Morph Core Platform & Interfaces:** Core runtime controller, FastAPI server, Typer CLI, and React dashboard.
+4. **Flight Recorder & CI Regression:** Regression replay runner, `.morph` bundle serialization, and CI invariant test exporter.
+5. **Environment Capture & Profiler Schema:** Profiler collectors, `EnvironmentProfile` model, and `FieldStatus` verification.
+6. **Failure Corpora:** Timeout client (A), Lock TTL interaction (B), CPU race condition (C), and Locale formatting (D).
+
+### 3. Usage for Agents & Developers
+When researching or implementing features:
+1. First read `graphify-out/GRAPH_REPORT.md` or query `graphify-out/graph.json`.
+2. Trace specific node connections (for example, how `runtime_controller` links to `user_space_proxy` and `telemetry_collector`).
+3. Only open individual target files for precision edits.
+
