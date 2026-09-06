@@ -1,0 +1,155 @@
+"""Runtime Controller: orchestrates environment condition reproduction and execution."""
+
+from __future__ import annotations
+
+import platform
+from typing import Optional
+
+from morph.runtime.adapters.base import BaseAdapter, ProxyAdapter
+from morph.runtime.adapters.linux import LinuxAdapter
+from morph.runtime.adapters.macos import MacOSAdapter
+from morph.runtime.adapters.windows import WindowsAdapter
+from morph.runtime.runner import execute_command
+from morph.schema.profile import EnvironmentProfile, FieldStatus
+from morph.schema.telemetry import RunResult
+
+
+def get_default_adapter(force_proxy: bool = False) -> BaseAdapter:
+    """Return the default system adapter for the current host OS, or ProxyAdapter if forced."""
+    if force_proxy:
+        return ProxyAdapter()
+
+    sys_name = platform.system().lower()
+    if sys_name == "darwin":
+        return MacOSAdapter()
+    elif sys_name == "linux":
+        return LinuxAdapter()
+    elif sys_name == "windows":
+        return WindowsAdapter()
+    else:
+        return ProxyAdapter()
+
+
+def reconcile_profile_statuses(
+    profile: EnvironmentProfile, adapter: BaseAdapter | None = None
+) -> EnvironmentProfile:
+    """Evaluate an EnvironmentProfile against adapter capabilities and update FieldStatuses.
+
+    Marks fields as REPRODUCED, APPROXIMATED, or UNAVAILABLE.
+    Returns a copy of the profile with updated statuses.
+    """
+    adapter = adapter or get_default_adapter()
+    caps = adapter.capabilities()
+    updated = profile.model_copy(deep=True)
+
+    # OS reconciliation
+    current_os = platform.system().lower()
+    target_os = str(updated.os.family.value).lower()
+    if target_os == current_os:
+        updated.os.family.status = FieldStatus.REPRODUCED
+        updated.os.version.status = FieldStatus.APPROXIMATED
+    else:
+        updated.os.family.status = FieldStatus.UNAVAILABLE
+        updated.os.version.status = FieldStatus.UNAVAILABLE
+
+    # CPU reconciliation
+    if caps.get("cpu", False):
+        updated.cpu.cores.status = FieldStatus.APPROXIMATED
+        updated.cpu.architecture.status = (
+            FieldStatus.REPRODUCED
+            if str(updated.cpu.architecture.value) == platform.machine()
+            else FieldStatus.UNAVAILABLE
+        )
+    else:
+        updated.cpu.cores.status = FieldStatus.UNAVAILABLE
+        updated.cpu.architecture.status = FieldStatus.UNAVAILABLE
+
+    # Memory reconciliation
+    if caps.get("memory", False):
+        updated.memory.total_mb.status = FieldStatus.APPROXIMATED
+    else:
+        updated.memory.total_mb.status = FieldStatus.UNAVAILABLE
+
+    # Locale reconciliation
+    if caps.get("locale", False):
+        updated.locale.locale.status = FieldStatus.REPRODUCED
+        updated.locale.timezone.status = FieldStatus.REPRODUCED
+    else:
+        updated.locale.locale.status = FieldStatus.UNAVAILABLE
+        updated.locale.timezone.status = FieldStatus.UNAVAILABLE
+
+    # Network reconciliation
+    if updated.network:
+        if caps.get("network", False):
+            updated.network.latency_ms.status = FieldStatus.REPRODUCED
+            updated.network.packet_loss_percent.status = FieldStatus.REPRODUCED
+            if updated.network.bandwidth_mbps:
+                updated.network.bandwidth_mbps.status = FieldStatus.APPROXIMATED
+        else:
+            updated.network.latency_ms.status = FieldStatus.UNAVAILABLE
+            updated.network.packet_loss_percent.status = FieldStatus.UNAVAILABLE
+
+    return updated
+
+
+class RuntimeController:
+    """Master controller managing adapter lifecycles and application execution."""
+
+    def __init__(
+        self, adapter: BaseAdapter | None = None, force_proxy: bool = False
+    ) -> None:
+        self.adapter = adapter or get_default_adapter(force_proxy=force_proxy)
+
+    def apply_conditions(self, profile: EnvironmentProfile) -> None:
+        """Apply all relevant conditions from the environment profile via the active adapter."""
+        # 1. Network conditions
+        if profile.network:
+            latency = float(profile.network.latency_ms.value or 0.0)
+            loss = float(profile.network.packet_loss_percent.value or 0.0)
+            bw = (
+                float(profile.network.bandwidth_mbps.value)
+                if profile.network.bandwidth_mbps and profile.network.bandwidth_mbps.value
+                else None
+            )
+            self.adapter.apply_network(
+                latency_ms=latency,
+                packet_loss_percent=loss,
+                bandwidth_mbps=bw,
+            )
+
+        # 2. CPU constraints
+        if profile.cpu and profile.cpu.cores:
+            try:
+                cores = int(profile.cpu.cores.value)
+                self.adapter.apply_cpu(max_cores=cores)
+            except (ValueError, TypeError):
+                pass
+
+        # 3. Memory constraints
+        if profile.memory and profile.memory.total_mb:
+            try:
+                mem_mb = int(profile.memory.total_mb.value)
+                self.adapter.apply_memory(limit_mb=mem_mb)
+            except (ValueError, TypeError):
+                pass
+
+        # 4. Locale & Timezone
+        locale_str = str(profile.locale.locale.value) if profile.locale and profile.locale.locale else None
+        timezone = str(profile.locale.timezone.value) if profile.locale and profile.locale.timezone else None
+        self.adapter.apply_locale(locale_str=locale_str, timezone=timezone)
+
+    def run(
+        self,
+        profile: EnvironmentProfile,
+        command: str,
+        timeout: float = 30.0,
+        cwd: Optional[str] = None,
+    ) -> RunResult:
+        """Apply environment conditions, execute the command, capture telemetry, and guarantee cleanup."""
+        try:
+            self.apply_conditions(profile)
+            env_overrides = self.adapter.get_env_overrides()
+            result = execute_command(command, env_overrides=env_overrides, timeout=timeout, cwd=cwd)
+            return result
+        finally:
+            self.adapter.cleanup()
