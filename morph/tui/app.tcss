@@ -106,8 +106,16 @@ Screen {
     width: 8;
 }
 
+#setup #in-regid {
+    width: 16;
+}
+
 #setup #btn-run {
     margin-left: 2;
+}
+
+#setup #btn-save {
+    margin-left: 1;
 }
 
 #exp-body {
