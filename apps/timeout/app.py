@@ -35,7 +35,7 @@ FIXED_TIMEOUT_S = float(os.getenv("MORPH_A_FIXED_TIMEOUT", "1.0"))
 
 
 class _Handler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self) -> None:  # noqa: N802 (stdlib naming)
+    def do_GET(self) -> None:
         time.sleep(RESP_DELAY_S)
         self.send_response(200)
         self.end_headers()
