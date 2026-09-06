@@ -26,6 +26,7 @@ def export_ci_test(
 
     out = Path(output_path)
     safe_name = _safe_identifier(artifact.regression_id)
+    target_ref = str(Path(regression).resolve()) if isinstance(regression, (str, Path)) and Path(regression).is_dir() else artifact.regression_id
 
     code = f'''"""Standalone Morph Invariant CI Test.
 
@@ -44,7 +45,7 @@ from morph.regression.replay import replay_regression
 def test_morph_{safe_name}_environment_invariant():
     """Verify application complies with the recorded regression threshold."""
     result = replay_regression(
-        "{artifact.regression_id}",
+        "{target_ref}",
         trials=1,
     )
     assert result.matches_expected, (
