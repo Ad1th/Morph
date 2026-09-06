@@ -31,6 +31,27 @@ Exit codes: `0` pass, `1` engineered failure (timeout), `2` setup error.
 | `MORPH_A_TIMEOUT` | `0.25` | client timeout, unfixed variant (seconds) |
 | `MORPH_A_FIXED_TIMEOUT` | `1.0` | client timeout, `--fixed` variant (seconds) |
 
+### Matching the threshold to the pitch
+
+The defaults above are the ones faultyapps.md specifies (200ms response vs a
+250ms deadline), which puts the flip point at only **~50ms** of added latency.
+
+But [PRD §19](../../docs/Morph_PRD.md) and [Design Spec §28](../../docs/Morph_Design_Spec.md)
+both narrate a threshold of **~150–200ms** ("100ms PASS, 150ms PASS, 200ms FAIL").
+If a judge watches the threshold search run against the defaults, it will bottom
+out at ~50ms and will not match the slide.
+
+To put the flip point in the band the pitch claims, drop the response delay so
+the deadline headroom is ~170ms:
+
+```bash
+MORPH_A_RESP_DELAY_S=0.08 python -m apps.timeout test   # flips at ~170ms added latency
+```
+
+Decide which number the demo quotes *before* rehearsing, and remember the
+loopback doubling below: on `lo`, a `netem delay` of X adds ~2X to round-trip,
+so the netem parameter is about half the RTT threshold being reported.
+
 ## Manual verification protocol
 
 See [docs/faultyapps.md section 7](../../docs/faultyapps.md#7-manual-verification-protocol)
