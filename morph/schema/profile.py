@@ -28,7 +28,7 @@ class CPUInfo(BaseModel):
     architecture: ProfileField
     cores: ProfileField
     logical_processors: ProfileField
-    clock_mhz: ProfileField
+    clock_mhz: ProfileField | None = None
 
 
 class MemoryInfo(BaseModel):
