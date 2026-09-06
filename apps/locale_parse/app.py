@@ -33,7 +33,6 @@ from __future__ import annotations
 import json
 import locale
 import os
-import sys
 
 RAW_VALUE = os.getenv("MORPH_D_RAW", "1,5")
 EXPECTED = float(os.getenv("MORPH_D_EXPECTED", "1.5"))

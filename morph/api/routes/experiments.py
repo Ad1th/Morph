@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Dict, Optional
+
 from fastapi import APIRouter, HTTPException
 
 from morph.engine.experiment import run_experiment
@@ -11,7 +11,7 @@ from morph.runtime.controller import RuntimeController
 from morph.schema.experiment import ExperimentConfig, ExperimentResult
 
 router = APIRouter()
-_EXPERIMENTS_CACHE: Dict[str, ExperimentResult] = {}
+_EXPERIMENTS_CACHE: dict[str, ExperimentResult] = {}
 
 
 @router.post("", response_model=ExperimentResult)

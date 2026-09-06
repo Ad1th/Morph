@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -13,7 +14,7 @@ def _default_run_id() -> str:
 
 
 def _default_timestamp() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 class TelemetryData(BaseModel):

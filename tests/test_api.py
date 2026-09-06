@@ -1,5 +1,5 @@
-import pytest
 from fastapi.testclient import TestClient
+
 from morph.api.app import app
 from morph.schema.profile import (
     CPUInfo,

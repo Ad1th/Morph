@@ -1,40 +1,40 @@
-from morph.schema.profile import (
-    FieldStatus,
-    ProfileField,
-    OSInfo,
-    CPUInfo,
-    MemoryInfo,
-    LocaleInfo,
-    FilesystemInfo,
-    NetworkInfo,
-    EnvironmentProfile,
-)
-from morph.schema.telemetry import RunResult, TelemetryData
 from morph.schema.experiment import (
-    TrialBatch,
     ComparisonResult,
-    ThresholdResult,
     ExperimentConfig,
     ExperimentResult,
+    ThresholdResult,
+    TrialBatch,
+)
+from morph.schema.profile import (
+    CPUInfo,
+    EnvironmentProfile,
+    FieldStatus,
+    FilesystemInfo,
+    LocaleInfo,
+    MemoryInfo,
+    NetworkInfo,
+    OSInfo,
+    ProfileField,
 )
 from morph.schema.regression import RegressionArtifact
+from morph.schema.telemetry import RunResult, TelemetryData
 
 __all__ = [
-    "FieldStatus",
-    "ProfileField",
-    "OSInfo",
     "CPUInfo",
-    "MemoryInfo",
-    "LocaleInfo",
-    "FilesystemInfo",
-    "NetworkInfo",
-    "EnvironmentProfile",
-    "RunResult",
-    "TelemetryData",
-    "TrialBatch",
     "ComparisonResult",
-    "ThresholdResult",
+    "EnvironmentProfile",
     "ExperimentConfig",
     "ExperimentResult",
+    "FieldStatus",
+    "FilesystemInfo",
+    "LocaleInfo",
+    "MemoryInfo",
+    "NetworkInfo",
+    "OSInfo",
+    "ProfileField",
     "RegressionArtifact",
+    "RunResult",
+    "TelemetryData",
+    "ThresholdResult",
+    "TrialBatch",
 ]

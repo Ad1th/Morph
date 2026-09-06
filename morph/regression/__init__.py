@@ -10,11 +10,11 @@ from morph.regression.replay import ReplayResult, replay_regression
 
 __all__ = [
     "DEFAULT_REGRESSIONS_DIR",
-    "save_regression",
-    "load_regression",
-    "list_regressions",
-    "delete_regression",
-    "replay_regression",
-    "export_ci_test",
     "ReplayResult",
+    "delete_regression",
+    "export_ci_test",
+    "list_regressions",
+    "load_regression",
+    "replay_regression",
+    "save_regression",
 ]

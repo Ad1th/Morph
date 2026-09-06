@@ -1,4 +1,5 @@
 from typer.testing import CliRunner
+
 from morph.cli.main import app
 
 runner = CliRunner()
@@ -53,8 +54,14 @@ def test_cli_export_and_replay(tmp_path, monkeypatch):
             logical_processors=ProfileField(value=8, status=FieldStatus.CAPTURED),
         ),
         memory=MemoryInfo(total_mb=ProfileField(value=16384, status=FieldStatus.CAPTURED)),
-        locale=LocaleInfo(locale=ProfileField(value="en_US.UTF-8", status=FieldStatus.CAPTURED), timezone=ProfileField(value="UTC", status=FieldStatus.CAPTURED)),
-        network=NetworkInfo(latency_ms=ProfileField(value=10.0, status=FieldStatus.REQUESTED), packet_loss_percent=ProfileField(value=0.0, status=FieldStatus.REQUESTED)),
+        locale=LocaleInfo(
+            locale=ProfileField(value="en_US.UTF-8", status=FieldStatus.CAPTURED),
+            timezone=ProfileField(value="UTC", status=FieldStatus.CAPTURED),
+        ),
+        network=NetworkInfo(
+            latency_ms=ProfileField(value=10.0, status=FieldStatus.REQUESTED),
+            packet_loss_percent=ProfileField(value=0.0, status=FieldStatus.REQUESTED),
+        ),
     )
     artifact = RegressionArtifact(
         regression_id="cli-reg-001",

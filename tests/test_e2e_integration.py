@@ -13,11 +13,9 @@ Validates the full loop:
 
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
-from pathlib import Path
-import pytest
+
 from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
@@ -26,7 +24,6 @@ from morph.cli.main import app as cli_app
 from morph.engine.experiment import run_experiment
 from morph.profiler.capture import capture_environment
 from morph.regression import (
-    delete_regression,
     export_ci_test,
     list_regressions,
     load_regression,
@@ -34,8 +31,6 @@ from morph.regression import (
     save_regression,
 )
 from morph.runtime.controller import RuntimeController, reconcile_profile_statuses
-from morph.runtime.runner import execute_command
-from morph.schema.experiment import ExperimentConfig
 from morph.schema.profile import (
     CPUInfo,
     EnvironmentProfile,
@@ -87,8 +82,9 @@ def test_e2e_environment_capture_and_reconciliation():
 
     sample = make_sample_profile()
     reconciled = reconcile_profile_statuses(sample)
-    assert reconciled.os.family.status in (FieldStatus.REPRODUCED, FieldStatus.APPROXIMATED, FieldStatus.UNAVAILABLE)
-    assert reconciled.network.latency_ms.status in (FieldStatus.REPRODUCED, FieldStatus.APPROXIMATED, FieldStatus.UNAVAILABLE)
+    reconciled_statuses = (FieldStatus.REPRODUCED, FieldStatus.APPROXIMATED, FieldStatus.UNAVAILABLE)
+    assert reconciled.os.family.status in reconciled_statuses
+    assert reconciled.network.latency_ms.status in reconciled_statuses
 
 
 def test_e2e_runtime_controller_execution():
@@ -121,7 +117,8 @@ def test_e2e_runtime_controller_execution():
 
 def test_e2e_causal_isolation_experiment():
     """3. Test running an automated causal isolation experiment on candidate treatments."""
-    baseline_fn = lambda: True
+    def baseline_fn():
+        return True
 
     candidates = {
         "candidate_a": lambda: True,

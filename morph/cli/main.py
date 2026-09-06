@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from typing import Optional
 
 import typer
 import uvicorn
@@ -13,7 +11,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from morph.profiler.capture import capture_environment
-from morph.regression import export_ci_test, load_regression, replay_regression
+from morph.regression import export_ci_test, replay_regression
 from morph.runtime.controller import RuntimeController
 from morph.schema.profile import EnvironmentProfile
 
@@ -23,7 +21,7 @@ console = Console()
 
 @app.command()
 def capture(
-    output: Optional[Path] = typer.Option(
+    output: Path | None = typer.Option(
         None, "--output", "-o", help="Path to save captured profile JSON"
     )
 ):
@@ -43,7 +41,9 @@ def capture(
 @app.command()
 def define(
     output: Path = typer.Option("target_profile.json", "--output", "-o", help="Target output file"),
-    template: str = typer.Option("default", "--template", "-t", help="Template type (default, high-latency, constrained)"),
+    template: str = typer.Option(
+        "default", "--template", "-t", help="Template: default, high-latency, or constrained"
+    ),
 ):
     """Generate a template environment profile JSON for editing."""
     base = capture_environment()
@@ -64,9 +64,11 @@ def define(
 @app.command()
 def run(
     command: str = typer.Option(..., "--command", "-c", help="Command to execute"),
-    profile: Optional[Path] = typer.Option(None, "--profile", "-p", help="Path to EnvironmentProfile JSON"),
+    profile: Path | None = typer.Option(None, "--profile", "-p", help="Path to EnvironmentProfile JSON"),
     timeout: float = typer.Option(30.0, "--timeout", help="Timeout in seconds"),
-    force_proxy: bool = typer.Option(False, "--force-proxy", help="Force user-space TCP proxy instead of native OS tools"),
+    force_proxy: bool = typer.Option(
+        False, "--force-proxy", help="Force the user-space TCP proxy instead of native OS tools"
+    ),
 ):
     """Run an application under a simulated environment profile."""
     controller = RuntimeController(force_proxy=force_proxy)
@@ -86,11 +88,14 @@ def run(
         result = execute_command(command=command, timeout=timeout)
 
     status_style = "bold green" if result.passed else "bold red"
+    error_line = ""
+    if not result.passed:
+        error_line = f"\nError: {result.error_type}: {result.error_message}"
     console.print(Panel(
         f"Exit Code: {result.exit_code}\n"
         f"Duration: {result.duration_ms:.1f}ms\n"
         f"Peak Memory: {result.peak_memory_mb:.1f} MB\n"
-        f"Passed: {result.passed}" + (f"\nError: {result.error_type}: {result.error_message}" if not result.passed else ""),
+        f"Passed: {result.passed}" + error_line,
         title=f"Run Result — [{'PASS' if result.passed else 'FAIL'}]",
         border_style=status_style,
     ))
@@ -122,7 +127,8 @@ def replay(
     table.add_row("Failures", str(result.failures))
     table.add_row("Failure Rate", f"{result.failure_rate:.1%}")
     table.add_row("Expected Max Rate", f"{result.regression.expected_max_failure_rate:.1%}")
-    table.add_row("Invariant Status", "[green]COMPLIANT[/green]" if result.matches_expected else "[red]VIOLATION[/red]")
+    invariant = "[green]COMPLIANT[/green]" if result.matches_expected else "[red]VIOLATION[/red]"
+    table.add_row("Invariant Status", invariant)
 
     console.print(table)
     if not result.matches_expected:

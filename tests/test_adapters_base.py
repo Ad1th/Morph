@@ -1,4 +1,3 @@
-import pytest
 from morph.runtime.adapters.base import BaseAdapter, ProxyAdapter
 
 

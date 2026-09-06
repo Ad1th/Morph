@@ -1,23 +1,12 @@
-import pytest
-import json
 from morph.schema import (
-    FieldStatus,
-    ProfileField,
-    OSInfo,
-    CPUInfo,
-    MemoryInfo,
-    LocaleInfo,
-    FilesystemInfo,
-    NetworkInfo,
-    EnvironmentProfile,
-    RunResult,
-    TelemetryData,
-    TrialBatch,
     ComparisonResult,
-    ThresholdResult,
-    ExperimentConfig,
+    EnvironmentProfile,
     ExperimentResult,
+    FieldStatus,
     RegressionArtifact,
+    RunResult,
+    ThresholdResult,
+    TrialBatch,
 )
 
 
@@ -109,7 +98,8 @@ def test_experiment_schema():
         run_id="b-1", exit_code=0, stdout="", stderr="", duration_ms=10.0, passed=True, timestamp="now"
     )
     t_run = RunResult(
-        run_id="t-1", exit_code=1, stdout="", stderr="err", duration_ms=20.0, passed=False, error_type="Err", timestamp="now"
+        run_id="t-1", exit_code=1, stdout="", stderr="err", duration_ms=20.0,
+        passed=False, error_type="Err", timestamp="now",
     )
 
     batch_baseline = TrialBatch(

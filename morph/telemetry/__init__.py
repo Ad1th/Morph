@@ -6,8 +6,8 @@ from morph.telemetry.parser import (
 )
 
 __all__ = [
-    "run_with_telemetry",
-    "extract_error_type",
     "extract_error_message",
+    "extract_error_type",
     "extract_stack_trace",
+    "run_with_telemetry",
 ]
