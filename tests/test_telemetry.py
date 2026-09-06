@@ -55,10 +55,12 @@ def test_timeout_terminates_and_flags():
 
 def test_timeout_kills_child_process_tree(tmp_path):
     marker = tmp_path / "leaked.txt"
+    # repr() escapes backslashes/quotes so the path is a valid Python literal
+    # even nested inside this outer (non-raw) string, safe on Windows too.
     child = (
         "import subprocess, sys, time; "
         "subprocess.Popen([sys.executable, '-c', "
-        f"\"import time; time.sleep(3); open(r'{marker}', 'w').write('leaked')\"]); "
+        f"\"import time; time.sleep(3); open({str(marker)!r}, 'w').write('leaked')\"]); "
         "time.sleep(30)"
     )
     r = run_with_telemetry(_py(child), timeout=0.8)
