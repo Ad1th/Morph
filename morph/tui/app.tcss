@@ -132,7 +132,7 @@ Screen {
     background: $surface;
 }
 
-#verdict {
+#verdict, #matrix {
     height: auto;
     padding: 0 2 1 2;
 }

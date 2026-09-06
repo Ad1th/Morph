@@ -179,6 +179,11 @@ async def test_demo_mode_runs_without_a_command():
         assert screen._lanes["full_target"]._effect == "significant_increase"
         assert not screen.query_one("#verdict").has_class("hidden")
 
+        # the 2x2 interaction matrix resolves from the same four batches
+        assert not screen.query_one("#matrix").has_class("hidden")
+        assert screen._rates["full_target"] == 1.0
+        assert screen._rates["latency_only"] == 0.0
+
 
 @pytest.mark.asyncio
 async def test_threshold_gauge_converges(monkeypatch):

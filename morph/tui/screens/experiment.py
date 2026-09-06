@@ -23,7 +23,10 @@ from morph.tui.messages import EngineEvent, RunFinished
 from morph.tui.orchestrator import run_experiment_live
 from morph.tui.profiles import default_profile_hint, resolve_profile
 from morph.tui.widgets.condition_lane import ConditionLane
+from morph.tui.widgets.interaction_matrix import InteractionMatrix
 from morph.tui.widgets.verdict_card import VerdictCard
+
+_INTERACTION_SET = {"baseline", "latency_only", "loss_only", "full_target"}
 
 
 class ExperimentScreen(Screen):
@@ -36,6 +39,7 @@ class ExperimentScreen(Screen):
         super().__init__()
         self._cfg = load_config()
         self._lanes: dict[str, ConditionLane] = {}
+        self._rates: dict[str, float] = {}
         self._busy = False
 
     def compose(self) -> ComposeResult:
@@ -56,6 +60,7 @@ class ExperimentScreen(Screen):
             yield VerticalScroll(id="lanes")
             yield RichLog(id="exp-log", wrap=True, markup=True, highlight=True)
         yield VerdictCard(id="verdict", classes="hidden")
+        yield InteractionMatrix(id="matrix", classes="hidden")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -106,7 +111,9 @@ class ExperimentScreen(Screen):
         lanes = self.query_one("#lanes", VerticalScroll)
         lanes.remove_children()
         self._lanes.clear()
+        self._rates.clear()
         self.query_one("#verdict", VerdictCard).add_class("hidden")
+        self.query_one("#matrix", InteractionMatrix).add_class("hidden")
         self.query_one("#exp-log", RichLog).clear()
 
     @work(thread=True, exclusive=True)
@@ -153,6 +160,7 @@ class ExperimentScreen(Screen):
             lane = self._lanes.get(ev.condition)
             if lane is not None:
                 lane.finish(ev.failures or 0, ev.failure_rate or 0.0)
+            self._rates[ev.condition] = ev.failure_rate or 0.0
 
         elif ev.kind == "comparison":
             lane = self._lanes.get(ev.condition)
@@ -170,6 +178,21 @@ class ExperimentScreen(Screen):
                 str(ev.extra.get("summary", "")),
             )
             card.remove_class("hidden")
+            self._maybe_show_matrix()
+
+    def _maybe_show_matrix(self) -> None:
+        if not _INTERACTION_SET.issubset(self._rates):
+            return
+        matrix = self.query_one("#matrix", InteractionMatrix)
+        matrix.show(
+            "latency",
+            "loss",
+            neither=self._rates["baseline"],
+            a_only=self._rates["latency_only"],
+            b_only=self._rates["loss_only"],
+            both=self._rates["full_target"],
+        )
+        matrix.remove_class("hidden")
 
     def on_run_finished(self, message: RunFinished) -> None:
         self._busy = False
