@@ -15,10 +15,11 @@ DEFAULT_REGRESSIONS_DIR = Path(".morph/regressions")
 
 def save_regression(
     artifact: RegressionArtifact,
-    base_dir: Union[Path, str] = DEFAULT_REGRESSIONS_DIR,
+    base_dir: Optional[Union[Path, str]] = None,
 ) -> Path:
     """Save a RegressionArtifact as a structured directory bundle under base_dir/regression_id."""
-    target_dir = Path(base_dir) / artifact.regression_id
+    target_base = Path(base_dir) if base_dir is not None else DEFAULT_REGRESSIONS_DIR
+    target_dir = target_base / artifact.regression_id
     target_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. environment.json
@@ -50,12 +51,13 @@ def save_regression(
 
 def load_regression(
     path_or_id: Union[Path, str],
-    base_dir: Union[Path, str] = DEFAULT_REGRESSIONS_DIR,
+    base_dir: Optional[Union[Path, str]] = None,
 ) -> RegressionArtifact:
     """Load and reconstruct a RegressionArtifact from a bundle directory or regression ID."""
+    target_base = Path(base_dir) if base_dir is not None else DEFAULT_REGRESSIONS_DIR
     p = Path(path_or_id)
     if not p.is_dir():
-        p = Path(base_dir) / path_or_id
+        p = target_base / path_or_id
 
     if not p.is_dir():
         raise FileNotFoundError(f"Regression bundle not found at: {p}")
@@ -86,10 +88,11 @@ def load_regression(
 
 
 def list_regressions(
-    base_dir: Union[Path, str] = DEFAULT_REGRESSIONS_DIR,
+    base_dir: Optional[Union[Path, str]] = None,
 ) -> List[RegressionArtifact]:
     """Scan base_dir and return all valid RegressionArtifact bundles."""
-    p = Path(base_dir)
+    target_base = Path(base_dir) if base_dir is not None else DEFAULT_REGRESSIONS_DIR
+    p = target_base
     if not p.exists() or not p.is_dir():
         return []
 
@@ -97,7 +100,7 @@ def list_regressions(
     for item in sorted(p.iterdir()):
         if item.is_dir() and (item / "environment.json").exists():
             try:
-                results.append(load_regression(item))
+                results.append(load_regression(item, base_dir=target_base))
             except Exception:
                 continue
     return results
@@ -105,12 +108,13 @@ def list_regressions(
 
 def delete_regression(
     path_or_id: Union[Path, str],
-    base_dir: Union[Path, str] = DEFAULT_REGRESSIONS_DIR,
+    base_dir: Optional[Union[Path, str]] = None,
 ) -> bool:
     """Delete a regression bundle directory."""
+    target_base = Path(base_dir) if base_dir is not None else DEFAULT_REGRESSIONS_DIR
     p = Path(path_or_id)
     if not p.is_dir():
-        p = Path(base_dir) / path_or_id
+        p = target_base / path_or_id
     if p.is_dir():
         shutil.rmtree(p)
         return True
