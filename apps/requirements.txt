@@ -1,0 +1,5 @@
+# Dependencies for the demo apps ONLY. Kept separate from the root requirements.txt
+# on purpose: "what Morph needs to run" and "what the things Morph tests need to run"
+# must stay distinct (see docs/faultyapps.md section 4).
+
+httpx>=0.27
