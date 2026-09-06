@@ -15,6 +15,7 @@ from morph.schema.profile import (
     MemoryInfo,
     NetworkInfo,
     OSInfo,
+    ProcessInfo,
     ProfileField,
 )
 from morph.schema.regression import RegressionArtifact
@@ -35,6 +36,7 @@ __all__ = [
     "MorphConfig",
     "NetworkInfo",
     "OSInfo",
+    "ProcessInfo",
     "ProfileField",
     "RegressionArtifact",
     "RunResult",

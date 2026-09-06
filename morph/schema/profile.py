@@ -22,6 +22,7 @@ class ProfileField(BaseModel):
 class OSInfo(BaseModel):
     family: ProfileField
     version: ProfileField
+    kernel_version: ProfileField | None = None
 
 
 class CPUInfo(BaseModel):
@@ -29,10 +30,13 @@ class CPUInfo(BaseModel):
     cores: ProfileField
     logical_processors: ProfileField
     clock_mhz: ProfileField | None = None
+    quota_percent: ProfileField | None = None
 
 
 class MemoryInfo(BaseModel):
     total_mb: ProfileField
+    swap_mb: ProfileField | None = None
+    pressure_percent: ProfileField | None = None
 
 
 class LocaleInfo(BaseModel):
@@ -42,12 +46,27 @@ class LocaleInfo(BaseModel):
 
 class FilesystemInfo(BaseModel):
     case_sensitive: ProfileField
+    filesystem_type: ProfileField | None = None
+    read_only: ProfileField | None = None
+    disk_space_limit_mb: ProfileField | None = None
+    disk_read_latency_ms: ProfileField | None = None
+    disk_write_latency_ms: ProfileField | None = None
 
 
 class NetworkInfo(BaseModel):
     latency_ms: ProfileField
     packet_loss_percent: ProfileField
     bandwidth_mbps: ProfileField | None = None
+    jitter_ms: ProfileField | None = None
+    available: ProfileField | None = None
+    connection_type: ProfileField | None = None
+
+
+class ProcessInfo(BaseModel):
+    timeout_s: ProfileField | None = None
+    max_processes: ProfileField | None = None
+    thread_limit: ProfileField | None = None
+    fd_limit: ProfileField | None = None
 
 
 class EnvironmentProfile(BaseModel):
@@ -58,3 +77,5 @@ class EnvironmentProfile(BaseModel):
     locale: LocaleInfo
     filesystem: FilesystemInfo | None = None
     network: NetworkInfo | None = None
+    process: ProcessInfo | None = None
+    env_vars: dict[str, str] = {}
