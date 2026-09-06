@@ -140,3 +140,11 @@ def test_classify_no_effect_when_not_significant():
     baseline = TrialBatch(condition_label="baseline", total_runs=100, failures=0)
     treatment = TrialBatch(condition_label="treatment", total_runs=100, failures=1)
     assert classify_failure(baseline, treatment, is_significant=False) == NO_EFFECT
+
+
+def test_classify_no_effect_when_treatment_did_not_actually_increase():
+    # is_significant=True alone must not be enough: a significant *decrease*
+    # (e.g. a fix being verified) is not evidence the condition caused failures.
+    baseline = TrialBatch(condition_label="baseline", total_runs=100, failures=5)
+    treatment = TrialBatch(condition_label="treatment", total_runs=100, failures=1)
+    assert classify_failure(baseline, treatment, is_significant=True) == NO_EFFECT

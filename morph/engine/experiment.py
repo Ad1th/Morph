@@ -61,8 +61,8 @@ def detect_interaction(
     n: int = 5,
 ) -> dict:
     """Runs all four cells of a 2x2 design. An interaction is confirmed only
-    when A alone and B alone show no effect but A+B does — proving the failure
-    depends on the combination, not either condition individually."""
+    when A alone and B alone show no effect but A+B does: this proves the
+    failure depends on the combination, not either condition individually."""
     neither = run_trials(run_neither, n, "neither")
     a_only = run_trials(run_a, n, label_a)
     b_only = run_trials(run_b, n, label_b)

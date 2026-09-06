@@ -4,7 +4,6 @@ is genuinely introduced or merely amplified by an environmental condition."""
 from morph.schema.experiment import TrialBatch
 
 BASELINE_INTERNAL_FAILURE_THRESHOLD = 0.10
-EXPOSED_MIN_BASELINE_RATE = 0.0
 
 ENVIRONMENT_CAUSED = "environment_caused"
 ENVIRONMENT_EXPOSED = "environment_exposed"
@@ -17,15 +16,15 @@ def classify_failure(baseline: TrialBatch, treatment: TrialBatch, is_significant
     application_internal: baseline already fails often, regardless of environment.
     environment_caused:   baseline near 0% failures, treatment significantly worse.
     environment_exposed:  baseline has some (low) failures, treatment amplifies them.
-    no_effect:            treatment did not significantly change the failure rate.
+    no_effect:            treatment did not significantly increase the failure rate.
     """
     if baseline.failure_rate > BASELINE_INTERNAL_FAILURE_THRESHOLD:
         return APPLICATION_INTERNAL
 
-    if not is_significant:
+    if not is_significant or treatment.failure_rate <= baseline.failure_rate:
         return NO_EFFECT
 
-    if baseline.failure_rate > EXPOSED_MIN_BASELINE_RATE:
+    if baseline.failure_rate > 0:
         return ENVIRONMENT_EXPOSED
 
     return ENVIRONMENT_CAUSED
