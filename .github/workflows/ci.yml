@@ -82,6 +82,7 @@ jobs:
       - name: CLI smoke test
         run: |
           morph --help
+          morph tui --help
           morph capture --output /tmp/profile.json
           python -c "from morph.schema.profile import EnvironmentProfile; EnvironmentProfile.model_validate_json(open('/tmp/profile.json').read())"
           morph run --command "python -c 'print(1)'"

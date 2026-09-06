@@ -88,6 +88,17 @@ Unlike OS or locale — a small, enumerable set of buckets — network condition
 
 Once the cause is found and fixed, the same captured environment becomes a **regression test** — the bug's conditions don't disappear into a closed ticket.
 
+### Driving it
+
+A scriptable CLI (`morph capture / define / run / experiment / threshold / replay / export / serve`) and a full-screen terminal console:
+
+```
+morph tui           # live: watch trials land, the p-value cross 0.05, the verdict resolve
+morph tui --demo     # a recorded run — no root, network, or target app needed
+```
+
+See [`docs/tui.md`](docs/tui.md).
+
 ---
 
 ## Local vs. cloud execution
