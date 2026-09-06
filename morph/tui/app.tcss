@@ -140,3 +140,52 @@ Screen {
 ExperimentScreen.significant {
     border: thick $error;
 }
+
+/* ---------- Environment ---------- */
+
+#env-bar {
+    height: auto;
+    padding: 1;
+    background: $panel;
+}
+
+#env-bar Select {
+    width: 24;
+}
+
+#env-bar Input {
+    width: 1fr;
+    margin-left: 1;
+}
+
+#env-bar Button {
+    margin-left: 1;
+}
+
+#env-diff {
+    height: 1fr;
+    margin: 1 2;
+}
+
+#env-edit {
+    height: auto;
+    padding: 0 2;
+}
+
+#env-edit-label {
+    width: 22;
+    color: $text-muted;
+    padding: 1 1 0 0;
+}
+
+#env-edit-input {
+    width: 1fr;
+}
+
+#env-status {
+    dock: bottom;
+    height: 1;
+    padding: 0 2;
+    background: $panel;
+    color: $text-muted;
+}

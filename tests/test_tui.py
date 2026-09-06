@@ -18,6 +18,7 @@ from morph.schema.profile import (
 from morph.tui.app import MorphApp
 from morph.tui.messages import EngineEvent, RunFinished
 from morph.tui.orchestrator import build_isolation_runners, set_profile_parameter
+from morph.tui.screens.environment import apply_template
 
 
 def _pf(value, status=FieldStatus.REQUESTED):
@@ -59,6 +60,19 @@ def test_set_profile_parameter_rejects_bad_path():
         set_profile_parameter(_profile(), "network.nonsense", 1.0)
 
 
+def test_apply_template_high_latency_and_constrained():
+    base = _profile(0.0, 0.0)
+    hl = apply_template(base, "high-latency")
+    assert hl.network.latency_ms.value == 180.0
+    assert hl.network.packet_loss_percent.value == 2.0
+
+    con = apply_template(base, "constrained")
+    assert con.cpu.cores.value == 2
+    assert con.memory.total_mb.value == 4096
+    # original untouched
+    assert base.cpu.cores.value == 4
+
+
 # --------------------------------------------------------------------------- #
 # app navigation
 # --------------------------------------------------------------------------- #
@@ -80,6 +94,31 @@ async def test_home_navigation():
             await pilot.press("escape")
             await pilot.pause()
             assert app.screen.__class__.__name__ == "HomeScreen"
+
+
+@pytest.mark.asyncio
+async def test_environment_screen_capture_template_reconcile():
+    app = MorphApp()
+    async with app.run_test() as pilot:
+        await pilot.press("n")
+        await pilot.pause()
+        screen = app.screen
+
+        for _ in range(60):
+            await pilot.pause(0.05)
+            if screen._profile is not None:
+                break
+        assert screen._profile is not None  # host capture landed
+
+        screen.query_one("#env-template").value = "high-latency"
+        await pilot.pause()
+        await pilot.pause()
+        assert screen._profile.network.latency_ms.value == 180.0
+
+        screen.action_reconcile()
+        await pilot.pause()
+        # every field carries a reconciled status (not the raw REQUESTED/CAPTURED)
+        assert screen.query_one("#env-diff").row_count == 9
 
 
 # --------------------------------------------------------------------------- #
