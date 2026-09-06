@@ -44,6 +44,11 @@ dist/
 .morph/cache/
 *.log
 
+# Graphify local tool state: regenerable extraction cache and change-detection
+# manifest, not the tracked outputs (graph.html/json, GRAPH_REPORT.md).
+graphify-out/cache/
+graphify-out/manifest.json
+
 # Env / secrets
 .env
 
