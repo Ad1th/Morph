@@ -96,6 +96,14 @@ async def test_monitor_screen_runs_and_warns_in_demo_mode():
         assert "latency" in warn_text and "LockLostException" in warn_text
         assert len(screen.query_one("#spark-dur").data) == len(screen._hist)
 
+        # the pass/fail strip is built from a list slice + rich.Text, so it
+        # renders cleanly at any length (it used to slice Rich markup and raise
+        # MarkupError past ~7 runs). Force a long history and re-render.
+        for _ in range(200):
+            screen._hist.add(screen._last_params, _run(_ % 3 != 0, 40.0))
+        screen._repaint_graph()
+        assert str(screen.query_one("#mon-strip").render())
+
 
 class _SliderApp(App):
     def __init__(self) -> None:

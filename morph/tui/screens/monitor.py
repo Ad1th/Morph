@@ -14,6 +14,7 @@ import random
 from typing import ClassVar
 
 import psutil
+from rich.text import Text
 from textual import work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -221,7 +222,7 @@ class MonitorScreen(Screen):
     def on_run_finished(self, message: RunFinished) -> None:
         self._busy = False
         if message.error is not None:
-            self._warn(f"[red]run failed: {message.error}[/red]")
+            self._warn(Text(f"run failed: {message.error}", style="red"))
         elif isinstance(message.result, RunResult):
             self._hist.add(self._last_params, message.result)
             self._repaint_graph()
@@ -240,8 +241,11 @@ class MonitorScreen(Screen):
             self.query_one("#val-dur", Static).update(f"{s.duration_ms:,.0f} ms")
             self.query_one("#val-cpu", Static).update(f"{s.cpu_percent:.0f} %")
             self.query_one("#val-mem", Static).update(f"{s.peak_mem_mb:,.0f} MB")
-        strip = "".join("[green]●[/green]" if ok else "[red3]✗[/red3]" for ok in self._hist.outcomes)
-        self.query_one("#mon-strip", Static).update(strip[-120:])
+
+        strip = Text()
+        for ok in self._hist.outcomes[-100:]:
+            strip.append("● " if ok else "✗ ", style="green" if ok else "red3")
+        self.query_one("#mon-strip", Static).update(strip)
 
     def _update_warnings(self) -> None:
         current = self._current_params()
@@ -255,19 +259,22 @@ class MonitorScreen(Screen):
                 hot.append(f"{slider.label} {current[slider.param]:g} {over} the boundary (~{boundary:g})")
 
         if not hot:
-            passing = self._hist.latest and self._hist.latest.passed
-            self._warn("[green]healthy[/green] at these settings" if passing
-                       else "[dim]watching…[/dim]")
+            passing = bool(self._hist.latest and self._hist.latest.passed)
+            self._warn(Text("healthy at these settings" if passing else "watching…",
+                            style="green" if passing else "dim"))
             return
 
-        reason = ""
+        line = Text()
+        line.append("⚠  ", style="bold red3")
+        line.append("  ;  ".join(hot), style="red3")
         fail = self._hist.last_failure
         if fail is not None:
             why = fail.error_message or (fail.stderr.strip().splitlines()[-1] if fail.stderr else "")
-            reason = f"  ·  {fail.error_type or 'failure'}: {why}" if (fail.error_type or why) else ""
-        self._warn(f"[red3]⚠[/red3]  {' ; '.join(hot)}{reason}")
+            if fail.error_type or why:
+                line.append(f"    {fail.error_type or 'failure'}: {why}", style="dim")
+        self._warn(line)
 
-    def _warn(self, text: str) -> None:
+    def _warn(self, text: str | Text) -> None:
         self.query_one("#mon-warn", Static).update(text)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
