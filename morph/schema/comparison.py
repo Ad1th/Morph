@@ -1,6 +1,5 @@
 """Statistical comparison results: baseline vs. treatment, and threshold search."""
 
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -11,7 +10,7 @@ class ComparisonResult(BaseModel):
     baseline_total: int
     treatment_failures: int
     treatment_total: int
-    p_value: Optional[float] = None
+    p_value: float | None = None
     is_significant: bool
     effect_label: str  # "no_effect" | "significant_increase" | "significant_decrease"
 

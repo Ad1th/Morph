@@ -6,7 +6,7 @@ run passed) rather than a real subprocess, so the engine is testable without a
 target application or the runtime controller wired up.
 """
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from morph.engine.classifier import classify_failure
 from morph.engine.comparison import compare_failure_rates
@@ -17,7 +17,7 @@ RunFn = Callable[[], bool]
 
 
 def run_trials(
-    run_fn: RunFn, n: int, condition_label: str, profile_overrides: Optional[dict] = None
+    run_fn: RunFn, n: int, condition_label: str, profile_overrides: dict | None = None
 ) -> TrialBatch:
     failures = sum(1 for _ in range(n) if not run_fn())
     return TrialBatch(

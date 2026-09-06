@@ -10,6 +10,7 @@ upstream while injecting delay and probabilistically dropping chunks.
 
 import asyncio
 import random
+from typing import Self
 
 
 class ProxyServer:
@@ -48,7 +49,7 @@ class ProxyServer:
             await self._server.wait_closed()
             self._server = None
 
-    async def __aenter__(self) -> "ProxyServer":
+    async def __aenter__(self) -> Self:
         await self.start()
         return self
 

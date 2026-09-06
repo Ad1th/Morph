@@ -41,7 +41,7 @@ def test_run_trials_all_pass():
 
 
 def test_isolate_variables_flags_the_failing_candidate():
-    baseline, comparisons = isolate_variables(
+    _baseline, comparisons = isolate_variables(
         always_pass,
         {"cpu_only": always_pass, "latency_only": always_pass, "latency+loss": always_fail},
         n=10,

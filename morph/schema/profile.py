@@ -1,7 +1,7 @@
 """EnvironmentProfile: the portable JSON description of a machine's conditions."""
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -47,7 +47,7 @@ class FilesystemInfo(BaseModel):
 class NetworkInfo(BaseModel):
     latency_ms: ProfileField
     packet_loss_percent: ProfileField
-    bandwidth_mbps: Optional[ProfileField] = None
+    bandwidth_mbps: ProfileField | None = None
 
 
 class EnvironmentProfile(BaseModel):
@@ -56,5 +56,5 @@ class EnvironmentProfile(BaseModel):
     cpu: CPUInfo
     memory: MemoryInfo
     locale: LocaleInfo
-    filesystem: Optional[FilesystemInfo] = None
-    network: Optional[NetworkInfo] = None
+    filesystem: FilesystemInfo | None = None
+    network: NetworkInfo | None = None

@@ -1,7 +1,7 @@
 """Binary search for the failure boundary of a single continuous parameter
 (e.g. network.latency_ms), holding all other conditions constant."""
 
-from typing import Callable
+from collections.abc import Callable
 
 from morph.schema.comparison import ThresholdResult
 
