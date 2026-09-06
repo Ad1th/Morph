@@ -15,7 +15,7 @@ if __name__ == "__main__":
     command = positional[0] if positional else "run"
 
     if command not in ("run", "test"):
-        print(f"usage: python -m apps.timeout run|test [--fixed]", file=sys.stderr)
+        print("usage: python -m apps.timeout run|test [--fixed]", file=sys.stderr)
         sys.exit(2)
 
     sys.exit(main(machine_mode=(command == "test"), fixed=fixed))
