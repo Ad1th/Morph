@@ -73,6 +73,17 @@ def test_run_endpoint():
     assert "api run test" in data["stdout"]
 
 
+def test_run_endpoint_env_overrides_no_profile():
+    payload = {
+        "command": "python3 -c \"import os; print(os.environ.get('MORPH_API_TEST'))\"",
+        "timeout": 10.0,
+        "env_overrides": {"MORPH_API_TEST": "from-api"},
+    }
+    res = client.post("/run", json=payload)
+    assert res.status_code == 200
+    assert "from-api" in res.json()["stdout"]
+
+
 def test_experiments_endpoint():
     profile = make_test_profile()
     payload = {
