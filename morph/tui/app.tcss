@@ -1,0 +1,85 @@
+/* Morph TUI -- one restrained accent ($accent), dark-first, adapts to light. */
+
+Screen {
+    background: $background;
+}
+
+/* ---------- Home ---------- */
+
+#home-wrap {
+    align: center middle;
+    height: 1fr;
+}
+
+#logo {
+    color: $accent;
+    text-style: bold;
+    content-align: center middle;
+    width: auto;
+    margin-bottom: 1;
+}
+
+#tagline {
+    color: $text-muted;
+    content-align: center middle;
+    width: 100%;
+    margin-bottom: 2;
+}
+
+#menu {
+    grid-size: 2 2;
+    grid-gutter: 1 2;
+    grid-rows: 5;
+    grid-columns: 32;
+    width: auto;
+    height: auto;
+}
+
+.card {
+    width: 32;
+    height: 5;
+    border: round $panel-lighten-2;
+    background: $panel;
+    color: $text;
+    content-align: center middle;
+    text-align: center;
+}
+
+.card:hover {
+    border: round $accent;
+    background: $boost;
+}
+
+.card:focus {
+    border: thick $accent;
+    background: $boost;
+}
+
+#home-status {
+    dock: bottom;
+    height: 1;
+    padding: 0 1;
+    background: $panel;
+    color: $text-muted;
+}
+
+/* ---------- shared screen chrome ---------- */
+
+.screen-title {
+    dock: top;
+    height: 1;
+    background: $accent;
+    color: $text;
+    text-style: bold;
+    padding: 0 1;
+}
+
+.placeholder {
+    align: center middle;
+    height: 1fr;
+    color: $text-muted;
+}
+
+.hidden {
+    display: none;
+}
