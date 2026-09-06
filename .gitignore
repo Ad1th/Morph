@@ -3,7 +3,7 @@
 Thumbs.db
 
 # Go
-/morph
+# /morph
 /bin/
 /dist/
 *.test
@@ -58,3 +58,4 @@ dist/
 # Temporary / Draft Specs
 Morph_Design_Spec.md
 Morph_PRD.md
+graphify-out/cache/

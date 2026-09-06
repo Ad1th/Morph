@@ -1,45 +1,49 @@
-# Graph Report - .  (2026-09-06)
+# Graph Report - /Users/adith/Documents/Dev/ACTIVE/Morph  (2026-09-06)
 
 ## Corpus Check
-- Corpus is ~15,356 words - fits in a single context window. You may not need a graph.
+- 7 files · ~24,114 words
+- Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 33 nodes · 30 edges · 8 communities detected
-- Extraction: 90% EXTRACTED · 10% INFERRED · 0% AMBIGUOUS · INFERRED: 3 edges (avg confidence: 0.78)
-- Token cost: 1,200 input · 800 output
+- 67 nodes · 95 edges · 11 communities detected
+- Extraction: 78% EXTRACTED · 22% INFERRED · 0% AMBIGUOUS · INFERRED: 21 edges (avg confidence: 0.64)
+- Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
-- [[_COMMUNITY_Experiment Engine & Causal Statistics|Experiment Engine & Causal Statistics]]
-- [[_COMMUNITY_Runtime OS Adapters & Telemetry|Runtime OS Adapters & Telemetry]]
-- [[_COMMUNITY_Morph Core Platform & Interfaces|Morph Core Platform & Interfaces]]
-- [[_COMMUNITY_Flight Recorder & CI Regression|Flight Recorder & CI Regression]]
-- [[_COMMUNITY_Environment Capture & Profiler Schema|Environment Capture & Profiler Schema]]
-- [[_COMMUNITY_Failure Corpus Timeout Scenario|Failure Corpus: Timeout Scenario]]
-- [[_COMMUNITY_Failure Corpus Race Condition|Failure Corpus: Race Condition]]
-- [[_COMMUNITY_Failure Corpus Locale Formatting|Failure Corpus: Locale Formatting]]
+- [[_COMMUNITY_Community 0|Community 0]]
+- [[_COMMUNITY_Community 1|Community 1]]
+- [[_COMMUNITY_Community 2|Community 2]]
+- [[_COMMUNITY_Community 3|Community 3]]
+- [[_COMMUNITY_Community 4|Community 4]]
+- [[_COMMUNITY_Community 5|Community 5]]
+- [[_COMMUNITY_Community 6|Community 6]]
+- [[_COMMUNITY_Community 7|Community 7]]
+- [[_COMMUNITY_Community 8|Community 8]]
+- [[_COMMUNITY_Community 9|Community 9]]
+- [[_COMMUNITY_Community 10|Community 10]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `Experiment Engine` - 9 edges
-2. `Morph Core Platform` - 8 edges
-3. `BaseAdapter Interface` - 5 edges
-4. `Flight Recorder (.morph)` - 3 edges
-5. `Runtime Controller` - 3 edges
-6. `Causal Isolation Engine` - 2 edges
-7. `Environment Profiler` - 2 edges
-8. `EnvironmentProfile Schema` - 2 edges
-9. `Threshold Search (Binary Search)` - 2 edges
-10. `Multi-Variable Interaction Detection` - 2 edges
+1. `RunResult` - 9 edges
+2. `Experiment Engine` - 9 edges
+3. `EnvironmentProfile` - 8 edges
+4. `Morph Core Platform` - 8 edges
+5. `test_experiment_schema()` - 7 edges
+6. `TrialBatch` - 5 edges
+7. `ComparisonResult` - 5 edges
+8. `ThresholdResult` - 5 edges
+9. `ExperimentResult` - 5 edges
+10. `sample_profile_dict()` - 5 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Experiment Engine` --references--> `SGLang Plain-English Reporter`  [INFERRED]
   architecture.md → Morph_PRD.md
 - `Experiment Engine` --references--> `ElevenLabs Voice Announcer`  [INFERRED]
   architecture.md → Morph_PRD.md
+- `test_run_result_schema()` --calls--> `RunResult`  [INFERRED]
+  /Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py → /Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/telemetry.py
 - `Morph Core Platform` --implements--> `Environment Twin`  [EXTRACTED]
   architecture.md → README.md
 - `Morph Core Platform` --references--> `Tin Cloud Fallback Worker`  [EXTRACTED]
-  architecture.md → Morph_PRD.md
-- `Morph Core Platform` --references--> `n8n CI Workflow Orchestrator`  [EXTRACTED]
   architecture.md → Morph_PRD.md
 
 ## Hyperedges (group relationships)
@@ -48,58 +52,78 @@
 
 ## Communities
 
-### Community 0 - "Experiment Engine & Causal Statistics"
-Cohesion: 0.25
-Nodes (9): Baseline vs Treatment Runner, ElevenLabs Voice Announcer, Experiment Engine, Failure B: Lock TTL vs Network (Flagship), Failure Classifier (Caused vs Exposed), Fisher Exact & Two-Proportion Test, Multi-Variable Interaction Detection, SGLang Plain-English Reporter (+1 more)
+### Community 0 - "Community 0"
+Cohesion: 0.22
+Nodes (12): BaseModel, Enum, CPUInfo, FieldStatus, FilesystemInfo, LocaleInfo, MemoryInfo, NetworkInfo (+4 more)
 
-### Community 1 - "Runtime OS Adapters & Telemetry"
+### Community 1 - "Community 1"
+Cohesion: 0.17
+Nodes (13): Baseline vs Treatment Runner, Causal Isolation Engine, CI Invariant Exporter, ElevenLabs Voice Announcer, Experiment Engine, Failure B: Lock TTL vs Network (Flagship), Failure Classifier (Caused vs Exposed), Fisher Exact & Two-Proportion Test (+5 more)
+
+### Community 2 - "Community 2"
+Cohesion: 0.2
+Nodes (10): Typer CLI Interface, EnvironmentProfile Schema, Environment Twin, FastAPI API Server, FieldStatus (Reproduced/Approximated/Unavailable), React/Vite Dashboard, Morph Core Platform, n8n CI Workflow Orchestrator (+2 more)
+
+### Community 3 - "Community 3"
+Cohesion: 0.56
+Nodes (8): ComparisonResult, ExperimentConfig, ExperimentResult, ThresholdResult, TrialBatch, EnvironmentProfile, RunResult, test_experiment_schema()
+
+### Community 4 - "Community 4"
+Cohesion: 0.36
+Nodes (6): RegressionArtifact, sample_profile_dict(), test_environment_profile_deserialization(), test_environment_profile_json_roundtrip(), test_regression_artifact_schema(), test_run_result_schema()
+
+### Community 5 - "Community 5"
 Cohesion: 0.29
 Nodes (7): Linux Adapter (tc/netem/cgroups), macOS Adapter (dnctl/pfctl), Windows Adapter (Clumsy/JobObjects), BaseAdapter Interface, Runtime Controller, Telemetry Collector, User-Space TCP Proxy (AsyncIO)
 
-### Community 2 - "Morph Core Platform & Interfaces"
-Cohesion: 0.29
-Nodes (7): Typer CLI Interface, Environment Twin, FastAPI API Server, React/Vite Dashboard, Morph Core Platform, n8n CI Workflow Orchestrator, Tin Cloud Fallback Worker
+### Community 6 - "Community 6"
+Cohesion: 1.0
+Nodes (1): Morph: Test software in environments you don't physically have.
 
-### Community 3 - "Flight Recorder & CI Regression"
-Cohesion: 0.5
-Nodes (4): Causal Isolation Engine, CI Invariant Exporter, Flight Recorder (.morph), Regression Replay Engine
+### Community 7 - "Community 7"
+Cohesion: 1.0
+Nodes (0): 
 
-### Community 4 - "Environment Capture & Profiler Schema"
-Cohesion: 0.67
-Nodes (3): EnvironmentProfile Schema, FieldStatus (Reproduced/Approximated/Unavailable), Environment Profiler
-
-### Community 5 - "Failure Corpus: Timeout Scenario"
+### Community 8 - "Community 8"
 Cohesion: 1.0
 Nodes (1): Failure A: Simple Timeout
 
-### Community 6 - "Failure Corpus: Race Condition"
+### Community 9 - "Community 9"
 Cohesion: 1.0
 Nodes (1): Failure C: CPU Constraint Race Condition
 
-### Community 7 - "Failure Corpus: Locale Formatting"
+### Community 10 - "Community 10"
 Cohesion: 1.0
 Nodes (1): Failure D: Locale Date Formatting
 
 ## Knowledge Gaps
-- **21 isolated node(s):** `Environment Twin`, `FieldStatus (Reproduced/Approximated/Unavailable)`, `Windows Adapter (Clumsy/JobObjects)`, `macOS Adapter (dnctl/pfctl)`, `Linux Adapter (tc/netem/cgroups)` (+16 more)
+- **22 isolated node(s):** `Morph: Test software in environments you don't physically have.`, `Environment Twin`, `FieldStatus (Reproduced/Approximated/Unavailable)`, `Windows Adapter (Clumsy/JobObjects)`, `macOS Adapter (dnctl/pfctl)` (+17 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **Thin community `Failure Corpus: Timeout Scenario`** (1 nodes): `Failure A: Simple Timeout`
+- **Thin community `Community 6`** (2 nodes): `Morph: Test software in environments you don't physically have.`, `__init__.py`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Failure Corpus: Race Condition`** (1 nodes): `Failure C: CPU Constraint Race Condition`
+- **Thin community `Community 7`** (1 nodes): `__init__.py`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Failure Corpus: Locale Formatting`** (1 nodes): `Failure D: Locale Date Formatting`
+- **Thin community `Community 8`** (1 nodes): `Failure A: Simple Timeout`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 9`** (1 nodes): `Failure C: CPU Constraint Race Condition`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 10`** (1 nodes): `Failure D: Locale Date Formatting`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Morph Core Platform` connect `Morph Core Platform & Interfaces` to `Experiment Engine & Causal Statistics`, `Runtime OS Adapters & Telemetry`, `Environment Capture & Profiler Schema`?**
-  _High betweenness centrality (0.611) - this node is a cross-community bridge._
-- **Why does `Experiment Engine` connect `Experiment Engine & Causal Statistics` to `Morph Core Platform & Interfaces`, `Flight Recorder & CI Regression`?**
-  _High betweenness centrality (0.527) - this node is a cross-community bridge._
-- **Why does `Runtime Controller` connect `Runtime OS Adapters & Telemetry` to `Morph Core Platform & Interfaces`?**
-  _High betweenness centrality (0.288) - this node is a cross-community bridge._
+- **Why does `Morph Core Platform` connect `Community 2` to `Community 1`, `Community 5`?**
+  _High betweenness centrality (0.141) - this node is a cross-community bridge._
+- **Why does `Experiment Engine` connect `Community 1` to `Community 2`?**
+  _High betweenness centrality (0.122) - this node is a cross-community bridge._
+- **Why does `Runtime Controller` connect `Community 5` to `Community 2`?**
+  _High betweenness centrality (0.067) - this node is a cross-community bridge._
+- **Are the 7 inferred relationships involving `RunResult` (e.g. with `TrialBatch` and `ComparisonResult`) actually correct?**
+  _`RunResult` has 7 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 2 inferred relationships involving `Experiment Engine` (e.g. with `SGLang Plain-English Reporter` and `ElevenLabs Voice Announcer`) actually correct?**
   _`Experiment Engine` has 2 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `Environment Twin`, `FieldStatus (Reproduced/Approximated/Unavailable)`, `Windows Adapter (Clumsy/JobObjects)` to the rest of the system?**
-  _21 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Are the 6 inferred relationships involving `EnvironmentProfile` (e.g. with `RegressionArtifact` and `TrialBatch`) actually correct?**
+  _`EnvironmentProfile` has 6 INFERRED edges - model-reasoned connections that need verification._
+- **What connects `Morph: Test software in environments you don't physically have.`, `Environment Twin`, `FieldStatus (Reproduced/Approximated/Unavailable)` to the rest of the system?**
+  _22 weakly-connected nodes found - possible documentation gaps or missing edges._

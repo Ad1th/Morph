@@ -38,271 +38,1357 @@
   },
   "nodes": [
     {
+      "label": "__init__.py",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/__init__.py",
+      "source_location": "L1",
+      "id": "users_adith_documents_dev_active_morph_morph_init_py",
+      "community": 6,
+      "norm_label": "__init__.py"
+    },
+    {
+      "label": "Morph: Test software in environments you don't physically have.",
+      "file_type": "rationale",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/__init__.py",
+      "source_location": "L1",
+      "id": "init_rationale_1",
+      "community": 6,
+      "norm_label": "morph: test software in environments you don't physically have."
+    },
+    {
+      "label": "regression.py",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/regression.py",
+      "source_location": "L1",
+      "id": "users_adith_documents_dev_active_morph_morph_schema_regression_py",
+      "community": 4,
+      "norm_label": "regression.py"
+    },
+    {
+      "label": "RegressionArtifact",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/regression.py",
+      "source_location": "L6",
+      "id": "regression_regressionartifact",
+      "community": 4,
+      "norm_label": "regressionartifact"
+    },
+    {
+      "label": "BaseModel",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "id": "basemodel",
+      "community": 0,
+      "norm_label": "basemodel"
+    },
+    {
+      "label": "profile.py",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L1",
+      "id": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "community": 0,
+      "norm_label": "profile.py"
+    },
+    {
+      "label": "FieldStatus",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L6",
+      "id": "profile_fieldstatus",
+      "community": 0,
+      "norm_label": "fieldstatus"
+    },
+    {
+      "label": "str",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "id": "str",
+      "community": 0,
+      "norm_label": "str"
+    },
+    {
+      "label": "Enum",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "id": "enum",
+      "community": 0,
+      "norm_label": "enum"
+    },
+    {
+      "label": "ProfileField",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L14",
+      "id": "profile_profilefield",
+      "community": 0,
+      "norm_label": "profilefield"
+    },
+    {
+      "label": "OSInfo",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L19",
+      "id": "profile_osinfo",
+      "community": 0,
+      "norm_label": "osinfo"
+    },
+    {
+      "label": "CPUInfo",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L24",
+      "id": "profile_cpuinfo",
+      "community": 0,
+      "norm_label": "cpuinfo"
+    },
+    {
+      "label": "MemoryInfo",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L31",
+      "id": "profile_memoryinfo",
+      "community": 0,
+      "norm_label": "memoryinfo"
+    },
+    {
+      "label": "LocaleInfo",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L35",
+      "id": "profile_localeinfo",
+      "community": 0,
+      "norm_label": "localeinfo"
+    },
+    {
+      "label": "FilesystemInfo",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L40",
+      "id": "profile_filesysteminfo",
+      "community": 0,
+      "norm_label": "filesysteminfo"
+    },
+    {
+      "label": "NetworkInfo",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L44",
+      "id": "profile_networkinfo",
+      "community": 0,
+      "norm_label": "networkinfo"
+    },
+    {
+      "label": "EnvironmentProfile",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L50",
+      "id": "profile_environmentprofile",
+      "community": 3,
+      "norm_label": "environmentprofile"
+    },
+    {
+      "label": "__init__.py",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/__init__.py",
+      "source_location": "L1",
+      "id": "users_adith_documents_dev_active_morph_morph_schema_init_py",
+      "community": 7,
+      "norm_label": "__init__.py"
+    },
+    {
+      "label": "telemetry.py",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/telemetry.py",
+      "source_location": "L1",
+      "id": "users_adith_documents_dev_active_morph_morph_schema_telemetry_py",
+      "community": 0,
+      "norm_label": "telemetry.py"
+    },
+    {
+      "label": "TelemetryData",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/telemetry.py",
+      "source_location": "L5",
+      "id": "telemetry_telemetrydata",
+      "community": 0,
+      "norm_label": "telemetrydata"
+    },
+    {
+      "label": "RunResult",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/telemetry.py",
+      "source_location": "L13",
+      "id": "telemetry_runresult",
+      "community": 3,
+      "norm_label": "runresult"
+    },
+    {
+      "label": "experiment.py",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L1",
+      "id": "users_adith_documents_dev_active_morph_morph_schema_experiment_py",
+      "community": 3,
+      "norm_label": "experiment.py"
+    },
+    {
+      "label": "TrialBatch",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L7",
+      "id": "experiment_trialbatch",
+      "community": 3,
+      "norm_label": "trialbatch"
+    },
+    {
+      "label": "ComparisonResult",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L16",
+      "id": "experiment_comparisonresult",
+      "community": 3,
+      "norm_label": "comparisonresult"
+    },
+    {
+      "label": "ThresholdResult",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L24",
+      "id": "experiment_thresholdresult",
+      "community": 3,
+      "norm_label": "thresholdresult"
+    },
+    {
+      "label": "ExperimentConfig",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L32",
+      "id": "experiment_experimentconfig",
+      "community": 3,
+      "norm_label": "experimentconfig"
+    },
+    {
+      "label": "ExperimentResult",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L41",
+      "id": "experiment_experimentresult",
+      "community": 3,
+      "norm_label": "experimentresult"
+    },
+    {
+      "label": "test_schema.py",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L1",
+      "id": "users_adith_documents_dev_active_morph_tests_test_schema_py",
+      "community": 4,
+      "norm_label": "test_schema.py"
+    },
+    {
+      "label": "sample_profile_dict()",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L24",
+      "id": "test_schema_sample_profile_dict",
+      "community": 4,
+      "norm_label": "sample_profile_dict()"
+    },
+    {
+      "label": "test_environment_profile_deserialization()",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L55",
+      "id": "test_schema_test_environment_profile_deserialization",
+      "community": 4,
+      "norm_label": "test_environment_profile_deserialization()"
+    },
+    {
+      "label": "test_environment_profile_json_roundtrip()",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L68",
+      "id": "test_schema_test_environment_profile_json_roundtrip",
+      "community": 4,
+      "norm_label": "test_environment_profile_json_roundtrip()"
+    },
+    {
+      "label": "test_run_result_schema()",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L77",
+      "id": "test_schema_test_run_result_schema",
+      "community": 4,
+      "norm_label": "test_run_result_schema()"
+    },
+    {
+      "label": "test_experiment_schema()",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L106",
+      "id": "test_schema_test_experiment_schema",
+      "community": 3,
+      "norm_label": "test_experiment_schema()"
+    },
+    {
+      "label": "test_regression_artifact_schema()",
+      "file_type": "code",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L162",
+      "id": "test_schema_test_regression_artifact_schema",
+      "community": 4,
+      "norm_label": "test_regression_artifact_schema()"
+    },
+    {
       "label": "Morph Core Platform",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "morph_core",
       "community": 2,
-      "norm_label": "morph core platform"
+      "norm_label": "morph core platform",
+      "id": "morph_core"
     },
     {
       "label": "Environment Twin",
       "file_type": "document",
       "source_file": "README.md",
-      "id": "env_twin",
       "community": 2,
-      "norm_label": "environment twin"
+      "norm_label": "environment twin",
+      "id": "env_twin"
     },
     {
       "label": "Causal Isolation Engine",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "causal_isolation",
-      "community": 3,
-      "norm_label": "causal isolation engine"
+      "community": 1,
+      "norm_label": "causal isolation engine",
+      "id": "causal_isolation"
     },
     {
       "label": "Flight Recorder (.morph)",
       "file_type": "document",
       "source_file": "Morph_PRD.md",
-      "id": "flight_recorder",
-      "community": 3,
-      "norm_label": "flight recorder (.morph)"
+      "community": 1,
+      "norm_label": "flight recorder (.morph)",
+      "id": "flight_recorder"
     },
     {
       "label": "Environment Profiler",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "profiler",
-      "community": 4,
-      "norm_label": "environment profiler"
+      "community": 2,
+      "norm_label": "environment profiler",
+      "id": "profiler"
     },
     {
       "label": "EnvironmentProfile Schema",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "env_profile_schema",
-      "community": 4,
-      "norm_label": "environmentprofile schema"
+      "community": 2,
+      "norm_label": "environmentprofile schema",
+      "id": "env_profile_schema"
     },
     {
       "label": "FieldStatus (Reproduced/Approximated/Unavailable)",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "field_status",
-      "community": 4,
-      "norm_label": "fieldstatus (reproduced/approximated/unavailable)"
+      "community": 2,
+      "norm_label": "fieldstatus (reproduced/approximated/unavailable)",
+      "id": "field_status"
     },
     {
       "label": "Runtime Controller",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "runtime_controller",
-      "community": 1,
-      "norm_label": "runtime controller"
+      "community": 5,
+      "norm_label": "runtime controller",
+      "id": "runtime_controller"
     },
     {
       "label": "BaseAdapter Interface",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "base_adapter",
-      "community": 1,
-      "norm_label": "baseadapter interface"
+      "community": 5,
+      "norm_label": "baseadapter interface",
+      "id": "base_adapter"
     },
     {
       "label": "Windows Adapter (Clumsy/JobObjects)",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "adapter_windows",
-      "community": 1,
-      "norm_label": "windows adapter (clumsy/jobobjects)"
+      "community": 5,
+      "norm_label": "windows adapter (clumsy/jobobjects)",
+      "id": "adapter_windows"
     },
     {
       "label": "macOS Adapter (dnctl/pfctl)",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "adapter_macos",
-      "community": 1,
-      "norm_label": "macos adapter (dnctl/pfctl)"
+      "community": 5,
+      "norm_label": "macos adapter (dnctl/pfctl)",
+      "id": "adapter_macos"
     },
     {
       "label": "Linux Adapter (tc/netem/cgroups)",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "adapter_linux",
-      "community": 1,
-      "norm_label": "linux adapter (tc/netem/cgroups)"
+      "community": 5,
+      "norm_label": "linux adapter (tc/netem/cgroups)",
+      "id": "adapter_linux"
     },
     {
       "label": "User-Space TCP Proxy (AsyncIO)",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "user_space_proxy",
-      "community": 1,
-      "norm_label": "user-space tcp proxy (asyncio)"
+      "community": 5,
+      "norm_label": "user-space tcp proxy (asyncio)",
+      "id": "user_space_proxy"
     },
     {
       "label": "Experiment Engine",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "experiment_engine",
-      "community": 0,
-      "norm_label": "experiment engine"
+      "community": 1,
+      "norm_label": "experiment engine",
+      "id": "experiment_engine"
     },
     {
       "label": "Baseline vs Treatment Runner",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "baseline_treatment",
-      "community": 0,
-      "norm_label": "baseline vs treatment runner"
+      "community": 1,
+      "norm_label": "baseline vs treatment runner",
+      "id": "baseline_treatment"
     },
     {
       "label": "Threshold Search (Binary Search)",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "threshold_search",
-      "community": 0,
-      "norm_label": "threshold search (binary search)"
+      "community": 1,
+      "norm_label": "threshold search (binary search)",
+      "id": "threshold_search"
     },
     {
       "label": "Multi-Variable Interaction Detection",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "interaction_detection",
-      "community": 0,
-      "norm_label": "multi-variable interaction detection"
+      "community": 1,
+      "norm_label": "multi-variable interaction detection",
+      "id": "interaction_detection"
     },
     {
       "label": "Fisher Exact & Two-Proportion Test",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "fisher_exact_test",
-      "community": 0,
-      "norm_label": "fisher exact & two-proportion test"
+      "community": 1,
+      "norm_label": "fisher exact & two-proportion test",
+      "id": "fisher_exact_test"
     },
     {
       "label": "Failure Classifier (Caused vs Exposed)",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "failure_classifier",
-      "community": 0,
-      "norm_label": "failure classifier (caused vs exposed)"
+      "community": 1,
+      "norm_label": "failure classifier (caused vs exposed)",
+      "id": "failure_classifier"
     },
     {
       "label": "Telemetry Collector",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "telemetry_collector",
-      "community": 1,
-      "norm_label": "telemetry collector"
+      "community": 5,
+      "norm_label": "telemetry collector",
+      "id": "telemetry_collector"
     },
     {
       "label": "Regression Replay Engine",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "regression_replay",
-      "community": 3,
-      "norm_label": "regression replay engine"
+      "community": 1,
+      "norm_label": "regression replay engine",
+      "id": "regression_replay"
     },
     {
       "label": "CI Invariant Exporter",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "ci_invariant_exporter",
-      "community": 3,
-      "norm_label": "ci invariant exporter"
+      "community": 1,
+      "norm_label": "ci invariant exporter",
+      "id": "ci_invariant_exporter"
     },
     {
       "label": "FastAPI API Server",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "fastapi_backend",
       "community": 2,
-      "norm_label": "fastapi api server"
+      "norm_label": "fastapi api server",
+      "id": "fastapi_backend"
     },
     {
       "label": "Typer CLI Interface",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "cli_interface",
       "community": 2,
-      "norm_label": "typer cli interface"
+      "norm_label": "typer cli interface",
+      "id": "cli_interface"
     },
     {
       "label": "React/Vite Dashboard",
       "file_type": "document",
       "source_file": "architecture.md",
-      "id": "frontend_dashboard",
       "community": 2,
-      "norm_label": "react/vite dashboard"
+      "norm_label": "react/vite dashboard",
+      "id": "frontend_dashboard"
     },
     {
       "label": "Failure A: Simple Timeout",
       "file_type": "document",
       "source_file": "Morph_PRD.md",
-      "id": "failure_a_timeout",
-      "community": 5,
-      "norm_label": "failure a: simple timeout"
+      "community": 8,
+      "norm_label": "failure a: simple timeout",
+      "id": "failure_a_timeout"
     },
     {
       "label": "Failure B: Lock TTL vs Network (Flagship)",
       "file_type": "document",
       "source_file": "Morph_PRD.md",
-      "id": "failure_b_interaction",
-      "community": 0,
-      "norm_label": "failure b: lock ttl vs network (flagship)"
+      "community": 1,
+      "norm_label": "failure b: lock ttl vs network (flagship)",
+      "id": "failure_b_interaction"
     },
     {
       "label": "Failure C: CPU Constraint Race Condition",
       "file_type": "document",
       "source_file": "Morph_PRD.md",
-      "id": "failure_c_race",
-      "community": 6,
-      "norm_label": "failure c: cpu constraint race condition"
+      "community": 9,
+      "norm_label": "failure c: cpu constraint race condition",
+      "id": "failure_c_race"
     },
     {
       "label": "Failure D: Locale Date Formatting",
       "file_type": "document",
       "source_file": "Morph_PRD.md",
-      "id": "failure_d_locale",
-      "community": 7,
-      "norm_label": "failure d: locale date formatting"
+      "community": 10,
+      "norm_label": "failure d: locale date formatting",
+      "id": "failure_d_locale"
     },
     {
       "label": "Tin Cloud Fallback Worker",
       "file_type": "document",
       "source_file": "Morph_PRD.md",
-      "id": "tin_cloud_fallback",
       "community": 2,
-      "norm_label": "tin cloud fallback worker"
+      "norm_label": "tin cloud fallback worker",
+      "id": "tin_cloud_fallback"
     },
     {
       "label": "n8n CI Workflow Orchestrator",
       "file_type": "document",
       "source_file": "Morph_PRD.md",
-      "id": "n8n_ci_orchestration",
       "community": 2,
-      "norm_label": "n8n ci workflow orchestrator"
+      "norm_label": "n8n ci workflow orchestrator",
+      "id": "n8n_ci_orchestration"
     },
     {
       "label": "SGLang Plain-English Reporter",
       "file_type": "document",
       "source_file": "Morph_PRD.md",
-      "id": "sglang_plain_prose",
-      "community": 0,
-      "norm_label": "sglang plain-english reporter"
+      "community": 1,
+      "norm_label": "sglang plain-english reporter",
+      "id": "sglang_plain_prose"
     },
     {
       "label": "ElevenLabs Voice Announcer",
       "file_type": "document",
       "source_file": "Morph_PRD.md",
-      "id": "elevenlabs_voice",
-      "community": 0,
-      "norm_label": "elevenlabs voice announcer"
+      "community": 1,
+      "norm_label": "elevenlabs voice announcer",
+      "id": "elevenlabs_voice"
     }
   ],
   "links": [
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/__init__.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_src": "init_rationale_1",
+      "_tgt": "users_adith_documents_dev_active_morph_morph_init_py",
+      "source": "users_adith_documents_dev_active_morph_morph_init_py",
+      "target": "init_rationale_1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/regression.py",
+      "source_location": "L6",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_regression_py",
+      "_tgt": "regression_regressionartifact",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_regression_py",
+      "target": "regression_regressionartifact",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/regression.py",
+      "source_location": "L6",
+      "weight": 1.0,
+      "_src": "regression_regressionartifact",
+      "_tgt": "basemodel",
+      "source": "regression_regressionartifact",
+      "target": "basemodel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/regression.py",
+      "source_location": "L3",
+      "weight": 0.8,
+      "_src": "regression_regressionartifact",
+      "_tgt": "profile_environmentprofile",
+      "source": "regression_regressionartifact",
+      "target": "profile_environmentprofile",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L164",
+      "weight": 1.0,
+      "_src": "test_schema_test_regression_artifact_schema",
+      "_tgt": "regression_regressionartifact",
+      "source": "regression_regressionartifact",
+      "target": "test_schema_test_regression_artifact_schema"
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L14",
+      "weight": 1.0,
+      "_src": "profile_profilefield",
+      "_tgt": "basemodel",
+      "source": "basemodel",
+      "target": "profile_profilefield",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L19",
+      "weight": 1.0,
+      "_src": "profile_osinfo",
+      "_tgt": "basemodel",
+      "source": "basemodel",
+      "target": "profile_osinfo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "_src": "profile_cpuinfo",
+      "_tgt": "basemodel",
+      "source": "basemodel",
+      "target": "profile_cpuinfo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L31",
+      "weight": 1.0,
+      "_src": "profile_memoryinfo",
+      "_tgt": "basemodel",
+      "source": "basemodel",
+      "target": "profile_memoryinfo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L35",
+      "weight": 1.0,
+      "_src": "profile_localeinfo",
+      "_tgt": "basemodel",
+      "source": "basemodel",
+      "target": "profile_localeinfo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L40",
+      "weight": 1.0,
+      "_src": "profile_filesysteminfo",
+      "_tgt": "basemodel",
+      "source": "basemodel",
+      "target": "profile_filesysteminfo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L44",
+      "weight": 1.0,
+      "_src": "profile_networkinfo",
+      "_tgt": "basemodel",
+      "source": "basemodel",
+      "target": "profile_networkinfo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L50",
+      "weight": 1.0,
+      "_src": "profile_environmentprofile",
+      "_tgt": "basemodel",
+      "source": "basemodel",
+      "target": "profile_environmentprofile",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/telemetry.py",
+      "source_location": "L5",
+      "weight": 1.0,
+      "_src": "telemetry_telemetrydata",
+      "_tgt": "basemodel",
+      "source": "basemodel",
+      "target": "telemetry_telemetrydata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/telemetry.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "_src": "telemetry_runresult",
+      "_tgt": "basemodel",
+      "source": "basemodel",
+      "target": "telemetry_runresult",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L7",
+      "weight": 1.0,
+      "_src": "experiment_trialbatch",
+      "_tgt": "basemodel",
+      "source": "basemodel",
+      "target": "experiment_trialbatch",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L16",
+      "weight": 1.0,
+      "_src": "experiment_comparisonresult",
+      "_tgt": "basemodel",
+      "source": "basemodel",
+      "target": "experiment_comparisonresult",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "_src": "experiment_thresholdresult",
+      "_tgt": "basemodel",
+      "source": "basemodel",
+      "target": "experiment_thresholdresult",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L32",
+      "weight": 1.0,
+      "_src": "experiment_experimentconfig",
+      "_tgt": "basemodel",
+      "source": "basemodel",
+      "target": "experiment_experimentconfig",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L41",
+      "weight": 1.0,
+      "_src": "experiment_experimentresult",
+      "_tgt": "basemodel",
+      "source": "basemodel",
+      "target": "experiment_experimentresult",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "_tgt": "enum",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "target": "enum",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L6",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "_tgt": "profile_fieldstatus",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "target": "profile_fieldstatus",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L14",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "_tgt": "profile_profilefield",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "target": "profile_profilefield",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L19",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "_tgt": "profile_osinfo",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "target": "profile_osinfo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "_tgt": "profile_cpuinfo",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "target": "profile_cpuinfo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L31",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "_tgt": "profile_memoryinfo",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "target": "profile_memoryinfo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L35",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "_tgt": "profile_localeinfo",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "target": "profile_localeinfo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L40",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "_tgt": "profile_filesysteminfo",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "target": "profile_filesysteminfo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L44",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "_tgt": "profile_networkinfo",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "target": "profile_networkinfo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L50",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "_tgt": "profile_environmentprofile",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_profile_py",
+      "target": "profile_environmentprofile",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L6",
+      "weight": 1.0,
+      "_src": "profile_fieldstatus",
+      "_tgt": "str",
+      "source": "profile_fieldstatus",
+      "target": "str",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/profile.py",
+      "source_location": "L6",
+      "weight": 1.0,
+      "_src": "profile_fieldstatus",
+      "_tgt": "enum",
+      "source": "profile_fieldstatus",
+      "target": "enum",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L3",
+      "weight": 0.8,
+      "_src": "experiment_trialbatch",
+      "_tgt": "profile_environmentprofile",
+      "source": "profile_environmentprofile",
+      "target": "experiment_trialbatch",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L3",
+      "weight": 0.8,
+      "_src": "experiment_comparisonresult",
+      "_tgt": "profile_environmentprofile",
+      "source": "profile_environmentprofile",
+      "target": "experiment_comparisonresult",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L3",
+      "weight": 0.8,
+      "_src": "experiment_thresholdresult",
+      "_tgt": "profile_environmentprofile",
+      "source": "profile_environmentprofile",
+      "target": "experiment_thresholdresult",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L3",
+      "weight": 0.8,
+      "_src": "experiment_experimentconfig",
+      "_tgt": "profile_environmentprofile",
+      "source": "profile_environmentprofile",
+      "target": "experiment_experimentconfig",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L3",
+      "weight": 0.8,
+      "_src": "experiment_experimentresult",
+      "_tgt": "profile_environmentprofile",
+      "source": "profile_environmentprofile",
+      "target": "experiment_experimentresult",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/telemetry.py",
+      "source_location": "L5",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_telemetry_py",
+      "_tgt": "telemetry_telemetrydata",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_telemetry_py",
+      "target": "telemetry_telemetrydata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/telemetry.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_telemetry_py",
+      "_tgt": "telemetry_runresult",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_telemetry_py",
+      "target": "telemetry_runresult",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L4",
+      "weight": 0.8,
+      "_src": "experiment_trialbatch",
+      "_tgt": "telemetry_runresult",
+      "source": "telemetry_runresult",
+      "target": "experiment_trialbatch",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L4",
+      "weight": 0.8,
+      "_src": "experiment_comparisonresult",
+      "_tgt": "telemetry_runresult",
+      "source": "telemetry_runresult",
+      "target": "experiment_comparisonresult",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L4",
+      "weight": 0.8,
+      "_src": "experiment_thresholdresult",
+      "_tgt": "telemetry_runresult",
+      "source": "telemetry_runresult",
+      "target": "experiment_thresholdresult",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L4",
+      "weight": 0.8,
+      "_src": "experiment_experimentconfig",
+      "_tgt": "telemetry_runresult",
+      "source": "telemetry_runresult",
+      "target": "experiment_experimentconfig",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L4",
+      "weight": 0.8,
+      "_src": "experiment_experimentresult",
+      "_tgt": "telemetry_runresult",
+      "source": "telemetry_runresult",
+      "target": "experiment_experimentresult",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L78",
+      "weight": 1.0,
+      "_src": "test_schema_test_run_result_schema",
+      "_tgt": "telemetry_runresult",
+      "source": "telemetry_runresult",
+      "target": "test_schema_test_run_result_schema"
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L108",
+      "weight": 1.0,
+      "_src": "test_schema_test_experiment_schema",
+      "_tgt": "telemetry_runresult",
+      "source": "telemetry_runresult",
+      "target": "test_schema_test_experiment_schema"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L7",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_experiment_py",
+      "_tgt": "experiment_trialbatch",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_experiment_py",
+      "target": "experiment_trialbatch",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L16",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_experiment_py",
+      "_tgt": "experiment_comparisonresult",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_experiment_py",
+      "target": "experiment_comparisonresult",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_experiment_py",
+      "_tgt": "experiment_thresholdresult",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_experiment_py",
+      "target": "experiment_thresholdresult",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L32",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_experiment_py",
+      "_tgt": "experiment_experimentconfig",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_experiment_py",
+      "target": "experiment_experimentconfig",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/morph/schema/experiment.py",
+      "source_location": "L41",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_morph_schema_experiment_py",
+      "_tgt": "experiment_experimentresult",
+      "source": "users_adith_documents_dev_active_morph_morph_schema_experiment_py",
+      "target": "experiment_experimentresult",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L115",
+      "weight": 1.0,
+      "_src": "test_schema_test_experiment_schema",
+      "_tgt": "experiment_trialbatch",
+      "source": "experiment_trialbatch",
+      "target": "test_schema_test_experiment_schema"
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L131",
+      "weight": 1.0,
+      "_src": "test_schema_test_experiment_schema",
+      "_tgt": "experiment_comparisonresult",
+      "source": "experiment_comparisonresult",
+      "target": "test_schema_test_experiment_schema"
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L139",
+      "weight": 1.0,
+      "_src": "test_schema_test_experiment_schema",
+      "_tgt": "experiment_thresholdresult",
+      "source": "experiment_thresholdresult",
+      "target": "test_schema_test_experiment_schema"
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L147",
+      "weight": 1.0,
+      "_src": "test_schema_test_experiment_schema",
+      "_tgt": "experiment_experimentresult",
+      "source": "experiment_experimentresult",
+      "target": "test_schema_test_experiment_schema"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L24",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_tests_test_schema_py",
+      "_tgt": "test_schema_sample_profile_dict",
+      "source": "users_adith_documents_dev_active_morph_tests_test_schema_py",
+      "target": "test_schema_sample_profile_dict",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L55",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_tests_test_schema_py",
+      "_tgt": "test_schema_test_environment_profile_deserialization",
+      "source": "users_adith_documents_dev_active_morph_tests_test_schema_py",
+      "target": "test_schema_test_environment_profile_deserialization",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L68",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_tests_test_schema_py",
+      "_tgt": "test_schema_test_environment_profile_json_roundtrip",
+      "source": "users_adith_documents_dev_active_morph_tests_test_schema_py",
+      "target": "test_schema_test_environment_profile_json_roundtrip",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L77",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_tests_test_schema_py",
+      "_tgt": "test_schema_test_run_result_schema",
+      "source": "users_adith_documents_dev_active_morph_tests_test_schema_py",
+      "target": "test_schema_test_run_result_schema",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L106",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_tests_test_schema_py",
+      "_tgt": "test_schema_test_experiment_schema",
+      "source": "users_adith_documents_dev_active_morph_tests_test_schema_py",
+      "target": "test_schema_test_experiment_schema",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L162",
+      "weight": 1.0,
+      "_src": "users_adith_documents_dev_active_morph_tests_test_schema_py",
+      "_tgt": "test_schema_test_regression_artifact_schema",
+      "source": "users_adith_documents_dev_active_morph_tests_test_schema_py",
+      "target": "test_schema_test_regression_artifact_schema",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L56",
+      "weight": 1.0,
+      "_src": "test_schema_test_environment_profile_deserialization",
+      "_tgt": "test_schema_sample_profile_dict",
+      "source": "test_schema_sample_profile_dict",
+      "target": "test_schema_test_environment_profile_deserialization",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L69",
+      "weight": 1.0,
+      "_src": "test_schema_test_environment_profile_json_roundtrip",
+      "_tgt": "test_schema_sample_profile_dict",
+      "source": "test_schema_sample_profile_dict",
+      "target": "test_schema_test_environment_profile_json_roundtrip",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L107",
+      "weight": 1.0,
+      "_src": "test_schema_test_experiment_schema",
+      "_tgt": "test_schema_sample_profile_dict",
+      "source": "test_schema_sample_profile_dict",
+      "target": "test_schema_test_experiment_schema",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "/Users/adith/Documents/Dev/ACTIVE/Morph/tests/test_schema.py",
+      "source_location": "L163",
+      "weight": 1.0,
+      "_src": "test_schema_test_regression_artifact_schema",
+      "_tgt": "test_schema_sample_profile_dict",
+      "source": "test_schema_sample_profile_dict",
+      "target": "test_schema_test_regression_artifact_schema",
+      "confidence_score": 1.0
+    },
     {
       "relation": "implements",
       "confidence": "EXTRACTED",
@@ -353,8 +1439,8 @@
       "confidence_score": 1.0,
       "source_file": "architecture.md",
       "weight": 1.0,
-      "_src": "fastapi_backend",
-      "_tgt": "morph_core",
+      "_src": "morph_core",
+      "_tgt": "fastapi_backend",
       "source": "morph_core",
       "target": "fastapi_backend"
     },
@@ -364,8 +1450,8 @@
       "confidence_score": 1.0,
       "source_file": "architecture.md",
       "weight": 1.0,
-      "_src": "cli_interface",
-      "_tgt": "morph_core",
+      "_src": "morph_core",
+      "_tgt": "cli_interface",
       "source": "morph_core",
       "target": "cli_interface"
     },
@@ -606,8 +1692,8 @@
       "confidence_score": 1.0,
       "source_file": "Morph_PRD.md",
       "weight": 1.0,
-      "_src": "failure_b_interaction",
-      "_tgt": "threshold_search",
+      "_src": "threshold_search",
+      "_tgt": "failure_b_interaction",
       "source": "threshold_search",
       "target": "failure_b_interaction"
     },
@@ -617,8 +1703,8 @@
       "confidence_score": 1.0,
       "source_file": "Morph_PRD.md",
       "weight": 1.0,
-      "_src": "failure_b_interaction",
-      "_tgt": "interaction_detection",
+      "_src": "interaction_detection",
+      "_tgt": "failure_b_interaction",
       "source": "interaction_detection",
       "target": "failure_b_interaction"
     },
@@ -628,8 +1714,8 @@
       "confidence_score": 1.0,
       "source_file": "architecture.md",
       "weight": 1.0,
-      "_src": "frontend_dashboard",
-      "_tgt": "fastapi_backend",
+      "_src": "fastapi_backend",
+      "_tgt": "frontend_dashboard",
       "source": "fastapi_backend",
       "target": "frontend_dashboard"
     }
