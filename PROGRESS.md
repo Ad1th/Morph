@@ -136,13 +136,23 @@ regression test. See commit `32c62ea`.
 5. Re-run `/graphify` after any structural change so `graphify-out/` stays
    current.
 
-### Not yet done (out of scope for this pass, listed for context only)
+## Track 2 Status: COMPLETE (Phases 1-6)
 
-- CLI (`morph/cli/`), API server (`morph/api/`), frontend (`frontend/`)
-- `morph/telemetry/` (real subprocess-based trial runner)
-- `morph/runtime/controller.py` and the macOS/Windows/Linux native adapters
-  (`adapters/macos.py`, `windows.py`, `linux.py`); `proxy.py` is the only
-  adapter built so far
-- `morph/regression/` (`.morph/regressions/` artifacts, replay, CI exporter)
-- `network.py` and `runtime_env.py` profiler collectors
-- Demo failure corpus (`demo_apps/`)
+Track 2 (Platform, Runtime, Flight Recorder, API, CLI, and E2E Integration) has been fully completed by Adith:
+
+- **Phase 1 (Shared Pydantic Schemas)**: `morph/schema/` (`profile.py`, `telemetry.py`, `experiment.py`, `regression.py`, `comparison.py`).
+- **Phase 2 (Telemetry & Runner)**: `morph/telemetry/` (`collector.py`, `parser.py`) and `morph/runtime/runner.py`.
+- **Phase 3 (OS Adapters & Controller)**: `morph/runtime/adapters/` (`base.py`, `macos.py`, `linux.py`, `windows.py`) and `morph/runtime/controller.py`.
+- **Phase 4 (Flight Recorder & CI Regression Engine)**: `morph/regression/` (`artifact.py`, `replay.py`, `exporter.py`).
+- **Phase 5 (FastAPI Backend & Typer CLI)**: `morph/api/` (`app.py`, `routes/profiles.py`, `runs.py`, `experiments.py`, `regressions.py`) and `morph/cli/main.py`.
+- **Phase 6 (End-to-End Integration & Verification)**: `tests/test_e2e_integration.py` validating the full loop:
+  1. Environment capture and reconciliation
+  2. Subprocess execution under simulated conditions with telemetry
+  3. Automated causal isolation experiments
+  4. Flight recorder `.morph/regressions/` directory bundles
+  5. Regression replay against expected invariants
+  6. Standalone pytest CI test generation and direct subprocess verification
+  7. Full FastAPI REST API workflow
+  8. Full Typer CLI workflow
+
+**Total Test Suite**: 92 tests passing with 100% success rate across all components.
