@@ -1,8 +1,8 @@
-# Morph — Python dependencies
+# Morph: Python dependencies
 # Requires Python 3.11+
 #
 # Stack note: PRD Section 23 leaves the core-runtime language open (Go / Python / TypeScript),
-# to be decided in Phase 1. This file assumes the Python option — either Python for the whole
+# to be decided in Phase 1. This file assumes the Python option: either Python for the whole
 # runtime, or a Python core that shells out to OS-native network/resource tools (tc/netem,
 # Clumsy, dnctl/pfctl). If the team picks Go or TS for the runtime instead, everything below
 # still applies to the experiment/stats engine and the deliberately-buggy demo apps.
