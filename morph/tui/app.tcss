@@ -83,3 +83,60 @@ Screen {
 .hidden {
     display: none;
 }
+
+/* ---------- Experiment ---------- */
+
+#setup {
+    height: auto;
+    padding: 1;
+    background: $panel;
+    align-vertical: middle;
+}
+
+#setup Label {
+    padding: 1 1 0 2;
+    color: $text-muted;
+}
+
+#setup Input {
+    width: 1fr;
+}
+
+#setup #in-trials {
+    width: 8;
+}
+
+#setup #btn-run {
+    margin-left: 2;
+}
+
+#exp-body {
+    height: 1fr;
+}
+
+#lanes {
+    width: 3fr;
+    padding: 1 2;
+}
+
+.lane {
+    height: auto;
+    padding: 1 0;
+    border-bottom: dashed $panel-lighten-2;
+}
+
+#exp-log {
+    width: 2fr;
+    border-left: solid $panel-lighten-2;
+    padding: 0 1;
+    background: $surface;
+}
+
+#verdict {
+    height: auto;
+    padding: 0 2 1 2;
+}
+
+ExperimentScreen.significant {
+    border: thick $error;
+}
