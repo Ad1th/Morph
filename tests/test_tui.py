@@ -121,6 +121,57 @@ async def test_environment_screen_capture_template_reconcile():
         assert screen.query_one("#env-diff").row_count == 9
 
 
+@pytest.mark.asyncio
+async def test_threshold_gauge_converges(monkeypatch):
+    import morph.tui.screens.threshold as th_mod
+
+    monkeypatch.setattr(th_mod.ThresholdScreen, "_worker", lambda self, *a: None)
+
+    app = MorphApp()
+    async with app.run_test() as pilot:
+        await pilot.press("t")
+        await pilot.pause()
+        screen = app.screen
+        screen.query_one("#th-command").value = "noop"
+        screen.query_one("#th-param").value = "network.latency_ms"
+        await pilot.pause()
+        screen.action_run()
+        await pilot.pause()
+
+        probes = [
+            (200, False, 0, 200),
+            (100, True, 100, 200),
+            (150, True, 150, 200),
+            (175, True, 175, 200),
+            (187, False, 175, 187),
+        ]
+        for value, passed, safe, fail in probes:
+            screen.post_message(
+                EngineEvent(
+                    TrialEvent(
+                        kind="search_probe", param_value=float(value),
+                        failures=0 if passed else 1, total=3,
+                        safe_value=float(safe), failure_value=float(fail),
+                        extra={"passed": passed},
+                    )
+                )
+            )
+        screen.post_message(
+            EngineEvent(
+                TrialEvent(kind="phase_done", phase="threshold",
+                           boundary_estimate=181.0, safe_value=175.0, failure_value=187.0)
+            )
+        )
+        screen.post_message(RunFinished(object()))
+        await pilot.pause()
+        await pilot.pause()
+
+        gauge = screen._gauge
+        assert len(gauge._probes) == 5
+        assert gauge._boundary == 181.0
+        assert gauge._safe == 175.0 and gauge._fail == 187.0
+
+
 # --------------------------------------------------------------------------- #
 # live experiment console wiring (engine faked)
 # --------------------------------------------------------------------------- #

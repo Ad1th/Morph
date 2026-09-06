@@ -189,3 +189,50 @@ ExperimentScreen.significant {
     background: $panel;
     color: $text-muted;
 }
+
+/* ---------- Threshold ---------- */
+
+#th-bar, #th-setup2 {
+    height: auto;
+    padding: 1 1 0 1;
+    background: $panel;
+}
+
+#th-setup2 {
+    padding: 0 1 1 1;
+}
+
+#th-bar Select {
+    width: 28;
+}
+
+#th-bar Input {
+    width: 12;
+    margin-left: 1;
+}
+
+#th-bar Button {
+    margin-left: 2;
+}
+
+#th-setup2 Input {
+    width: 1fr;
+    margin-right: 1;
+}
+
+#th-gauge-wrap {
+    height: auto;
+    padding: 1 2;
+}
+
+.gauge {
+    height: auto;
+    padding: 1 0;
+}
+
+#th-log {
+    height: 1fr;
+    border-top: solid $panel-lighten-2;
+    padding: 0 2;
+    background: $surface;
+}
