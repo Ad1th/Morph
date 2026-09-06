@@ -2,6 +2,7 @@
 cross-field validation rules from docs/ui-spec.md section 5."""
 
 from morph.engine.validator import (
+    check_cross_field_rules,
     check_platform_restrictions,
     check_thresholds,
     check_worker_required,
@@ -20,8 +21,9 @@ from morph.schema.profile import (
 )
 
 
-def make_profile(*, cores=4, ram_mb=8192, latency_ms=0, packet_loss=0.0,
-                  cores_status=FieldStatus.CAPTURED, ram_status=FieldStatus.CAPTURED) -> EnvironmentProfile:
+def make_profile(*, cores=4, ram_mb=8192, latency_ms=0, packet_loss=0.0, jitter_ms=None,
+                  quota_percent=None, cores_status=FieldStatus.CAPTURED,
+                  ram_status=FieldStatus.CAPTURED) -> EnvironmentProfile:
     return EnvironmentProfile(
         os=OSInfo(
             family=ProfileField(value="linux", status=FieldStatus.CAPTURED),
@@ -31,6 +33,8 @@ def make_profile(*, cores=4, ram_mb=8192, latency_ms=0, packet_loss=0.0,
             architecture=ProfileField(value="x86_64", status=FieldStatus.CAPTURED),
             cores=ProfileField(value=cores, status=cores_status),
             logical_processors=ProfileField(value=cores, status=FieldStatus.CAPTURED),
+            quota_percent=ProfileField(value=quota_percent, status=FieldStatus.REQUESTED)
+            if quota_percent is not None else None,
         ),
         memory=MemoryInfo(total_mb=ProfileField(value=ram_mb, status=ram_status)),
         locale=LocaleInfo(
@@ -40,6 +44,8 @@ def make_profile(*, cores=4, ram_mb=8192, latency_ms=0, packet_loss=0.0,
         network=NetworkInfo(
             latency_ms=ProfileField(value=latency_ms, status=FieldStatus.REQUESTED),
             packet_loss_percent=ProfileField(value=packet_loss, status=FieldStatus.REQUESTED),
+            jitter_ms=ProfileField(value=jitter_ms, status=FieldStatus.REQUESTED)
+            if jitter_ms is not None else None,
         ),
     )
 
@@ -74,6 +80,28 @@ def test_thresholds_never_raise_only_report():
     profile = make_profile(latency_ms=999999)
     check_thresholds(profile)
     assert profile.network.latency_ms.value == 999999
+
+
+def test_cross_field_jitter_within_latency_passes():
+    profile = make_profile(latency_ms=180, jitter_ms=15)
+    assert check_cross_field_rules(profile) == []
+
+
+def test_cross_field_jitter_exceeding_latency_blocks():
+    profile = make_profile(latency_ms=100, jitter_ms=150)
+    issues = check_cross_field_rules(profile)
+    assert any(i.field == "network.jitter_ms" and i.severity == "block" for i in issues)
+
+
+def test_cross_field_cpu_quota_within_ceiling_passes():
+    profile = make_profile(cores=4, quota_percent=300)
+    assert check_cross_field_rules(profile) == []
+
+
+def test_cross_field_cpu_quota_exceeding_ceiling_blocks():
+    profile = make_profile(cores=4, quota_percent=500)  # ceiling is 4*100=400
+    issues = check_cross_field_rules(profile)
+    assert any(i.field == "cpu.quota_percent" and i.severity == "block" for i in issues)
 
 
 def test_worker_required_when_cores_exceed_host():

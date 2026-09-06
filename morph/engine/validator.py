@@ -1,13 +1,6 @@
 """Threshold checker: bounds-checks a requested EnvironmentProfile and enforces
 the cross-field rules from docs/ui-spec.md section 5.
 
-Two of that section's rules are deliberately NOT implemented here:
-"jitter <= latency" and "CPU quota <= cores * 100%". Neither `jitter` nor
-`cpu_quota` exists as an EnvironmentProfile field yet -- adding them is a
-schema change affecting every phase built on that shared contract, not
-something this checker should do unilaterally. Everything below only checks
-fields that already exist on EnvironmentProfile.
-
 Per ui-spec.md section 5: "block or warn, never silently clamp without
 telling the user" -- so every issue here is reported, never auto-corrected.
 """
@@ -21,7 +14,7 @@ from pydantic import BaseModel
 from morph.profiler.capture import capture_environment
 from morph.runtime.adapters.base import BaseAdapter
 from morph.runtime.controller import get_default_adapter
-from morph.schema.parameters import MVP_PARAMETERS
+from morph.schema.parameters import PARAMETER_CATALOG
 from morph.schema.profile import EnvironmentProfile, FieldStatus
 
 Severity = Literal["block", "warn"]
@@ -53,10 +46,10 @@ def _resolve(profile: EnvironmentProfile, field_path: str):
 
 
 def check_thresholds(profile: EnvironmentProfile) -> list[ValidationIssue]:
-    """Bounds-checks every MVP parameter present in `profile` against its
-    metadata min/max (ui-spec.md section 2)."""
+    """Bounds-checks every catalog parameter present in `profile` against its
+    metadata min/max (ui-spec.md sections 2-3)."""
     issues: list[ValidationIssue] = []
-    for meta in MVP_PARAMETERS.values():
+    for meta in PARAMETER_CATALOG.values():
         field = _resolve(profile, meta.field_path)
         if field is None or not isinstance(field.value, (int, float)):
             continue
@@ -71,6 +64,32 @@ def check_thresholds(profile: EnvironmentProfile) -> list[ValidationIssue]:
                 field=meta.field_path, severity="block",
                 message=f"{meta.name} ({value} {meta.unit}) exceeds the maximum of {meta.max} {meta.unit}",
             ))
+    return issues
+
+
+def check_cross_field_rules(profile: EnvironmentProfile) -> list[ValidationIssue]:
+    """ui-spec.md section 5 rules relating two fields to each other:
+    jitter <= latency, and CPU quota <= cores * 100%."""
+    issues: list[ValidationIssue] = []
+
+    latency = _resolve(profile, "network.latency_ms")
+    jitter = _resolve(profile, "network.jitter_ms")
+    if latency and jitter and isinstance(jitter.value, (int, float)) and jitter.value > (latency.value or 0):
+        issues.append(ValidationIssue(
+            field="network.jitter_ms", severity="block",
+            message=f"jitter ({jitter.value} ms) must not exceed latency ({latency.value} ms)",
+        ))
+
+    cores = _resolve(profile, "cpu.cores")
+    quota = _resolve(profile, "cpu.quota_percent")
+    if cores and quota and isinstance(quota.value, (int, float)):
+        ceiling = cores.value * 100
+        if quota.value > ceiling:
+            issues.append(ValidationIssue(
+                field="cpu.quota_percent", severity="block",
+                message=f"CPU quota ({quota.value}%) exceeds {cores.value} cores x 100% = {ceiling}%",
+            ))
+
     return issues
 
 
@@ -133,8 +152,10 @@ def validate_profile(
     host: EnvironmentProfile | None = None,
     adapter: BaseAdapter | None = None,
 ) -> ValidationResult:
-    """Runs every check: bounds, worker-routing, and platform restrictions."""
+    """Runs every check: bounds, cross-field rules, worker-routing, and
+    platform restrictions."""
     issues = check_thresholds(profile)
+    issues += check_cross_field_rules(profile)
     issues += check_worker_required(profile, host)
     issues += check_platform_restrictions(profile, adapter or get_default_adapter())
     return ValidationResult(issues=issues)
