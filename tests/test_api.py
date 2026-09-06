@@ -48,6 +48,16 @@ def test_health_check():
     assert res.json() == {"status": "ok", "service": "morph-api"}
 
 
+def test_parameter_catalog_endpoint():
+    from morph.schema.parameters import PARAMETER_CATALOG
+
+    res = client.get("/parameters")
+    assert res.status_code == 200
+    data = res.json()
+    assert set(data) == set(PARAMETER_CATALOG)
+    assert data["cpu_cores"]["field_path"] == "cpu.cores"
+
+
 def test_capture_and_reconcile_profiles():
     res = client.post("/profiles/capture")
     assert res.status_code == 200

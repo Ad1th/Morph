@@ -1,3 +1,3 @@
-from morph.api.routes import experiments, profiles, regressions, runs
+from morph.api.routes import experiments, parameters, profiles, regressions, runs
 
-__all__ = ["experiments", "profiles", "regressions", "runs"]
+__all__ = ["experiments", "parameters", "profiles", "regressions", "runs"]
