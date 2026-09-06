@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, Union
+
 from pydantic import BaseModel, Field
 
 from morph.regression.artifact import load_regression
@@ -20,17 +20,17 @@ class ReplayResult(BaseModel):
     failure_rate: float
     total_runs: int
     failures: int
-    runs: List[RunResult] = Field(default_factory=list)
+    runs: list[RunResult] = Field(default_factory=list)
     regression: RegressionArtifact
     summary: str = ""
 
 
 def replay_regression(
-    regression: Union[RegressionArtifact, Path, str],
-    controller: Optional[RuntimeController] = None,
+    regression: RegressionArtifact | Path | str,
+    controller: RuntimeController | None = None,
     trials: int = 1,
     timeout: float = 30.0,
-    cwd: Optional[str] = None,
+    cwd: str | None = None,
 ) -> ReplayResult:
     """Load and execute a regression artifact, evaluating against its expected tolerances."""
     if isinstance(regression, (str, Path)):
@@ -39,7 +39,7 @@ def replay_regression(
         artifact = regression
 
     ctrl = controller or RuntimeController()
-    runs: List[RunResult] = []
+    runs: list[RunResult] = []
     failures = 0
 
     for _ in range(trials):

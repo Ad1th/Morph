@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import platform
-from typing import Optional
 
 from morph.runtime.adapters.base import BaseAdapter, ProxyAdapter
 from morph.runtime.adapters.linux import LinuxAdapter
@@ -143,7 +142,7 @@ class RuntimeController:
         profile: EnvironmentProfile,
         command: str,
         timeout: float = 30.0,
-        cwd: Optional[str] = None,
+        cwd: str | None = None,
     ) -> RunResult:
         """Apply environment conditions, execute the command, capture telemetry, and guarantee cleanup."""
         try:

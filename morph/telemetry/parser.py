@@ -8,7 +8,6 @@ experiment engine can classify a failure without the app cooperating.
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 # Final line of a Python traceback, or a bare "Type: message" string.
 # A leading module path (pkg.mod.MyError) is consumed and dropped.
@@ -38,7 +37,7 @@ def _iter_sources(stderr: str, stdout: str):
             yield text
 
 
-def _match(text: str) -> Optional[re.Match]:
+def _match(text: str) -> re.Match | None:
     """Return the match that best identifies the failure in `text`.
 
     Java header first; otherwise scan lines bottom-up so a chained traceback
@@ -56,7 +55,7 @@ def _match(text: str) -> Optional[re.Match]:
     return None
 
 
-def extract_error_type(stderr: str, stdout: str = "") -> Optional[str]:
+def extract_error_type(stderr: str, stdout: str = "") -> str | None:
     for text in _iter_sources(stderr, stdout):
         m = _match(text)
         if m:
@@ -64,7 +63,7 @@ def extract_error_type(stderr: str, stdout: str = "") -> Optional[str]:
     return None
 
 
-def extract_error_message(stderr: str, stdout: str = "") -> Optional[str]:
+def extract_error_message(stderr: str, stdout: str = "") -> str | None:
     for text in _iter_sources(stderr, stdout):
         m = _match(text)
         if m:
@@ -72,7 +71,7 @@ def extract_error_message(stderr: str, stdout: str = "") -> Optional[str]:
     return None
 
 
-def extract_stack_trace(stderr: str) -> Optional[str]:
+def extract_stack_trace(stderr: str) -> str | None:
     stderr = stderr or ""
     if _PY_TRACEBACK_HEADER in stderr:
         idx = stderr.index(_PY_TRACEBACK_HEADER)

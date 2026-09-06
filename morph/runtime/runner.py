@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 from morph.schema.telemetry import RunResult
 from morph.telemetry.collector import run_with_telemetry
@@ -11,9 +10,9 @@ from morph.telemetry.collector import run_with_telemetry
 
 def execute_command(
     command: str,
-    env_overrides: Optional[dict] = None,
+    env_overrides: dict | None = None,
     timeout: float = 30.0,
-    cwd: Optional[str] = None,
+    cwd: str | None = None,
 ) -> RunResult:
     """Execute `command` under a copy of the current environment plus `env_overrides`.
 

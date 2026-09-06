@@ -9,8 +9,7 @@ import subprocess
 import threading
 import time
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import psutil
 
@@ -26,7 +25,7 @@ _KILL_GRACE_S = 3.0
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _new_run_id() -> str:
@@ -118,9 +117,9 @@ def _early_result(*, exit_code: int, stderr: str, duration_ms: float,
 
 def run_with_telemetry(
     command: str,
-    env: Optional[dict] = None,
+    env: dict | None = None,
     timeout: float = 30.0,
-    cwd: Optional[str] = None,
+    cwd: str | None = None,
 ) -> RunResult:
     """Run `command`, returning a populated RunResult.
 
