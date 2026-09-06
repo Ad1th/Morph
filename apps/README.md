@@ -21,59 +21,51 @@ python -m apps.<name> run --fixed     # runs the fixed variant
 | [timeout](timeout/) | network latency on `lo` | 0/50 | 20/20 fail | environment-caused |
 | [locale_parse](locale_parse/) | `LANG` / `LC_NUMERIC` | 0/50 | 50/50 fail | environment-caused |
 | [race](race/) | CPU quota (cgroup `cpu.max`) | 0/50 | 50/50 fail, rate 0.31-0.42 | environment-**exposed** |
-| pool_retry (flagship) | latency **+** packet loss combined | — | — | **not landed yet, see below** |
+| [pool_retry](pool_retry/) (flagship) | latency **+** packet loss combined | 0/20 | 19/20 fail | environment-caused, **interaction** |
 | real/turkish_locale | `LANG=tr_TR.UTF-8` (JVM) | — | — | not built yet |
 
-### Failure B is still being tuned
+### Failure B, the interaction fixture
 
-The flagship interaction fixture is written but does **not** yet meet the
-[§7 acceptance table](../docs/faultyapps.md#7-manual-verification-protocol), so it
-is deliberately not merged. Latest measurement:
+Verified against the [§7 acceptance table](../docs/faultyapps.md#7-manual-verification-protocol)
+under **real** injected conditions, 20 trials per leg:
 
 | leg | target | measured |
 |---|---|---|
-| baseline | < 5% | 0% ✓ |
-| latency alone | < 15% | 0% ✓ |
-| loss alone | < 15% | 20% ✗ |
-| latency + loss | > 90% | 80% ✗ |
-| `--fixed` under both | < 5% | 13% ✗ |
+| baseline | < 5% | 0/20 ✓ |
+| latency alone (90ms) | < 15% | 0/20 ✓ |
+| loss alone (12%) | < 15% | 1/20 ✓ |
+| latency + loss | > 90% | **19/20** ✓ |
+| `--fixed` under both | < 5% | 0/20 ✓ |
 
-The `--fixed` leg is the blocking one: the fix must survive the exact condition
-that breaks the app, or the fix → replay → PASS step of the demo does not hold.
-
-Root cause is understood — a request dies when *every* attempt stalls, with
-probability `stall_rate ^ (retries + 1)`, and no pool size can prevent that. The
-open question is a parameter set where retries are high enough to make exhaustion
-negligible while the combination still cascades past the deadline on elapsed time
-(so the failure mechanism stays the documented one).
-
-Per [faultyapps.md §9](../docs/faultyapps.md#9-build-order-and-review-1-target),
-A + D + C is a viable Review 1 without it.
+Neither condition alone breaks it; together they do, and the one-line fix
+survives the exact condition that breaks the app.
 
 ## Verification status
 
-Every app's failure logic, baseline, and fix are verified. What is **not** yet
-verified anywhere is that the *real* OS-level knobs produce these results — all
-measurements so far use each app's simulation knob, because this machine has no
-`tc`, no Clumsy admin rights, and no cgroups.
+Every app's failure logic, baseline, and fix are verified. How the *condition*
+was applied differs per app, and that distinction matters — a simulated knob
+proves the app's logic, not that the environment can actually drive it.
 
-| Condition | Verified via | Still needs |
+| App | Condition applied by | Still needs |
 |---|---|---|
-| network latency | server-side delay | real `tc netem` / Clumsy / `dnctl` |
-| packet loss | server-side stall probability | real `tc netem` — and recalibration, see below |
-| CPU quota | interpreter switch interval | real cgroup `cpu.max` on the Pi |
-| locale | real `setlocale` | nothing — genuinely verified |
+| pool_retry (B) | **real** — morph's TCP proxy, genuine delay and chunk drops | `tc netem` cross-check |
+| locale_parse (D) | **real** — `setlocale` | nothing |
+| timeout (A) | simulated — server-side delay | real injection; the proxy can now do this |
+| race (C) | simulated — interpreter switch interval | real cgroup `cpu.max` on the Pi |
 
-Two calibration warnings for whoever runs these against real shaping:
+**Latency is applied per direction**, both through the proxy and through `netem`
+on loopback, so round-trip is ~2x the configured value: `90ms` is ~180ms RTT.
+Any threshold Morph reports will be about twice the parameter that was dialled
+in unless it corrects for this.
 
-- **`netem loss 2%` is not `MORPH_B_SIM_STALL_PCT=2`.** Real loss costs a TCP
-  retransmit timeout rather than losing a request, and one HTTP request is many
-  packets. The simulated value is a per-*request* stall probability.
-- **Loopback doubles latency.** `netem delay 180ms` on `lo` delays request *and*
-  response, so RTT grows ~360ms. The netem parameter is roughly half the RTT.
+Remaining work, highest value first:
 
-[PRD §39](../docs/Morph_PRD.md) makes this the demo's single point of failure, so
-this verification pass is the highest-value remaining work on the corpus.
+1. **Run Failure A through the proxy.** B already proves the mechanism works and
+   needs no admin rights, so A's simulated delay can be replaced with real
+   injected latency the same way. This closes [PRD §39](../docs/Morph_PRD.md)'s
+   single point of failure on the machine you already have.
+2. **Failure C on the Pi**, under a real cgroup quota — the one condition the
+   proxy cannot supply.
 
 Install demo-app deps separately from Morph's own deps:
 
