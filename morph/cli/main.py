@@ -13,9 +13,10 @@ from rich.table import Table
 from morph.engine.experiment import run_experiment
 from morph.engine.threshold import search_threshold
 from morph.profiler.capture import capture_environment
-from morph.regression import export_ci_test, replay_regression
+from morph.regression import export_ci_test, replay_regression, save_regression
 from morph.runtime.controller import RuntimeController
 from morph.schema.profile import EnvironmentProfile
+from morph.schema.regression import RegressionArtifact
 
 app = typer.Typer(name="morph", help="Morph: Test software in environments you don't physically have.")
 console = Console()
@@ -231,6 +232,42 @@ def threshold(
         title="Threshold Search Result",
         border_style="bold green",
     ))
+
+
+@app.command()
+def save(
+    regression_id: str = typer.Option(..., "--id", help="Regression bundle id (directory name)"),
+    profile: Path = typer.Option(..., "--profile", "-p", help="EnvironmentProfile JSON to freeze"),
+    command: str = typer.Option(..., "--command", "-c", help="Command the bundle replays"),
+    expected_exit: int = typer.Option(0, "--expected-exit", help="Exit code a healthy run returns"),
+    max_failure_rate: float = typer.Option(
+        0.0, "--max-failure-rate", help="Failure rate a replay may not exceed"
+    ),
+    failure_signature: str | None = typer.Option(
+        None, "--signature", help="Short note on how the failure presents"
+    ),
+    base_dir: Path = typer.Option(
+        Path(".morph/regressions"), "--dir", help="Where to write the bundle"
+    ),
+):
+    """Freeze a profile + command as a replayable regression bundle."""
+    if not profile.exists():
+        console.print(f"[bold red]Error:[/bold red] Profile file '{profile}' not found")
+        raise typer.Exit(code=1)
+
+    env = EnvironmentProfile.model_validate_json(profile.read_text(encoding="utf-8"))
+    artifact = RegressionArtifact(
+        regression_id=regression_id,
+        environment=env,
+        command=command,
+        expected_exit_code=expected_exit,
+        expected_max_failure_rate=max_failure_rate,
+        failure_signature=failure_signature,
+    )
+    out = save_regression(artifact, base_dir=base_dir)
+    console.print(f"[bold green]Saved regression bundle:[/bold green] {out}")
+    console.print(f"  replay:  morph replay {regression_id}")
+    console.print(f"  export:  morph export {regression_id} -o test_{regression_id}.py")
 
 
 @app.command()

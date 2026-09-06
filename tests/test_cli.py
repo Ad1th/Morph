@@ -82,6 +82,31 @@ def test_cli_export_and_replay(tmp_path, monkeypatch):
     assert out_ci.exists()
 
 
+def test_cli_save_then_replay(tmp_path):
+    profile = tmp_path / "target.json"
+    runner.invoke(app, ["capture", "--output", str(profile)])
+    bundles = tmp_path / "bundles"
+
+    result = runner.invoke(
+        app,
+        [
+            "save",
+            "--id", "cli-save-001",
+            "--profile", str(profile),
+            "--command", "python3 -c \"print('saved ok')\"",
+            "--max-failure-rate", "0.0",
+            "--dir", str(bundles),
+        ],
+    )
+    assert result.exit_code == 0
+    bundle = bundles / "cli-save-001"
+    assert (bundle / "environment.json").exists()
+    assert (bundle / "command.json").exists()
+
+    replay_res = runner.invoke(app, ["replay", str(bundle), "--trials", "1"])
+    assert replay_res.exit_code == 0
+
+
 def test_cli_experiment(tmp_path):
     from morph.schema.profile import (
         CPUInfo,

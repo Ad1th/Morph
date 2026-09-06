@@ -8,6 +8,7 @@ Fisher's exact runs once per condition and the verdict card resolves.
 
 from __future__ import annotations
 
+import time
 from typing import ClassVar
 
 from textual import work
@@ -17,8 +18,10 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Input, Label, RichLog, Static
 
 from morph.config import load_config
+from morph.regression import save_regression
 from morph.schema.events import TrialEvent
 from morph.schema.profile import EnvironmentProfile
+from morph.schema.regression import RegressionArtifact
 from morph.tui.messages import EngineEvent, RunFinished
 from morph.tui.orchestrator import run_experiment_live
 from morph.tui.profiles import default_profile_hint, resolve_profile
@@ -33,6 +36,7 @@ class ExperimentScreen(Screen):
     BINDINGS: ClassVar[list] = [
         ("escape", "app.pop_screen", "Back"),
         ("ctrl+r", "run", "Run"),
+        ("ctrl+s", "save", "Save regression"),
     ]
 
     def __init__(self) -> None:
@@ -41,6 +45,9 @@ class ExperimentScreen(Screen):
         self._lanes: dict[str, ConditionLane] = {}
         self._rates: dict[str, float] = {}
         self._busy = False
+        self._last_profile: EnvironmentProfile | None = None
+        self._last_command = ""
+        self._last_verdict = ""
 
     def compose(self) -> ComposeResult:
         yield Static(" Experiment · causal isolation ", classes="screen-title")
@@ -56,6 +63,8 @@ class ExperimentScreen(Screen):
             yield Label("trials")
             yield Input(value=str(self._cfg.default_trials), id="in-trials")
             yield Button("Run ▶", id="btn-run", variant="primary")
+            yield Input(placeholder="save id", id="in-regid")
+            yield Button("Save regression", id="btn-save", variant="success", disabled=True)
         with Horizontal(id="exp-body"):
             yield VerticalScroll(id="lanes")
             yield RichLog(id="exp-log", wrap=True, markup=True, highlight=True)
@@ -70,6 +79,8 @@ class ExperimentScreen(Screen):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-run":
             self.action_run()
+        elif event.button.id == "btn-save":
+            self.action_save()
 
     def action_run(self) -> None:
         if self._busy:
@@ -93,6 +104,8 @@ class ExperimentScreen(Screen):
 
         if demo:
             log.write("[yellow]DEMO[/yellow] [dim]replaying a recorded checkout-timeout experiment[/dim]")
+            self._last_profile = resolve_profile("")
+            self._last_command = "python -m apps.pool_retry"
             self._demo_worker()
             return
 
@@ -104,6 +117,8 @@ class ExperimentScreen(Screen):
             self.query_one("#btn-run", Button).disabled = False
             return
 
+        self._last_profile = profile
+        self._last_command = command
         log.write(f"[dim]running {trials} trials/condition · {command}[/dim]")
         self._worker(profile, command, trials)
 
@@ -112,6 +127,8 @@ class ExperimentScreen(Screen):
         lanes.remove_children()
         self._lanes.clear()
         self._rates.clear()
+        self._last_verdict = ""
+        self.query_one("#btn-save", Button).disabled = True
         self.query_one("#verdict", VerdictCard).add_class("hidden")
         self.query_one("#matrix", InteractionMatrix).add_class("hidden")
         self.query_one("#exp-log", RichLog).clear()
@@ -178,7 +195,33 @@ class ExperimentScreen(Screen):
                 str(ev.extra.get("summary", "")),
             )
             card.remove_class("hidden")
+            self._last_verdict = ev.classification
+            self.query_one("#btn-save", Button).disabled = self._last_profile is None
             self._maybe_show_matrix()
+
+    def action_save(self) -> None:
+        log = self.query_one("#exp-log", RichLog)
+        if self._last_profile is None or not self._last_verdict:
+            log.write("[red]run an experiment first[/red]")
+            return
+        regression_id = self.query_one("#in-regid", Input).value.strip() or f"morph-{int(time.time())}"
+        artifact = RegressionArtifact(
+            regression_id=regression_id,
+            environment=self._last_profile,
+            command=self._last_command,
+            expected_exit_code=0,
+            expected_max_failure_rate=0.0,
+            failure_signature=self._last_verdict,
+        )
+        try:
+            out = save_regression(artifact)
+        except Exception as exc:
+            log.write(f"[red]save failed: {exc}[/red]")
+            return
+        self.query_one("#btn-save", Button).disabled = True
+        log.write(
+            f"[green]saved[/green] [dim]{out}[/dim]  ·  replay:  morph replay {regression_id}"
+        )
 
     def _maybe_show_matrix(self) -> None:
         if not _INTERACTION_SET.issubset(self._rates):

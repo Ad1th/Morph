@@ -186,6 +186,36 @@ async def test_demo_mode_runs_without_a_command():
 
 
 @pytest.mark.asyncio
+async def test_experiment_screen_saves_regression(tmp_path, monkeypatch):
+    import morph.regression.artifact
+
+    monkeypatch.setattr(morph.regression.artifact, "DEFAULT_REGRESSIONS_DIR", tmp_path)
+
+    app = MorphApp(demo=True)
+    async with app.run_test() as pilot:
+        await pilot.press("e")
+        await pilot.pause()
+        screen = app.screen
+
+        assert screen.query_one("#btn-save").disabled  # nothing to save yet
+        screen.action_run()
+        for _ in range(200):
+            await pilot.pause(0.05)
+            if not screen._busy and screen._last_verdict:
+                break
+
+        assert not screen.query_one("#btn-save").disabled  # verdict landed
+        screen.query_one("#in-regid").value = "tui-save-001"
+        screen.action_save()
+        await pilot.pause()
+
+        bundle = tmp_path / "tui-save-001"
+        assert (bundle / "environment.json").exists()
+        assert (bundle / "command.json").exists()
+        assert screen.query_one("#btn-save").disabled  # consumed
+
+
+@pytest.mark.asyncio
 async def test_threshold_gauge_converges(monkeypatch):
     import morph.tui.screens.threshold as th_mod
 
