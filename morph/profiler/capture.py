@@ -5,6 +5,7 @@ from morph.profiler.collectors.filesystem import collect_filesystem
 from morph.profiler.collectors.locale_info import collect_locale
 from morph.profiler.collectors.memory import collect_memory
 from morph.profiler.collectors.os_info import collect_os
+from morph.profiler.collectors.process_limits import collect_process_limits
 from morph.schema.profile import EnvironmentProfile
 
 
@@ -16,6 +17,7 @@ def capture_environment() -> EnvironmentProfile:
         memory=collect_memory(),
         locale=collect_locale(),
         filesystem=collect_filesystem(),
+        process=collect_process_limits(),
     )
 
 
