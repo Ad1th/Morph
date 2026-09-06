@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from typing import Dict, List, Optional
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -19,7 +18,7 @@ PROFILES_DIR = Path(".morph/profiles")
 class SaveProfileRequest(BaseModel):
     id: str
     profile: EnvironmentProfile
-    description: Optional[str] = None
+    description: str | None = None
 
 
 @router.post("/capture", response_model=EnvironmentProfile)
@@ -31,8 +30,8 @@ def capture_current_profile() -> EnvironmentProfile:
         raise HTTPException(status_code=500, detail=f"Failed to capture environment: {exc}")
 
 
-@router.post("", response_model=Dict[str, str])
-def save_profile(req: SaveProfileRequest) -> Dict[str, str]:
+@router.post("", response_model=dict[str, str])
+def save_profile(req: SaveProfileRequest) -> dict[str, str]:
     """Save an environment profile to disk."""
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     target_file = PROFILES_DIR / f"{req.id}.json"
@@ -40,8 +39,8 @@ def save_profile(req: SaveProfileRequest) -> Dict[str, str]:
     return {"id": req.id, "status": "saved", "path": str(target_file)}
 
 
-@router.get("", response_model=List[Dict[str, str]])
-def list_profiles() -> List[Dict[str, str]]:
+@router.get("", response_model=list[dict[str, str]])
+def list_profiles() -> list[dict[str, str]]:
     """List all saved profiles in .morph/profiles."""
     if not PROFILES_DIR.exists():
         return []
@@ -65,7 +64,11 @@ def get_profile(profile_id: str) -> EnvironmentProfile:
 
 @router.post("/reconcile", response_model=EnvironmentProfile)
 def reconcile_profile(profile: EnvironmentProfile) -> EnvironmentProfile:
-    """Reconcile profile fields against host adapter capabilities, setting REPRODUCED/APPROXIMATED/UNAVAILABLE."""
+    """Reconcile profile fields against host adapter capabilities.
+
+    Sets field statuses to REPRODUCED, APPROXIMATED, or UNAVAILABLE.
+    """
+
     try:
         return reconcile_profile_statuses(profile)
     except Exception as exc:

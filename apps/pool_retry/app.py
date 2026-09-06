@@ -44,7 +44,6 @@ from __future__ import annotations
 import http.server
 import json
 import os
-
 import sys
 import threading
 import time
@@ -76,7 +75,7 @@ PROXY_LOSS_PCT = float(os.getenv("MORPH_B_PROXY_LOSS_PCT", "0"))
 
 
 class _Handler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self) -> None:  # noqa: N802 (stdlib naming)
+    def do_GET(self) -> None:
         time.sleep(SERVER_DELAY_S)
         try:
             self.send_response(200)

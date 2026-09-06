@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import threading
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 from morph.runtime.adapters.proxy import ProxyServer
 

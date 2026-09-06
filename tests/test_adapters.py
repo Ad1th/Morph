@@ -1,7 +1,6 @@
-import pytest
 from morph.runtime.adapters import (
-    MacOSAdapter,
     LinuxAdapter,
+    MacOSAdapter,
     WindowsAdapter,
 )
 

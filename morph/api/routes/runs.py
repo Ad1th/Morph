@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -15,9 +14,9 @@ router = APIRouter()
 
 class RunRequest(BaseModel):
     command: str
-    profile: Optional[EnvironmentProfile] = None
+    profile: EnvironmentProfile | None = None
     timeout: float = 30.0
-    cwd: Optional[str] = None
+    cwd: str | None = None
     force_proxy: bool = False
 
 

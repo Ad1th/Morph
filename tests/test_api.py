@@ -1,5 +1,5 @@
-import pytest
 from fastapi.testclient import TestClient
+
 from morph.api.app import app
 from morph.schema.profile import (
     CPUInfo,
@@ -111,3 +111,14 @@ def test_regressions_lifecycle(tmp_path, monkeypatch):
     replay_res = client.post("/regressions/api-reg-001/replay", json={"trials": 1})
     assert replay_res.status_code == 200
     assert replay_res.json()["matches_expected"] is True
+
+
+def test_websocket_experiment_stream():
+    with client.websocket_connect("/ws/experiment/exp-ws-test") as websocket:
+        data = websocket.receive_json()
+        assert data["type"] == "connected"
+        assert data["experiment_id"] == "exp-ws-test"
+        websocket.send_text("ping")
+        resp = websocket.receive_text()
+        assert resp == "pong"
+

@@ -1,4 +1,5 @@
 from typer.testing import CliRunner
+
 from morph.cli.main import app
 
 runner = CliRunner()
@@ -53,8 +54,14 @@ def test_cli_export_and_replay(tmp_path, monkeypatch):
             logical_processors=ProfileField(value=8, status=FieldStatus.CAPTURED),
         ),
         memory=MemoryInfo(total_mb=ProfileField(value=16384, status=FieldStatus.CAPTURED)),
-        locale=LocaleInfo(locale=ProfileField(value="en_US.UTF-8", status=FieldStatus.CAPTURED), timezone=ProfileField(value="UTC", status=FieldStatus.CAPTURED)),
-        network=NetworkInfo(latency_ms=ProfileField(value=10.0, status=FieldStatus.REQUESTED), packet_loss_percent=ProfileField(value=0.0, status=FieldStatus.REQUESTED)),
+        locale=LocaleInfo(
+            locale=ProfileField(value="en_US.UTF-8", status=FieldStatus.CAPTURED),
+            timezone=ProfileField(value="UTC", status=FieldStatus.CAPTURED),
+        ),
+        network=NetworkInfo(
+            latency_ms=ProfileField(value=10.0, status=FieldStatus.REQUESTED),
+            packet_loss_percent=ProfileField(value=0.0, status=FieldStatus.REQUESTED),
+        ),
     )
     artifact = RegressionArtifact(
         regression_id="cli-reg-001",
@@ -73,3 +80,114 @@ def test_cli_export_and_replay(tmp_path, monkeypatch):
     export_res = runner.invoke(app, ["export", str(saved_path), "--output", str(out_ci)])
     assert export_res.exit_code == 0
     assert out_ci.exists()
+
+
+def test_cli_experiment(tmp_path):
+    from morph.schema.profile import (
+        CPUInfo,
+        EnvironmentProfile,
+        FieldStatus,
+        LocaleInfo,
+        MemoryInfo,
+        NetworkInfo,
+        OSInfo,
+        ProfileField,
+    )
+    profile = EnvironmentProfile(
+        version="1.0",
+        os=OSInfo(
+            family=ProfileField(value="darwin", status=FieldStatus.CAPTURED),
+            version=ProfileField(value="14.5", status=FieldStatus.CAPTURED),
+        ),
+        cpu=CPUInfo(
+            architecture=ProfileField(value="arm64", status=FieldStatus.CAPTURED),
+            cores=ProfileField(value=8, status=FieldStatus.CAPTURED),
+            logical_processors=ProfileField(value=8, status=FieldStatus.CAPTURED),
+        ),
+        memory=MemoryInfo(total_mb=ProfileField(value=16384, status=FieldStatus.CAPTURED)),
+        locale=LocaleInfo(
+            locale=ProfileField(value="en_US.UTF-8", status=FieldStatus.CAPTURED),
+            timezone=ProfileField(value="UTC", status=FieldStatus.CAPTURED),
+        ),
+        network=NetworkInfo(
+            latency_ms=ProfileField(value=10.0, status=FieldStatus.REQUESTED),
+            packet_loss_percent=ProfileField(value=0.0, status=FieldStatus.REQUESTED),
+        ),
+    )
+    p_file = tmp_path / "target_prof.json"
+    p_file.write_text(profile.model_dump_json(), encoding="utf-8")
+
+    res = runner.invoke(
+        app,
+        [
+            "experiment",
+            "--profile",
+            str(p_file),
+            "--command",
+            "python3 -c \"print('exp test')\"",
+            "--trials",
+            "1",
+        ],
+    )
+    assert res.exit_code == 0
+
+    assert "Causal Isolation Results" in res.stdout
+
+
+def test_cli_threshold(tmp_path):
+    from morph.schema.profile import (
+        CPUInfo,
+        EnvironmentProfile,
+        FieldStatus,
+        LocaleInfo,
+        MemoryInfo,
+        NetworkInfo,
+        OSInfo,
+        ProfileField,
+    )
+    profile = EnvironmentProfile(
+        version="1.0",
+        os=OSInfo(
+            family=ProfileField(value="darwin", status=FieldStatus.CAPTURED),
+            version=ProfileField(value="14.5", status=FieldStatus.CAPTURED),
+        ),
+        cpu=CPUInfo(
+            architecture=ProfileField(value="arm64", status=FieldStatus.CAPTURED),
+            cores=ProfileField(value=8, status=FieldStatus.CAPTURED),
+            logical_processors=ProfileField(value=8, status=FieldStatus.CAPTURED),
+        ),
+        memory=MemoryInfo(total_mb=ProfileField(value=16384, status=FieldStatus.CAPTURED)),
+        locale=LocaleInfo(
+            locale=ProfileField(value="en_US.UTF-8", status=FieldStatus.CAPTURED),
+            timezone=ProfileField(value="UTC", status=FieldStatus.CAPTURED),
+        ),
+        network=NetworkInfo(
+            latency_ms=ProfileField(value=10.0, status=FieldStatus.REQUESTED),
+            packet_loss_percent=ProfileField(value=0.0, status=FieldStatus.REQUESTED),
+        ),
+    )
+    p_file = tmp_path / "base_prof.json"
+    p_file.write_text(profile.model_dump_json(), encoding="utf-8")
+
+    res = runner.invoke(
+        app,
+        [
+            "threshold",
+            "--profile",
+            str(p_file),
+            "--command",
+            "python3 -c \"print('thresh test')\"",
+            "--parameter",
+            "network.latency_ms",
+            "--low",
+            "0",
+            "--high",
+            "100",
+            "--trials",
+            "1",
+        ],
+    )
+    assert res.exit_code == 0
+    assert "Threshold Search Result" in res.stdout
+
+
