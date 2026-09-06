@@ -110,6 +110,13 @@ class RuntimeController:
                 if profile.network.bandwidth_mbps and profile.network.bandwidth_mbps.value
                 else None
             )
+            # "Offline" has no dedicated mechanism: it reuses the existing
+            # proxy path with loss forced to 100%, which genuinely drops
+            # every packet rather than approximating disconnection some
+            # other way (ui-spec.md section 5: "Network availability =
+            # Offline -> latency/bandwidth/loss/jitter greyed and ignored").
+            if profile.network.available and profile.network.available.value is False:
+                loss = 100.0
             self.adapter.apply_network(
                 latency_ms=latency,
                 packet_loss_percent=loss,
@@ -120,7 +127,12 @@ class RuntimeController:
         if profile.cpu and profile.cpu.cores:
             try:
                 cores = int(profile.cpu.cores.value)
-                self.adapter.apply_cpu(max_cores=cores)
+                quota = (
+                    float(profile.cpu.quota_percent.value)
+                    if profile.cpu.quota_percent and profile.cpu.quota_percent.value is not None
+                    else None
+                )
+                self.adapter.apply_cpu(max_cores=cores, quota_percent=quota)
             except (ValueError, TypeError):
                 pass
 
@@ -144,11 +156,33 @@ class RuntimeController:
         timeout: float = 30.0,
         cwd: str | None = None,
     ) -> RunResult:
-        """Apply environment conditions, execute the command, capture telemetry, and guarantee cleanup."""
+        """Apply environment conditions, execute the command, capture telemetry, and guarantee cleanup.
+
+        `profile.process.timeout_s`, if requested, overrides the `timeout`
+        argument; `max_processes`/`fd_limit` are POSIX-only rlimits applied
+        to the child (see `morph.telemetry.collector.run_with_telemetry`).
+        """
         try:
             self.apply_conditions(profile)
             env_overrides = self.adapter.get_env_overrides()
-            result = execute_command(command, env_overrides=env_overrides, timeout=timeout, cwd=cwd)
-            return result
+            if profile.env_vars:
+                # Explicit user-requested variables take precedence over the
+                # adapter's own (locale/proxy) overrides.
+                env_overrides = {**env_overrides, **profile.env_vars}
+
+            effective_timeout = timeout
+            max_processes = fd_limit = None
+            if profile.process:
+                if profile.process.timeout_s and profile.process.timeout_s.value is not None:
+                    effective_timeout = float(profile.process.timeout_s.value)
+                if profile.process.max_processes and profile.process.max_processes.value is not None:
+                    max_processes = int(profile.process.max_processes.value)
+                if profile.process.fd_limit and profile.process.fd_limit.value is not None:
+                    fd_limit = int(profile.process.fd_limit.value)
+
+            return execute_command(
+                command, env_overrides=env_overrides, timeout=effective_timeout, cwd=cwd,
+                max_processes=max_processes, fd_limit=fd_limit,
+            )
         finally:
             self.adapter.cleanup()

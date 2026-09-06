@@ -28,7 +28,12 @@ def export_ci_test(
     is_dir = isinstance(regression, (str, Path)) and Path(regression).is_dir()
     target_ref = str(Path(regression).resolve()) if is_dir else artifact.regression_id
 
-    code = f'''"""Standalone Morph Invariant CI Test.
+    # The docstring is a raw string (r"""...""") because artifact.command
+    # routinely contains an unescaped Windows path (e.g. "C:\Users\...\python.exe").
+    # A plain (non-raw) triple-quoted string would have Python's tokenizer
+    # treat "\U" in "\Users" as the start of a \UXXXXXXXX unicode escape,
+    # making the generated file fail to even compile.
+    code = f'''r"""Standalone Morph Invariant CI Test.
 
 Generated automatically by Morph Flight Recorder.
 Verifies that the application survives environment constraints:
@@ -45,11 +50,11 @@ from morph.regression.replay import replay_regression
 def test_morph_{safe_name}_environment_invariant():
     """Verify application complies with the recorded regression threshold."""
     result = replay_regression(
-        "{target_ref}",
+        {target_ref!r},
         trials=1,
     )
     assert result.matches_expected, (
-        f"Morph invariant violation on '{artifact.regression_id}': "
+        f"Morph invariant violation on {artifact.regression_id!r}: "
         f"failure rate {{result.failure_rate:.1%}} exceeds max allowed "
         f"{artifact.expected_max_failure_rate:.1%}. Summary: {{result.summary}}"
     )

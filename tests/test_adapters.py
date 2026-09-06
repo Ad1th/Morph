@@ -1,3 +1,5 @@
+import os
+
 from morph.runtime.adapters import (
     LinuxAdapter,
     MacOSAdapter,
@@ -62,3 +64,21 @@ def test_windows_adapter_capabilities_and_locale():
 
     adapter.cleanup()
     assert adapter.get_env_overrides() == {}
+
+
+def test_cpu_quota_hint_on_windows_and_macos():
+    # Neither has a wired-up native quota mechanism (needs pywin32 / no
+    # cgroups) -- an honest env-var hint, not a fake apply.
+    for adapter in (WindowsAdapter(), MacOSAdapter()):
+        adapter.apply_cpu(max_cores=2, quota_percent=150.0)
+        assert adapter.get_env_overrides()["MORPH_CPU_QUOTA_PERCENT"] == "150.0"
+        adapter.cleanup()
+
+
+def test_linux_cpu_quota_falls_back_to_hint_when_not_root():
+    if os.name == "posix" and os.geteuid() == 0:
+        return  # can't exercise the non-root fallback path as root
+    adapter = LinuxAdapter()
+    adapter.apply_cpu(max_cores=2, quota_percent=150.0)
+    assert adapter.get_env_overrides()["MORPH_CPU_QUOTA_PERCENT"] == "150.0"
+    adapter.cleanup()

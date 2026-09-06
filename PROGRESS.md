@@ -156,3 +156,56 @@ Track 2 (Platform, Runtime, Flight Recorder, API, CLI, and E2E Integration) has 
   8. Full Typer CLI workflow
 
 **Total Test Suite**: 92 tests passing with 100% success rate across all components.
+
+---
+
+## Sanity-check pass over Phases 3-6 (Parth)
+
+Integrating Track 2 surfaced 4 Windows-specific bugs (117/117 tests fixed, up
+from 113/117), plus a CLI crash on bad input. See commit `b7af641`:
+
+- `morph/telemetry/collector.py`: commands built as raw Windows-path strings
+  (the actual convention used by the new CLI/API/e2e code) were being mangled
+  by `shlex.split(posix=True)`. Fixed by skipping shlex entirely on Windows —
+  `Popen` there accepts a command-line string directly and parses it natively.
+- `morph/regression/exporter.py`: `morph export` generated an uncompilable
+  file for any regression whose command referenced a Windows path (`\Users`
+  read as a broken unicode escape). Fixed with a raw docstring + `repr()`.
+- `morph/cli/main.py`: `morph run` on a not-found command crashed with an
+  unhandled `TypeError` instead of showing the error (peak_memory_mb is None
+  in that case; `:.1f` doesn't accept None).
+
+Also completed a merge (`13558df`) that landed mid-session: `docs/ui-spec.md`
+(UI & parameter-control spec) from origin, pulled in via a `git pull` that
+started elsewhere while tests were running. Doc-only, no conflicts.
+
+Verified the new flagship demo app, `apps/pool_retry` (Failure B: latency +
+packet loss interaction), empirically against real injected proxy conditions:
+baseline PASS, latency-alone PASS, loss-alone PASS, combined 8/10 FAIL,
+`--fixed` under the same combined conditions 10/10 PASS. Matches the
+documented interaction claim exactly.
+
+## Threshold checker + parameter metadata (per docs/ui-spec.md)
+
+Cross-referenced `docs/ui-spec.md` against the codebase per its own
+contract (section 6: "the frontend renders entirely from this metadata").
+Three things it implies were checked:
+
+- **Profiler**: every MVP parameter's host-detected default (section 2) is
+  already covered by `morph/profiler/` — host cores, RAM, locale, timezone.
+  Nothing added.
+- **Threshold checker**: did NOT exist — nothing validated a requested
+  profile against min/max bounds or the cross-field rules in section 5.
+  Added `morph/schema/parameters.py` (`MVP_PARAMETERS`: the metadata catalog
+  from section 6, scoped to the 7 MVP params that map to existing
+  `EnvironmentProfile` fields) and `morph/engine/validator.py`
+  (`check_thresholds`, `check_worker_required`, `check_platform_restrictions`,
+  `validate_profile`). Two of section 5's rules are NOT implemented —
+  `jitter <= latency` and `CPU quota <= cores * 100%` — because neither
+  `jitter` nor `cpu_quota` exists as an `EnvironmentProfile` field, and
+  adding them is a schema change affecting every phase, not something to do
+  unilaterally inside a validator.
+- **Tester**: `tests/test_parameters.py` (4 tests) and `tests/test_validator.py`
+  (12 tests), all passing.
+
+108/108 core tests pass (`tests/` + these 16 new ones), ruff clean.

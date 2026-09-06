@@ -48,6 +48,16 @@ def test_health_check():
     assert res.json() == {"status": "ok", "service": "morph-api"}
 
 
+def test_parameter_catalog_endpoint():
+    from morph.schema.parameters import PARAMETER_CATALOG
+
+    res = client.get("/parameters")
+    assert res.status_code == 200
+    data = res.json()
+    assert set(data) == set(PARAMETER_CATALOG)
+    assert data["cpu_cores"]["field_path"] == "cpu.cores"
+
+
 def test_capture_and_reconcile_profiles():
     res = client.post("/profiles/capture")
     assert res.status_code == 200
@@ -71,6 +81,17 @@ def test_run_endpoint():
     assert data["passed"] is True
     assert data["exit_code"] == 0
     assert "api run test" in data["stdout"]
+
+
+def test_run_endpoint_env_overrides_no_profile():
+    payload = {
+        "command": "python3 -c \"import os; print(os.environ.get('MORPH_API_TEST'))\"",
+        "timeout": 10.0,
+        "env_overrides": {"MORPH_API_TEST": "from-api"},
+    }
+    res = client.post("/run", json=payload)
+    assert res.status_code == 200
+    assert "from-api" in res.json()["stdout"]
 
 
 def test_experiments_endpoint():

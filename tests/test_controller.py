@@ -1,3 +1,5 @@
+import sys
+
 from morph.runtime.adapters.base import BaseAdapter
 from morph.runtime.controller import (
     RuntimeController,
@@ -12,6 +14,7 @@ from morph.schema.profile import (
     MemoryInfo,
     NetworkInfo,
     OSInfo,
+    ProcessInfo,
     ProfileField,
 )
 from morph.schema.telemetry import RunResult
@@ -48,6 +51,7 @@ class MockAdapter(BaseAdapter):
         super().__init__()
         self.applied_network = None
         self.applied_cpu = None
+        self.applied_cpu_quota = None
         self.applied_memory = None
         self.applied_locale = None
         self.cleanup_called = False
@@ -58,8 +62,9 @@ class MockAdapter(BaseAdapter):
     def apply_network(self, latency_ms=0.0, packet_loss_percent=0.0, bandwidth_mbps=None):
         self.applied_network = (latency_ms, packet_loss_percent, bandwidth_mbps)
 
-    def apply_cpu(self, max_cores=None):
+    def apply_cpu(self, max_cores=None, quota_percent=None):
         self.applied_cpu = max_cores
+        self.applied_cpu_quota = quota_percent
 
     def apply_memory(self, limit_mb=None):
         self.applied_memory = limit_mb
@@ -120,3 +125,71 @@ def test_runtime_controller_guarantees_cleanup_on_error():
     assert res.passed is False
     assert res.error_type == "RuntimeError"
     assert mock_adapter.cleanup_called is True
+
+
+def test_apply_conditions_passes_cpu_quota_through():
+    profile = make_test_profile()
+    profile.cpu.quota_percent = ProfileField(value=150.0, status=FieldStatus.REQUESTED)
+    mock_adapter = MockAdapter()
+    controller = RuntimeController(adapter=mock_adapter)
+
+    controller.apply_conditions(profile)
+
+    assert mock_adapter.applied_cpu == 4
+    assert mock_adapter.applied_cpu_quota == 150.0
+
+
+def test_network_offline_forces_100_percent_loss():
+    profile = make_test_profile()
+    profile.network.available = ProfileField(value=False, status=FieldStatus.REQUESTED)
+    mock_adapter = MockAdapter()
+    controller = RuntimeController(adapter=mock_adapter)
+
+    controller.apply_conditions(profile)
+
+    _latency, loss, _bw = mock_adapter.applied_network
+    assert loss == 100.0
+
+
+def test_network_online_leaves_loss_untouched():
+    profile = make_test_profile()
+    profile.network.available = ProfileField(value=True, status=FieldStatus.CAPTURED)
+    mock_adapter = MockAdapter()
+    controller = RuntimeController(adapter=mock_adapter)
+
+    controller.apply_conditions(profile)
+
+    _, loss, _ = mock_adapter.applied_network
+    assert loss == 1.0  # the profile's own requested packet_loss_percent
+
+
+def test_env_vars_merge_into_run_overrides():
+    profile = make_test_profile()
+    profile.env_vars = {"MORPH_CUSTOM": "hello"}
+    controller = RuntimeController(adapter=MockAdapter())
+
+    res = controller.run(
+        profile,
+        f'{sys.executable} -c "import os; print(os.environ.get(\'MORPH_CUSTOM\'))"',
+    )
+
+    assert res.passed is True
+    assert "hello" in res.stdout
+
+
+def test_runtime_controller_process_timeout_overrides_argument():
+    profile = make_test_profile()
+    profile.process = ProcessInfo(
+        timeout_s=ProfileField(value=0.3, status=FieldStatus.REQUESTED)
+    )
+    controller = RuntimeController(adapter=MockAdapter())
+
+    res = controller.run(
+        profile,
+        f'{sys.executable} -c "import time; time.sleep(10)"',
+        timeout=30.0,  # profile's 0.3s should win, not this
+    )
+
+    assert res.passed is False
+    assert res.error_type == "TimeoutExpired"
+    assert res.duration_ms < 5000

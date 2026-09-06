@@ -1,5 +1,6 @@
 import os
 import shlex
+import subprocess
 import sys
 import time
 
@@ -10,6 +11,11 @@ from morph.telemetry.collector import run_with_telemetry
 
 
 def _py(code: str) -> str:
+    # OS-native quoting: run_with_telemetry passes Windows commands straight
+    # to CreateProcess (its own quoting rules) and shlex-splits POSIX ones,
+    # so the join style must match whichever the current OS will use.
+    if os.name == "nt":
+        return subprocess.list2cmdline([sys.executable, "-c", code])
     return shlex.join([sys.executable, "-c", code])
 
 

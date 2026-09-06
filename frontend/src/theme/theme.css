@@ -1,0 +1,246 @@
+/* Morph OS themes. One component tree, three skins, switched by [data-os] on <html>. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+/* Explicit stacking level so #root's content paints above the fixed
+   scanline overlay below (position:fixed always creates a stacking
+   context, which would otherwise sit above #root's plain static box
+   regardless of DOM order). */
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+body {
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+  background: var(--wallpaper);
+  -webkit-font-smoothing: antialiased;
+  position: relative;
+}
+
+/* CRT-ish scanline dither over the real wallpaper photo, per the Claude
+   Design Windows reference. Windows-only: mac/linux wallpapers are flat
+   CSS gradients with no texture to dither. */
+:root[data-os='windows'] body {
+  image-rendering: pixelated;
+}
+:root[data-os='windows'] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.12) 0px,
+    rgba(255, 255, 255, 0.12) 1px,
+    rgba(0, 0, 0, 0.05) 1px,
+    rgba(0, 0, 0, 0.05) 2px
+  );
+  z-index: 0;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+/* Shared 3D bevel (real Win98 look on windows; a flat 1px border elsewhere,
+   since mac/linux define --bevel-light == --bevel-dark). */
+.bevel-raised {
+  border-style: solid;
+  border-width: var(--bevel-width);
+  border-top-color: var(--bevel-light);
+  border-left-color: var(--bevel-light);
+  border-right-color: var(--bevel-dark);
+  border-bottom-color: var(--bevel-dark);
+}
+
+.bevel-sunken {
+  border-style: solid;
+  border-width: var(--bevel-width);
+  border-top-color: var(--bevel-dark);
+  border-left-color: var(--bevel-dark);
+  border-right-color: var(--bevel-light);
+  border-bottom-color: var(--bevel-light);
+}
+
+/* ---------- Windows: retro 98/2000 chrome, clouds wallpaper ---------- */
+:root[data-os='windows'] {
+  --font-display: 'Silkscreen', monospace;
+  --font-ui: 'DM Mono', monospace;
+  --font-mono: 'DM Mono', monospace;
+  --label-transform: uppercase;
+  --label-tracking: 0.02em;
+
+  --wallpaper: #3a67e8 url('/wallpapers/windows.jpg') top center / cover;
+
+  --window-bg: #c0c0c0;
+  --window-border: #4d4d4d;
+  --window-radius: 0px;
+  --window-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
+  --titlebar-bg: #000082;
+  --titlebar-text: #ffffff;
+  --titlebar-height: 26px;
+
+  /* Classic Win98 raised/sunken bevel: light top-left, dark bottom-right.
+     .bevel-raised/.bevel-sunken (below) apply these; on mac/linux both
+     colors equal surface-border, so the same classes render as a plain
+     flat border there instead of a false 3D bevel. */
+  --bevel-light: #ffffff;
+  --bevel-dark: #4d4d4d;
+  --bevel-width: 2px;
+
+  --text-primary: #10192b;
+  --text-secondary: #3a4a6b;
+  --accent: #000082;
+  --accent-text: #ffffff;
+
+  --surface: #ffffff;
+  --surface-border: #8a8a8a;
+  --group-header-bg: #e4e2da;
+  --group-header-bg-active: #000082;
+  --group-header-text: #10192b;
+  --group-header-text-active: #ffffff;
+
+  --input-bg: #ffffff;
+  --input-border: #7a7a7a;
+
+  --chip-detected-bg: #e4e2da;
+  --chip-detected-text: #444;
+  --chip-requested-bg: #dfe8ff;
+  --chip-requested-text: #000082;
+  --chip-reproduced-bg: #d8f0d8;
+  --chip-reproduced-text: #1a6b1a;
+  --chip-approximated-bg: #fff0c0;
+  --chip-approximated-text: #8a6200;
+  --chip-unavailable-bg: #ffd8d8;
+  --chip-unavailable-text: #a41818;
+
+  --button-bg: #c0c0c0;
+  --button-border: #4d4d4d;
+  --button-radius: 0px;
+}
+
+/* ---------- macOS: modern rounded window, Big Sur wave wallpaper ---------- */
+:root[data-os='mac'] {
+  --font-display: 'Silkscreen', monospace;
+  --font-ui: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --label-transform: none;
+  --label-tracking: normal;
+
+  --wallpaper: radial-gradient(ellipse 90% 60% at 15% 90%, #3fa0e8 0%, transparent 60%),
+    radial-gradient(ellipse 80% 60% at 60% 95%, #e0325a 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 90% 100%, #9b4ee8 0%, transparent 55%),
+    linear-gradient(160deg, #16152e 0%, #1e1c3d 45%, #241f3f 100%);
+
+  --window-bg: #ffffff;
+  --window-border: #d8d8dc;
+  --window-radius: 12px;
+  --window-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  --titlebar-bg: #f6f2f0;
+  --titlebar-text: #2b2b2f;
+  --titlebar-height: 40px;
+
+  /* No bevel on mac -- both colors equal surface-border so .bevel-* is flat. */
+  --bevel-light: #d8d8dc;
+  --bevel-dark: #d8d8dc;
+  --bevel-width: 1px;
+
+  --text-primary: #1c1c1e;
+  --text-secondary: #6e6e73;
+  --accent: #0a66ff;
+  --accent-text: #ffffff;
+
+  --surface: #ffffff;
+  --surface-border: #e5e5e7;
+  --group-header-bg: #f4f4f6;
+  --group-header-bg-active: #e7f0ff;
+  --group-header-text: #3a3a3d;
+  --group-header-text-active: #0a66ff;
+
+  --input-bg: #ffffff;
+  --input-border: #d6d6db;
+
+  --chip-detected-bg: #f0f0f2;
+  --chip-detected-text: #6e6e73;
+  --chip-requested-bg: #e7f0ff;
+  --chip-requested-text: #0a66ff;
+  --chip-reproduced-bg: #e5f7e8;
+  --chip-reproduced-text: #1c8a3a;
+  --chip-approximated-bg: #fff3d6;
+  --chip-approximated-text: #a3730a;
+  --chip-unavailable-bg: #fde6e6;
+  --chip-unavailable-text: #c62e2e;
+
+  --button-bg: #f0f0f2;
+  --button-border: #d6d6db;
+  --button-radius: 8px;
+}
+
+/* ---------- Linux: terminal-first, dark, monospace ---------- */
+:root[data-os='linux'] {
+  --font-display: 'Silkscreen', monospace;
+  --font-ui: 'JetBrains Mono', monospace;
+  --font-mono: 'JetBrains Mono', monospace;
+  --label-transform: none;
+  --label-tracking: normal;
+
+  --wallpaper: radial-gradient(ellipse 60% 50% at 10% 20%, #1b2735 0%, transparent 60%),
+    linear-gradient(160deg, #0a0f16 0%, #0d1420 60%, #0a0f16 100%);
+
+  --window-bg: #0e1116;
+  --window-border: #2ee6a6;
+  --window-radius: 4px;
+  --window-shadow: 0 0 0 1px rgba(46, 230, 166, 0.25), 0 20px 50px rgba(0, 0, 0, 0.6);
+  --titlebar-bg: #0e1116;
+  --titlebar-text: #2ee6a6;
+  --titlebar-height: 30px;
+
+  /* No bevel on linux -- both colors equal window-border so .bevel-* is flat. */
+  --bevel-light: #2ee6a6;
+  --bevel-dark: #2ee6a6;
+  --bevel-width: 1px;
+
+  --text-primary: #d6e6df;
+  --text-secondary: #7fa393;
+  --accent: #2ee6a6;
+  --accent-text: #06110d;
+
+  --surface: #10151c;
+  --surface-border: #223028;
+  --group-header-bg: #142019;
+  --group-header-bg-active: #163d2c;
+  --group-header-text: #9fd8bf;
+  --group-header-text-active: #2ee6a6;
+
+  --input-bg: #0b0f14;
+  --input-border: #2a3a33;
+
+  --chip-detected-bg: #182420;
+  --chip-detected-text: #7fa393;
+  --chip-requested-bg: #163d2c;
+  --chip-requested-text: #2ee6a6;
+  --chip-reproduced-bg: #163d2c;
+  --chip-reproduced-text: #2ee6a6;
+  --chip-approximated-bg: #3a3115;
+  --chip-approximated-text: #e6c02e;
+  --chip-unavailable-bg: #3a1818;
+  --chip-unavailable-text: #e64c4c;
+
+  --button-bg: #142019;
+  --button-border: #2ee6a6;
+  --button-radius: 2px;
+}

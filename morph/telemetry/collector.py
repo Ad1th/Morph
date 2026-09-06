@@ -98,6 +98,17 @@ def _kill_tree(pid: int) -> None:
             pass
 
 
+def _limit_resources(max_processes: int | None, fd_limit: int | None) -> None:
+    """preexec_fn: applies POSIX rlimits in the child, before exec. Never
+    called on Windows -- subprocess.Popen rejects preexec_fn there outright."""
+    import resource
+
+    if max_processes is not None:
+        resource.setrlimit(resource.RLIMIT_NPROC, (max_processes, max_processes))
+    if fd_limit is not None:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (fd_limit, fd_limit))
+
+
 def _early_result(*, exit_code: int, stderr: str, duration_ms: float,
                   error_type: str, error_message: str) -> RunResult:
     return RunResult(
@@ -120,34 +131,49 @@ def run_with_telemetry(
     env: dict | None = None,
     timeout: float = 30.0,
     cwd: str | None = None,
+    max_processes: int | None = None,
+    fd_limit: int | None = None,
 ) -> RunResult:
     """Run `command`, returning a populated RunResult.
 
     `env`, if given, is passed verbatim to the child and fully replaces its
     environment. Callers wanting os.environ + overrides should go through
     `morph.runtime.runner.execute_command`, which does the merge.
+
+    `max_processes`/`fd_limit` apply POSIX rlimits (RLIMIT_NPROC/RLIMIT_NOFILE)
+    to the child before exec. Silently ignored on Windows: there is no direct
+    equivalent without a pywin32 dependency this project doesn't have.
     """
-    # posix=True always, matching shlex.join() (used by every caller to build
-    # `command`): shlex.join() emits POSIX-style quoting unconditionally, it
-    # does not adapt to os.name, so the split side must not either. Splitting
-    # posix=False on Windows corrupted quoted paths (the executable's own
-    # quote characters became part of the literal argv[0]), causing every
-    # subprocess launch to fail with FileNotFoundError.
-    args = shlex.split(command, posix=True)
-    if not args:
+    if not command.strip():
         raise ValueError("command is empty")
 
     popen_kwargs = dict(
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=cwd, env=env
     )
+    if os.name != "nt" and (max_processes is not None or fd_limit is not None):
+        popen_kwargs["preexec_fn"] = lambda: _limit_resources(max_processes, fd_limit)
+
     if os.name == "nt":
+        # Windows' CreateProcess takes the whole command line as one string
+        # and does its own native quoting/backslash parsing -- passing it
+        # through untouched is both correct AND what a real Windows path or
+        # a manually-typed command already assumes. Re-splitting with shlex
+        # (a POSIX-shell concept) previously mismatched real-world command
+        # strings: `posix=False` corrupted shlex.join()-built commands, and
+        # `posix=True` corrupted raw Windows paths (their backslashes are
+        # POSIX escape characters), breaking one calling style or the other.
+        popen_target: str | list[str] = command
         popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
     else:
+        # POSIX Popen (shell=False) requires an argv list; shlex.split with
+        # posix=True is the correct, standard way to tokenize a shell-style
+        # command string here.
+        popen_target = shlex.split(command, posix=True)
         popen_kwargs["start_new_session"] = True
 
     start = time.perf_counter()
     try:
-        proc = subprocess.Popen(args, **popen_kwargs)
+        proc = subprocess.Popen(popen_target, **popen_kwargs)
     except FileNotFoundError as exc:
         return _early_result(exit_code=127, stderr=str(exc),
                              duration_ms=(time.perf_counter() - start) * 1000,

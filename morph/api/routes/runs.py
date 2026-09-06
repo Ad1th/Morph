@@ -18,6 +18,10 @@ class RunRequest(BaseModel):
     timeout: float = 30.0
     cwd: str | None = None
     force_proxy: bool = False
+    # Only used on the no-profile path below; with a profile, env vars come
+    # from profile.env_vars (the Environment Variables editor screen) via
+    # RuntimeController.run().
+    env_overrides: dict[str, str] = {}
 
 
 @router.post("", response_model=RunResult)
@@ -36,6 +40,7 @@ def execute_run(req: RunRequest) -> RunResult:
             from morph.runtime.runner import execute_command
             return execute_command(
                 command=req.command,
+                env_overrides=req.env_overrides,
                 timeout=req.timeout,
                 cwd=req.cwd,
             )

@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from morph.api.routes import experiments, profiles, regressions, runs, ws
+from morph.api.routes import experiments, parameters, profiles, regressions, runs, ws
 
 
 def create_app() -> FastAPI:
@@ -30,6 +30,7 @@ def create_app() -> FastAPI:
         return {"status": "ok", "service": "morph-api"}
 
     app.include_router(profiles.router, prefix="/profiles", tags=["profiles"])
+    app.include_router(parameters.router, prefix="/parameters", tags=["parameters"])
     app.include_router(runs.router, prefix="/run", tags=["runs"])
     app.include_router(experiments.router, prefix="/experiments", tags=["experiments"])
     app.include_router(regressions.router, prefix="/regressions", tags=["regressions"])
