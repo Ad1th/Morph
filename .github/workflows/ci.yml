@@ -1,0 +1,84 @@
+name: CI
+
+# Runs only for the main branch: direct pushes (merges) and pull requests
+# targeting it. Pushes to feature branches without an open PR do not trigger
+# this workflow. `pull_request` (not `pull_request_target`) keeps fork PRs on a
+# read-only token with no secret access.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject merge-conflict markers
+        run: |
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)( |$)' -- ':!.github/workflows/ci.yml'; then
+            echo "::error::Unresolved merge-conflict markers found"
+            exit 1
+          fi
+          echo "No conflict markers."
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            apps/requirements.txt
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - name: ruff check
+        run: ruff check morph/ tests/ apps/
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            apps/requirements.txt
+      - run: python -m pip install --upgrade pip
+      - name: Install project + demo-app deps
+        run: |
+          pip install -r requirements.txt
+          pip install -r apps/requirements.txt
+          pip install -e .
+      - name: Unit + integration tests
+        run: pytest -q --timeout=120
+      - name: Demo-app failure corpus is deterministic
+        run: pytest -q --timeout=120 apps/
+      - name: CLI smoke test
+        run: |
+          morph --help
+          morph capture --output /tmp/profile.json
+          python -c "from morph.schema.profile import EnvironmentProfile; EnvironmentProfile.model_validate_json(open('/tmp/profile.json').read())"
+          morph run --command "python -c 'print(1)'"
+      - name: Proxy adapter self-check
+        run: python -m morph.runtime.adapters.proxy
