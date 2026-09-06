@@ -1,0 +1,131 @@
+.desktop {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+.desktop__folder {
+  position: absolute;
+  top: 20px;
+  left: 24px;
+}
+
+.desktop__center {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #ffffff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.desktop__wordmark {
+  font-family: var(--font-display);
+  font-size: 48px;
+  letter-spacing: 0.4em;
+  margin: 0 0 20px 0;
+}
+
+.desktop__tagline {
+  font-family: var(--font-ui);
+  font-size: 20px;
+  font-weight: 600;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.desktop__dialog {
+  position: absolute;
+  top: 140px;
+  left: 24px;
+  width: 330px;
+  background: var(--window-bg);
+  border: 1px solid var(--window-border);
+  border-radius: var(--window-radius);
+  box-shadow: var(--window-shadow);
+  overflow: hidden;
+}
+
+.desktop__dialog-titlebar {
+  height: var(--titlebar-height);
+  background: var(--titlebar-bg);
+  color: var(--titlebar-text);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  gap: 8px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+}
+
+.desktop__dialog-title {
+  flex: 1;
+  text-transform: var(--label-transform);
+}
+
+.desktop__dialog-close {
+  cursor: default;
+  opacity: 0.8;
+}
+
+.desktop__traffic-lights {
+  display: flex;
+  gap: 6px;
+}
+.desktop__traffic-lights i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.desktop__traffic-lights i:nth-child(1) {
+  background: #ff5f57;
+}
+.desktop__traffic-lights i:nth-child(2) {
+  background: #febc2e;
+}
+.desktop__traffic-lights i:nth-child(3) {
+  background: #28c840;
+}
+
+.desktop__dialog-body {
+  padding: 16px;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+
+.desktop__dialog-body p {
+  margin: 0 0 14px 0;
+  font-size: 16px;
+}
+
+.desktop__dialog-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.desktop__btn {
+  flex: 1;
+  padding: 8px 10px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  text-transform: var(--label-transform);
+  background: var(--button-bg);
+  border: 1px solid var(--button-border);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.desktop__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.desktop__btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}

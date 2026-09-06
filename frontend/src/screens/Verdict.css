@@ -1,0 +1,113 @@
+.verdict {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.verdict__panel {
+  width: min(560px, 100%);
+  background: var(--window-bg);
+  border: 1px solid var(--window-border);
+  border-radius: var(--window-radius);
+  box-shadow: var(--window-shadow);
+  padding: 24px;
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+}
+
+.verdict__banner {
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 28px;
+  letter-spacing: 0.1em;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.verdict__banner[data-passed='true'] {
+  background: var(--chip-reproduced-bg);
+  color: var(--chip-reproduced-text);
+}
+
+.verdict__banner[data-passed='false'] {
+  background: var(--chip-unavailable-bg);
+  color: var(--chip-unavailable-text);
+}
+
+.verdict__metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.verdict__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+}
+
+.verdict__metric-label {
+  font-size: 11px;
+  text-transform: var(--label-transform);
+  color: var(--text-secondary);
+}
+
+.verdict__metric-value {
+  font-family: var(--font-mono);
+  font-size: 15px;
+}
+
+.verdict__error {
+  background: var(--chip-unavailable-bg);
+  color: var(--chip-unavailable-text);
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 16px;
+  word-break: break-word;
+}
+
+.verdict__toggle {
+  width: 100%;
+  padding: 8px;
+  background: var(--button-bg);
+  border: 1px solid var(--button-border);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.verdict__output {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  padding: 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 16px;
+}
+
+.verdict__back {
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--button-radius);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  cursor: pointer;
+}

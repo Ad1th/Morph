@@ -1,0 +1,58 @@
+.env-vars {
+  padding: 12px 14px;
+}
+
+.env-vars__hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 10px 0;
+  text-transform: var(--label-transform);
+}
+
+.env-vars__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.env-vars__key,
+.env-vars__value {
+  flex: 1;
+  padding: 6px 8px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.env-vars__key[data-warn='true'] {
+  border-color: var(--chip-approximated-text);
+}
+
+.env-vars__eq {
+  color: var(--text-secondary);
+}
+
+.env-vars__remove {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.env-vars__add {
+  padding: 6px 12px;
+  background: var(--button-bg);
+  border: 1px solid var(--button-border);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  cursor: pointer;
+}

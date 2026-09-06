@@ -1,0 +1,119 @@
+.param-config {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 60px 20px;
+}
+
+.param-config__status {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 18px;
+}
+
+.param-config__panel {
+  width: min(880px, 100%);
+  background: var(--window-bg);
+  border: 1px solid var(--window-border);
+  border-radius: var(--window-radius);
+  box-shadow: var(--window-shadow);
+  overflow: hidden;
+}
+
+.param-config__titlebar {
+  height: var(--titlebar-height);
+  background: var(--titlebar-bg);
+  color: var(--titlebar-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  text-transform: var(--label-transform);
+}
+
+.param-config__traffic-lights {
+  display: flex;
+  gap: 6px;
+}
+.param-config__traffic-lights i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.param-config__traffic-lights i:nth-child(1) {
+  background: #ff5f57;
+}
+.param-config__traffic-lights i:nth-child(2) {
+  background: #febc2e;
+}
+.param-config__traffic-lights i:nth-child(3) {
+  background: #28c840;
+}
+
+.param-config__summary,
+.param-config__search {
+  margin: 14px 14px 0 14px;
+  padding: 8px 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.param-config__search {
+  margin-top: 8px;
+  width: calc(100% - 28px);
+}
+
+.param-config__search::placeholder {
+  text-transform: var(--label-transform);
+  color: var(--text-secondary);
+}
+
+.param-config__groups {
+  padding: 14px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.param-config__footer {
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+  border-top: 1px solid var(--surface-border);
+}
+
+.param-config__btn {
+  padding: 8px 14px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  text-transform: var(--label-transform);
+  background: var(--button-bg);
+  border: 1px solid var(--button-border);
+  border-radius: var(--button-radius);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.param-config__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.param-config__btn--primary {
+  margin-left: auto;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}

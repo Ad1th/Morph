@@ -1,0 +1,89 @@
+.param-row {
+  display: grid;
+  grid-template-columns: 180px 1fr 100px 90px 24px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--surface-border);
+  font-family: var(--font-ui);
+}
+
+.param-row__label {
+  font-size: 14px;
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.param-row__control {
+  min-width: 0;
+}
+
+.param-row__slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.param-row__slider input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.param-row__number {
+  width: 64px;
+  padding: 3px 6px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.param-row__text {
+  width: 100%;
+  padding: 4px 8px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.param-row__unit {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.param-row__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.param-row__reset {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 15px;
+  padding: 2px;
+}
+
+.param-row__reset:hover {
+  color: var(--accent);
+}
+
+input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
