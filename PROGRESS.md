@@ -30,7 +30,12 @@ All four features are built, tested, linted clean, and committed. 25/25 tests
 pass (`py -3 -m pytest tests/ -q`), the proxy self-check passes
 (`py -3 -m morph.runtime.adapters.proxy`), and `ruff check morph/ tests/`
 reports no findings. A `code-review` pass was also run and its one real
-finding (see below) was fixed with a regression test.
+finding (see below) was fixed with a regression test. `graphify-out/` has been
+regenerated to include this pass's `morph/` modules and doc changes (269
+nodes, 330 edges, 45 communities as of this write-up). Use `python` (system
+default) for graphify's own tooling; use `py -3` specifically for anything
+touching this project's code, since that is the interpreter with
+psutil/pydantic/pytest/scipy/ruff/distro installed on this machine.
 
 ### What exists
 
