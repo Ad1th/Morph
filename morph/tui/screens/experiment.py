@@ -69,28 +69,37 @@ class ExperimentScreen(Screen):
     def action_run(self) -> None:
         if self._busy:
             return
+        log = self.query_one("#exp-log", RichLog)
+        demo = bool(getattr(self.app, "demo", False))
+
         command = self.query_one("#in-command", Input).value.strip()
-        if not command:
+        if not command and not demo:
             self.app.bell()
-            self.query_one("#exp-log", RichLog).write("[red]enter a command first[/red]")
+            log.write("[red]enter a command first[/red]")
             return
         try:
             trials = max(2, int(self.query_one("#in-trials", Input).value or "5"))
         except ValueError:
             trials = 5
 
-        try:
-            profile = resolve_profile(self.query_one("#in-profile", Input).value)
-        except Exception as exc:
-            self.query_one("#exp-log", RichLog).write(f"[red]bad profile: {exc}[/red]")
-            return
-
         self._reset_views()
         self._busy = True
         self.query_one("#btn-run", Button).disabled = True
-        self.query_one("#exp-log", RichLog).write(
-            f"[dim]running {trials} trials/condition · {command}[/dim]"
-        )
+
+        if demo:
+            log.write("[yellow]DEMO[/yellow] [dim]replaying a recorded checkout-timeout experiment[/dim]")
+            self._demo_worker()
+            return
+
+        try:
+            profile = resolve_profile(self.query_one("#in-profile", Input).value)
+        except Exception as exc:
+            log.write(f"[red]bad profile: {exc}[/red]")
+            self._busy = False
+            self.query_one("#btn-run", Button).disabled = False
+            return
+
+        log.write(f"[dim]running {trials} trials/condition · {command}[/dim]")
         self._worker(profile, command, trials)
 
     def _reset_views(self) -> None:
@@ -108,6 +117,16 @@ class ExperimentScreen(Screen):
         try:
             result = run_experiment_live(profile, command, trials, timeout=30.0, on_event=emit)
             self.post_message(RunFinished(result))
+        except Exception as exc:
+            self.post_message(RunFinished(None, exc))
+
+    @work(thread=True, exclusive=True)
+    def _demo_worker(self) -> None:
+        from morph.tui.demo import play
+
+        try:
+            play(lambda ev: self.post_message(EngineEvent(ev)))
+            self.post_message(RunFinished(object()))
         except Exception as exc:
             self.post_message(RunFinished(None, exc))
 

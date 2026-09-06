@@ -150,6 +150,36 @@ async def test_environment_screen_capture_template_reconcile():
         assert screen.query_one("#env-diff").row_count == 9
 
 
+def test_demo_events_tell_the_environment_caused_story():
+    from morph.tui.demo import demo_events
+
+    events = demo_events()
+    comparisons = [e for e in events if e.kind == "comparison"]
+    assert [c.is_significant for c in comparisons] == [False, False, True]
+    assert events[-1].kind == "verdict"
+    assert events[-1].classification == "environment_caused"
+    assert events[-1].strongest_condition == "full_target"
+    # no p-value on any per-trial event
+    assert all(e.p_value is None for e in events if e.kind == "trial")
+
+
+@pytest.mark.asyncio
+async def test_demo_mode_runs_without_a_command():
+    app = MorphApp(demo=True)
+    async with app.run_test() as pilot:
+        await pilot.press("e")
+        await pilot.pause()
+        screen = app.screen
+        screen.action_run()  # no command entered
+        for _ in range(200):
+            await pilot.pause(0.05)
+            if not screen._busy and screen._lanes:
+                break
+        assert set(screen._lanes) == {"baseline", "latency_only", "loss_only", "full_target"}
+        assert screen._lanes["full_target"]._effect == "significant_increase"
+        assert not screen.query_one("#verdict").has_class("hidden")
+
+
 @pytest.mark.asyncio
 async def test_threshold_gauge_converges(monkeypatch):
     import morph.tui.screens.threshold as th_mod
