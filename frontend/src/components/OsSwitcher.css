@@ -23,6 +23,17 @@
   outline-offset: 2px;
 }
 
+/* Metallic bevel badge, matching the Claude Design Windows reference. */
+:root[data-os='windows'] .os-switcher__badge {
+  width: 62px;
+  height: 62px;
+  background: linear-gradient(160deg, #f2f2f2 0%, #bdbdbd 45%, #8f8f8f 100%);
+  border: 2px solid #4a4a4a;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.6),
+    1px 2px 0 rgba(0, 0, 0, 0.35);
+}
+
 .os-switcher__menu {
   position: absolute;
   top: 52px;

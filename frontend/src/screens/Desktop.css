@@ -8,6 +8,48 @@
   position: absolute;
   top: 20px;
   left: 24px;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Windows 98 folder: small tab + body + inner highlight, built from divs
+   (matches the Claude Design reference exactly instead of an SVG glyph). */
+.desktop__folder--win98 {
+  top: 40px;
+  left: 40px;
+  width: 66px;
+  height: 52px;
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.45));
+}
+
+.desktop__folder-tab {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 30px;
+  height: 10px;
+  background: #f5e79e;
+  border: 2px solid #4a4526;
+  border-bottom: none;
+}
+
+.desktop__folder-body {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 66px;
+  height: 44px;
+  background: #f7e9a0;
+  border: 2px solid #4a4526;
+}
+
+.desktop__folder-highlight {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 58px;
+  height: 6px;
+  background: #fffbe0;
 }
 
 .desktop__center {
@@ -37,14 +79,12 @@
 
 .desktop__dialog {
   position: absolute;
-  top: 140px;
-  left: 24px;
-  width: 330px;
+  top: 128px;
+  left: 40px;
+  width: 336px;
   background: var(--window-bg);
-  border: 1px solid var(--window-border);
   border-radius: var(--window-radius);
   box-shadow: var(--window-shadow);
-  overflow: hidden;
 }
 
 .desktop__dialog-titlebar {
@@ -53,20 +93,34 @@
   color: var(--titlebar-text);
   display: flex;
   align-items: center;
-  padding: 0 10px;
+  margin: 3px;
+  padding: 0 3px 0 6px;
   gap: 8px;
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .desktop__dialog-title {
   flex: 1;
   text-transform: var(--label-transform);
+  white-space: nowrap;
 }
 
 .desktop__dialog-close {
-  cursor: default;
-  opacity: 0.8;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--button-bg);
+  color: #000;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
 }
 
 .desktop__traffic-lights {
@@ -90,30 +144,56 @@
 }
 
 .desktop__dialog-body {
-  padding: 16px;
+  padding: 14px 16px 16px;
   color: var(--text-primary);
   font-family: var(--font-ui);
 }
 
-.desktop__dialog-body p {
-  margin: 0 0 14px 0;
-  font-size: 16px;
+.desktop__dialog-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.desktop__dialog-icon {
+  flex: none;
+  width: 46px;
+  height: 42px;
+  background: #d9d9d9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.desktop__dialog-icon-inner {
+  width: 16px;
+  height: 11px;
+  background: #1f7a6b;
+  border: 1px solid #0d3f37;
+}
+
+.desktop__dialog-message {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.25;
+  text-align: center;
 }
 
 .desktop__dialog-actions {
   display: flex;
-  gap: 10px;
+  gap: 14px;
+  margin-top: 18px;
 }
 
 .desktop__btn {
   flex: 1;
-  padding: 8px 10px;
+  padding: 7px 6px;
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 13px;
   text-transform: var(--label-transform);
   background: var(--button-bg);
-  border: 1px solid var(--button-border);
-  border-radius: var(--button-radius);
   color: var(--text-primary);
   cursor: pointer;
 }
@@ -125,7 +205,26 @@
 
 .desktop__btn--primary {
   background: var(--accent);
-  border-color: var(--accent);
   color: var(--accent-text);
   font-weight: 600;
+}
+
+.desktop__github {
+  margin-top: 16px;
+}
+
+.desktop__label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.desktop__input {
+  width: 100%;
+  padding: 6px 7px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  outline: none;
 }

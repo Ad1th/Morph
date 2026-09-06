@@ -57,11 +57,12 @@ function OsGlyph({ os, small }: { os: OsName; small?: boolean }) {
   const size = small ? 16 : 22
   if (os === 'windows') {
     return (
-      <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden>
-        <rect x="1" y="1" width="8" height="8" fill="#4a7cd4" />
-        <rect x="11" y="1" width="8" height="8" fill="#4a7cd4" />
-        <rect x="1" y="11" width="8" height="8" fill="#4a7cd4" />
-        <rect x="11" y="11" width="8" height="8" fill="#4a7cd4" />
+      <svg width={size} height={size} viewBox="0 0 34 34" aria-hidden>
+        <rect x="1" y="1" width="32" height="32" rx="16" fill="#101f5c" stroke="#dcdcdc" strokeWidth="1" />
+        <rect x="6" y="6" width="10" height="10" fill="#7fa8ff" />
+        <rect x="18" y="6" width="10" height="10" fill="#ffffff" />
+        <rect x="6" y="18" width="10" height="10" fill="#ffffff" />
+        <rect x="18" y="18" width="10" height="10" fill="#7fa8ff" />
       </svg>
     )
   }
