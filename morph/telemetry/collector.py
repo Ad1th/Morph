@@ -128,7 +128,13 @@ def run_with_telemetry(
     environment. Callers wanting os.environ + overrides should go through
     `morph.runtime.runner.execute_command`, which does the merge.
     """
-    args = shlex.split(command, posix=(os.name != "nt"))
+    # posix=True always, matching shlex.join() (used by every caller to build
+    # `command`): shlex.join() emits POSIX-style quoting unconditionally, it
+    # does not adapt to os.name, so the split side must not either. Splitting
+    # posix=False on Windows corrupted quoted paths (the executable's own
+    # quote characters became part of the literal argv[0]), causing every
+    # subprocess launch to fail with FileNotFoundError.
+    args = shlex.split(command, posix=True)
     if not args:
         raise ValueError("command is empty")
 
