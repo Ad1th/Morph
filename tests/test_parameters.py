@@ -64,3 +64,11 @@ def test_uncontrollable_params_are_never_marked_local():
             assert "local" not in meta.platform_support.values(), (
                 f"{key} is not controllable but claims local platform support"
             )
+
+
+def test_boolean_defaults_do_not_coerce_to_float():
+    # Pydantic's union matching silently turned True/False into 1.0/0.0 when
+    # `bool` wasn't in the ParameterMetadata.default union -- a frontend would
+    # render a toggle's default as a slider value.
+    assert PARAMETER_CATALOG["network_availability"].default is True
+    assert PARAMETER_CATALOG["read_only_filesystem"].default is False

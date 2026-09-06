@@ -32,7 +32,7 @@ class ParameterMetadata(BaseModel):
     unit: str
     min: float | None = None
     max: float | None = None
-    default: float | str | None = None
+    default: bool | float | str | None = None  # bool before float: True/False must not coerce to 1.0/0.0
     step: float | None = None
     detectable: bool = True
     controllable: bool = True
