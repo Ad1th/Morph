@@ -1,14 +1,17 @@
-from enum import Enum
-from typing import Any, Optional
-from pydantic import BaseModel, Field
+"""EnvironmentProfile: the portable JSON description of a machine's conditions."""
+
+from enum import StrEnum
+from typing import Any
+
+from pydantic import BaseModel
 
 
-class FieldStatus(str, Enum):
-    CAPTURED = "captured"         # Measured from a real machine
-    REQUESTED = "requested"       # Defined manually by the developer
-    REPRODUCED = "reproduced"     # Successfully applied on the test machine
-    APPROXIMATED = "approximated" # Best-effort (e.g. CPU throttled but not identical)
-    UNAVAILABLE = "unavailable"   # Cannot be reproduced locally
+class FieldStatus(StrEnum):
+    CAPTURED = "captured"
+    REQUESTED = "requested"
+    REPRODUCED = "reproduced"
+    APPROXIMATED = "approximated"
+    UNAVAILABLE = "unavailable"
 
 
 class ProfileField(BaseModel):
@@ -17,15 +20,15 @@ class ProfileField(BaseModel):
 
 
 class OSInfo(BaseModel):
-    family: ProfileField          # "windows" | "darwin" | "linux"
-    version: ProfileField         # "11", "14.5", "22.04"
+    family: ProfileField
+    version: ProfileField
 
 
 class CPUInfo(BaseModel):
-    architecture: ProfileField    # "x86_64" | "arm64"
-    cores: ProfileField           # Physical core count
+    architecture: ProfileField
+    cores: ProfileField
     logical_processors: ProfileField
-    clock_mhz: Optional[ProfileField] = None
+    clock_mhz: ProfileField | None = None
 
 
 class MemoryInfo(BaseModel):
@@ -33,8 +36,8 @@ class MemoryInfo(BaseModel):
 
 
 class LocaleInfo(BaseModel):
-    locale: ProfileField          # "en-IN", "en-US", etc.
-    timezone: ProfileField        # "Asia/Kolkata", "UTC", etc.
+    locale: ProfileField
+    timezone: ProfileField
 
 
 class FilesystemInfo(BaseModel):
@@ -44,7 +47,7 @@ class FilesystemInfo(BaseModel):
 class NetworkInfo(BaseModel):
     latency_ms: ProfileField
     packet_loss_percent: ProfileField
-    bandwidth_mbps: Optional[ProfileField] = None
+    bandwidth_mbps: ProfileField | None = None
 
 
 class EnvironmentProfile(BaseModel):
@@ -53,5 +56,5 @@ class EnvironmentProfile(BaseModel):
     cpu: CPUInfo
     memory: MemoryInfo
     locale: LocaleInfo
-    filesystem: Optional[FilesystemInfo] = None
-    network: NetworkInfo
+    filesystem: FilesystemInfo | None = None
+    network: NetworkInfo | None = None

@@ -2,13 +2,6 @@
 .DS_Store
 Thumbs.db
 
-# Go
-# /morph
-/bin/
-/dist/
-*.test
-*.out
-/vendor/
 
 # Python
 __pycache__/
@@ -52,10 +45,14 @@ dist/
 .morph/cache/
 *.log
 
+# Graphify local tool state: regenerable extraction cache and change-detection
+# manifest, not the tracked outputs (graph.html/json, GRAPH_REPORT.md).
+graphify-out/cache/
+graphify-out/manifest.json
+
 # Env / secrets
 .env
 
 # Temporary / Draft Specs
 Morph_Design_Spec.md
 Morph_PRD.md
-graphify-out/cache/
