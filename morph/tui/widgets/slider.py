@@ -57,6 +57,7 @@ class Slider(Static, can_focus=True):
         self.value = self._clamp(value)
         self.status: str = ""      # reconcile badge, set by the screen
         self.muted: bool = False   # host can't really apply this one
+        self.warn: bool = False    # near a boundary the runs have revealed
 
     # --- interaction ------------------------------------------------------
     def _clamp(self, v: float) -> float:
@@ -88,6 +89,11 @@ class Slider(Static, can_focus=True):
         self.muted = muted
         self._redraw()
 
+    def set_warn(self, warn: bool) -> None:
+        if warn != self.warn:
+            self.warn = warn
+            self._redraw()
+
     # --- rendering ----------------------------------------------------------
     def on_mount(self) -> None:
         self._redraw()
@@ -104,6 +110,7 @@ class Slider(Static, can_focus=True):
         knob = "green" if self.has_focus else ("grey50" if self.muted else "cyan")
 
         line = Text()
+        line.append("⚠ " if self.warn else "  ", style="bold red3")
         line.append(f"{self.label:<11}", style="bold" if self.has_focus else ("dim" if self.muted else ""))
         line.append("▉" * filled, style=knob)
         line.append("░" * (_TRACK - filled), style="grey30")

@@ -6,6 +6,7 @@ import pytest
 from textual.app import App, ComposeResult
 
 from morph.schema.telemetry import RunResult, TelemetryData
+from morph.tui.app import MorphApp
 from morph.tui.perf import PerfHistory
 from morph.tui.widgets.slider import Slider
 
@@ -40,6 +41,57 @@ def test_perf_history_caps_at_capacity():
         hist.add({"x": float(i)}, _run(True, float(i)))
     assert len(hist) == 3
     assert hist.durations == [3.0, 4.0, 5.0]
+
+
+def test_implicates_only_blames_the_param_that_actually_split():
+    hist = PerfHistory()
+    # latency drives it: everything below 200 passes, at/above fails.
+    # cpu.cores is 4 for every run -> it must NOT be implicated.
+    for latency, passed in [(80, True), (150, True), (210, False), (260, False)]:
+        hist.add(
+            {"network.latency_ms": float(latency), "cpu.cores": 4.0},
+            _run(passed, latency * 1.4),
+        )
+    assert hist.implicates("network.latency_ms") == 210.0
+    assert hist.implicates("cpu.cores") is None
+
+
+@pytest.mark.asyncio
+async def test_monitor_screen_runs_and_warns_in_demo_mode():
+    app = MorphApp(demo=True)
+    async with app.run_test() as pilot:
+        await pilot.press("m")
+        await pilot.pause()
+        screen = app.screen
+        assert screen.__class__.__name__ == "MonitorScreen"
+
+        for _ in range(80):
+            await pilot.pause(0.05)
+            if len(screen._hist) and not screen._busy:
+                break
+        assert len(screen._hist) >= 1  # reconciled + auto-ran once
+
+        sliders = list(screen.query(Slider))
+        # honest badges: this host cannot cap RAM
+        by_param = {s.param: s for s in sliders}
+        assert by_param["memory.total_mb"].status == "unavailable"
+
+        latency = by_param["network.latency_ms"]
+        latency.focus()
+        for _ in range(30):
+            await pilot.press("shift+right")
+        await pilot.pause()
+        for _ in range(150):
+            await pilot.pause(0.05)
+            if not screen._busy and screen._current_params() == screen._last_params:
+                break
+
+        assert screen._hist.implicates("network.latency_ms") is not None
+        assert latency.warn is True
+        assert by_param["cpu.cores"].warn is False
+        warn_text = str(screen.query_one("#mon-warn").render())
+        assert "latency" in warn_text and "LockLostException" in warn_text
+        assert len(screen.query_one("#spark-dur").data) == len(screen._hist)
 
 
 class _SliderApp(App):

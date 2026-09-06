@@ -19,6 +19,7 @@ _LOGO = r"""
 
 _CARDS = [
     ("experiment", "Experiment", "baseline vs treatments -> causal verdict"),
+    ("monitor", "Monitor", "slide conditions, watch performance live"),
     ("threshold", "Threshold", "binary-search a parameter's tipping point"),
     ("environment", "Environment", "capture / build a target profile"),
     ("regressions", "Regressions", "browse & replay saved bundles"),
@@ -28,6 +29,7 @@ _CARDS = [
 class HomeScreen(Screen):
     BINDINGS: ClassVar[list] = [
         ("e", "open('experiment')", "Experiment"),
+        ("m", "open('monitor')", "Monitor"),
         ("t", "open('threshold')", "Threshold"),
         ("n", "open('environment')", "Environment"),
         ("r", "open('regressions')", "Regressions"),
@@ -57,11 +59,13 @@ class HomeScreen(Screen):
     def action_open(self, which: str) -> None:
         from morph.tui.screens.environment import EnvironmentScreen
         from morph.tui.screens.experiment import ExperimentScreen
+        from morph.tui.screens.monitor import MonitorScreen
         from morph.tui.screens.regressions import RegressionsScreen
         from morph.tui.screens.threshold import ThresholdScreen
 
         screens = {
             "experiment": ExperimentScreen,
+            "monitor": MonitorScreen,
             "threshold": ThresholdScreen,
             "environment": EnvironmentScreen,
             "regressions": RegressionsScreen,

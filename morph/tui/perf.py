@@ -87,3 +87,24 @@ class PerfHistory:
         vals = [s.params.get(param) for s in self._samples if s.passed and param in s.params]
         vals = [v for v in vals if v is not None]
         return max(vals) if vals else None
+
+    def implicates(self, param: str) -> float | None:
+        """A boundary for ``param`` only if the runs actually blame it: some run
+        passed strictly below it, and nothing at or above it passed. Rejects
+        params that just happened to be set during a failure caused by another.
+        """
+        boundary = self.first_failure_value(param)
+        if boundary is None:
+            return None
+        passes = [
+            s.params[param]
+            for s in self._samples
+            if s.passed and param in s.params and s.params[param] is not None
+        ]
+        if not passes or min(passes) is None:
+            return None
+        if not any(v < boundary for v in passes):   # nothing passed below it
+            return None
+        if any(v >= boundary for v in passes):      # something passed at/above it
+            return None
+        return boundary
