@@ -1,30 +1,36 @@
-import { useState, type ReactNode } from 'react'
-import './ParamGroup.css'
+import { useId, useState, type ReactNode } from 'react'
+import { Icon } from './ui/Icon'
 
 export function ParamGroup({
   name,
-  nonDefaultCount,
+  changed,
   defaultOpen = false,
   children,
 }: {
   name: string
-  /** Omitted by groups that are not parameter lists, e.g. the threshold search. */
-  nonDefaultCount?: number
+  changed: number
   defaultOpen?: boolean
   children: ReactNode
 }) {
   const [open, setOpen] = useState(defaultOpen)
-
+  const id = useId()
   return (
-    <div className="param-group" data-open={open}>
-      <button className="param-group__header" onClick={() => setOpen((v) => !v)}>
-        <span className="param-group__chevron">{open ? '▾' : '▸'}</span>
-        <span className="param-group__name">{name}</span>
-        {nonDefaultCount !== undefined && (
-          <span className="param-group__count">{nonDefaultCount} non-default</span>
-        )}
-      </button>
-      {open && <div className="param-group__body">{children}</div>}
-    </div>
+    <section className="pgroup" data-open={open}>
+      <h3>
+        <button
+          className="pgroup__head"
+          aria-expanded={open}
+          aria-controls={`${id}-panel`}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <Icon name={open ? 'chevronDown' : 'chevronRight'} size={14} />
+          <span>{name}</span>
+          <span className="pgroup__count muted small">{changed > 0 ? `${changed} changed` : ''}</span>
+        </button>
+      </h3>
+      <div id={`${id}-panel`} className="pgroup__panel" hidden={!open}>
+        {children}
+      </div>
+    </section>
   )
 }

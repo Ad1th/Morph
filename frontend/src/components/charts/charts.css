@@ -1,0 +1,290 @@
+/* Evidence track ------------------------------------------------------- */
+
+.evtrack {
+  margin: 0;
+  position: relative;
+  padding-bottom: 14px;
+}
+
+.evtrack__svg {
+  display: block;
+  width: 100%;
+  height: 28px;
+  overflow: visible;
+}
+
+.evtrack__axis {
+  stroke: var(--line-2);
+  stroke-width: 0.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.evtrack__tick {
+  stroke: var(--line-2);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.evtrack__one {
+  stroke: var(--line-3);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.evtrack__thr {
+  stroke: var(--gold);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.evtrack__fill {
+  fill: var(--gold);
+  opacity: 0.85;
+  transition: x var(--dur-3) var(--ease), width var(--dur-3) var(--ease);
+}
+
+.evtrack__fill[data-negative='true'] {
+  fill: var(--fg-2);
+}
+
+.evtrack__dot {
+  fill: var(--bg-0);
+  stroke: var(--gold);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.evtrack__head {
+  fill: var(--gold);
+  stroke: var(--bg-0);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  transition: cx var(--dur-3) var(--ease);
+}
+
+.evtrack[data-decisive='true'] .evtrack__fill,
+.evtrack[data-decisive='true'] .evtrack__head {
+  fill: var(--fail);
+}
+
+.evtrack[data-decisive='true'] .evtrack__thr {
+  stroke: var(--fail);
+}
+
+.evtrack__labels {
+  position: relative;
+  height: 14px;
+}
+
+.evtrack__label {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.evtrack__label--thr {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.evtrack[data-decisive='true'] .evtrack__label--thr {
+  color: var(--fail);
+}
+
+/* Dose-response chart ---------------------------------------------------- */
+
+.dose {
+  margin: 0;
+}
+
+.dose__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font-mono);
+}
+
+.dose__grid {
+  stroke: var(--line-1);
+  stroke-width: 1;
+}
+
+.dose__tick {
+  fill: var(--fg-2);
+  font-size: 11px;
+}
+
+.dose__band {
+  fill: var(--gold);
+  opacity: 0.14;
+  transition: x var(--dur-3) var(--ease), width var(--dur-3) var(--ease);
+}
+
+.dose__median {
+  stroke: var(--gold);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  transition: x1 var(--dur-3) var(--ease), x2 var(--dur-3) var(--ease);
+}
+
+.dose__curve {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.dose__probe {
+  stroke: var(--bg-1);
+  stroke-width: 2;
+}
+
+.dose__probe[data-passed='true'] {
+  fill: var(--ok);
+}
+
+.dose__probe[data-passed='false'] {
+  fill: var(--fail);
+}
+
+.dose__cross {
+  stroke: var(--line-3);
+  stroke-width: 1;
+}
+
+.dose__tip {
+  fill: var(--bg-2);
+  stroke: var(--line-2);
+}
+
+.dose__tiptext {
+  fill: var(--fg-0);
+  font-size: 11px;
+}
+
+.dose__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+  margin-top: var(--s-2);
+}
+
+.dose__key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  vertical-align: -1px;
+  margin-right: 4px;
+}
+
+.dose__key--pass {
+  background: var(--ok);
+}
+
+.dose__key--fail {
+  background: var(--fail);
+}
+
+.dose__key--band {
+  border-radius: 2px;
+  background: var(--gold);
+  opacity: 0.3;
+}
+
+.dose__key--curve {
+  border-radius: 1px;
+  height: 2px;
+  background: var(--gold);
+  width: 14px;
+  vertical-align: 3px;
+}
+
+/* Trial ticks ------------------------------------------------------- */
+
+.ticks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tick {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 0;
+  padding: 0;
+  background: var(--line-1);
+  display: grid;
+  place-items: center;
+  color: var(--bg-0);
+  animation: fade-up var(--dur-2) var(--ease) both;
+}
+
+.tick[data-passed='true'] {
+  background: var(--ok);
+}
+
+.tick[data-passed='false'] {
+  background: var(--fail);
+}
+
+.tick[data-selected='true'] {
+  box-shadow: 0 0 0 2px var(--bg-0), 0 0 0 3px var(--fg-0);
+}
+
+.tick[data-pending] {
+  background: transparent;
+  border: 1px dashed var(--line-2);
+}
+
+/* 2x2 interaction matrix ------------------------------------------- */
+
+.matrix {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  gap: 2px;
+  max-width: 480px;
+}
+
+.matrix__corner,
+.matrix__head {
+  padding: var(--s-1) var(--s-2);
+  font-size: var(--t-sm);
+  color: var(--fg-1);
+}
+
+.matrix__head {
+  text-align: center;
+}
+
+.matrix__cell {
+  padding: var(--s-3);
+  border-radius: var(--r-1);
+  background: var(--bg-2);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.matrix__cell strong {
+  font-size: var(--t-xl);
+  font-weight: 500;
+}
+
+.matrix__cell[data-level='high'] {
+  background: var(--fail-soft);
+  box-shadow: inset 0 0 0 1px var(--fail);
+}
+
+.matrix__cell[data-level='mid'] {
+  background: var(--warn-soft);
+}
