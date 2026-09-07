@@ -92,6 +92,7 @@ Morph reproduces **application-relevant conditions**, not a full hardware emulat
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt && pip install -e .
 
+cp .env.example .env                          # optional: tokens, worker host, deploy origins (gitignored)
 morph doctor                                  # what this host can shape, stale rules, worker status
 morph demo                                    # the flagship experiment, end to end, no root needed
 
@@ -112,7 +113,7 @@ Three surfaces share one service layer:
 
 - **CLI**: everything above, with `--json` on every command for scripting.
 - **TUI**: `morph tui` is a full-screen console with live lanes, evidence tracks, the Bayesian boundary gauge and a verdict card. `morph tui --demo` replays a real run with no root, network or target app. See [`docs/tui.md`](docs/tui.md).
-- **GUI**: `morph serve` starts a local API and the React dashboard in `frontend/` (projects, run, experiment, threshold, regressions, environment diff).
+- **GUI**: `morph serve` starts a local API and, after `npm run build`, serves the React dashboard from the same port (projects, run, experiment, threshold, regressions, environment diff). Hosting notes in [`docs/deployment.md`](docs/deployment.md).
 
 ---
 

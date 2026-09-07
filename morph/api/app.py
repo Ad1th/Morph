@@ -21,8 +21,9 @@ import os
 import platform
 from collections.abc import Iterable
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
@@ -105,6 +106,9 @@ def create_app(
     (``MORPH_SERVE_PORT``, ``MORPH_EXTRA_ORIGINS``, ``MORPH_ALLOWED_HOSTS``)
     because uvicorn imports the module-level ``app``.
     """
+    from morph.envfile import load_env_file
+
+    load_env_file()  # tokens / origins from the nearest .env, before os.environ is read below
     if port is None and os.environ.get("MORPH_SERVE_PORT", "").isdigit():
         port = int(os.environ["MORPH_SERVE_PORT"])
     origins = [*(origins or []), *_env_list("MORPH_EXTRA_ORIGINS")]
@@ -183,7 +187,50 @@ def create_app(
                       summary="Liveness probe", include_in_schema=False)
     app.add_api_route(f"{API_PREFIX}/version", version, methods=["GET"], tags=["meta"],
                       summary="Morph and runtime versions", include_in_schema=False)
+    _mount_dashboard(app)
     return app
+
+
+def dashboard_dir() -> Path | None:
+    """Where a built dashboard lives, if one does: ``MORPH_DASHBOARD_DIR`` or
+    ``frontend/dist`` next to the package. ``None`` when nothing is built."""
+    explicit = os.environ.get("MORPH_DASHBOARD_DIR")
+    candidates = [Path(explicit).expanduser()] if explicit else []
+    candidates.append(Path(__file__).resolve().parents[2] / "frontend" / "dist")
+    for directory in candidates:
+        if (directory / "index.html").is_file():
+            return directory
+    return None
+
+
+def _mount_dashboard(app: FastAPI) -> None:
+    """Serve the built React dashboard from the same origin as the API.
+
+    One process, one port, no CORS: ``morph serve`` after ``npm run build``
+    is a complete deployment. Every path that is not an API route or a real
+    file returns ``index.html`` so the dashboard's client-side routes
+    (``/app/experiment`` ...) survive a reload. Registered last, so API
+    routes always win.
+    """
+    directory = dashboard_dir()
+    if directory is None:
+        return
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    app.mount("/assets", StaticFiles(directory=directory / "assets"), name="dashboard-assets")
+    index = directory / "index.html"
+
+    @app.get("/{path:path}", include_in_schema=False)
+    async def dashboard(path: str, request: Request) -> FileResponse:
+        candidate = (directory / path).resolve()
+        if path and candidate.is_file() and directory in candidate.parents:
+            return FileResponse(candidate)
+        # Only a browser navigation gets the SPA shell; an API client asking for
+        # JSON at an unknown path still gets a 404 (and the TestClient does too).
+        if "text/html" not in request.headers.get("accept", ""):
+            raise HTTPException(status_code=404, detail="Not found")
+        return FileResponse(index)
 
 
 app = create_app()

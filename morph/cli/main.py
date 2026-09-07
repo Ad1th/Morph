@@ -204,6 +204,9 @@ def _main(
     ),
 ) -> None:
     """Morph: test software in environments you don't physically have."""
+    from morph.envfile import load_env_file
+
+    load_env_file()
 
 
 # --------------------------------------------------------------------------- #
