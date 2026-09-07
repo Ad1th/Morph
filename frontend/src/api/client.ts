@@ -38,7 +38,12 @@ export const api = {
 
   captureProfile: () => request<EnvironmentProfile>('/profiles/capture', { method: 'POST' }),
 
-  getParameterCatalog: () => request<Record<string, ParameterMetadata>>('/parameters'),
+  /* The catalog's cores and memory ceilings describe the machine the run is
+     headed for, so the target travels with the request. */
+  getParameterCatalog: (target = 'local') =>
+    request<Record<string, ParameterMetadata>>(
+      `/parameters?target=${encodeURIComponent(target)}`,
+    ),
 
   reconcileProfile: (profile: EnvironmentProfile) =>
     request<EnvironmentProfile>('/profiles/reconcile', {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api/client'
 import { getField, setFieldValue } from '../api/profileFields'
 import type {
@@ -45,7 +45,7 @@ export function ParameterConfiguration({
   const [target, setTarget] = useState('local')
 
   useEffect(() => {
-    Promise.all([api.captureProfile(), api.getParameterCatalog()])
+    Promise.all([api.captureProfile(), api.getParameterCatalog(target)])
       .then(([p, c]) => {
         setProfile(p)
         setCatalog(c)
@@ -63,6 +63,26 @@ export function ParameterConfiguration({
       })
       .catch((err) => setPlatformError(err instanceof Error ? err.message : String(err)))
   }, [])
+
+  /* Re-read the catalog when the run target changes: cores and memory are
+     bounded by the machine that will actually execute, so switching from this
+     laptop to the worker re-scales those sliders. The captured profile is
+     deliberately NOT re-fetched -- it describes the conditions being
+     reproduced, which do not change just because the executor did.
+
+     Skipped on the first pass: the mount effect above already fetched the
+     catalog for the initial target, and refetching here would duplicate it. */
+  const didMountRef = useRef(false)
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true
+      return
+    }
+    api
+      .getParameterCatalog(target)
+      .then(setCatalog)
+      .catch((err) => setLoadError(String(err)))
+  }, [target])
 
   const [activeTab, setActiveTab] = useState<'params' | 'threshold' | 'surface'>('params')
 
@@ -244,6 +264,20 @@ export function ParameterConfiguration({
               )}
             </select>
           </label>
+
+          {/* Says which machine the sliders are describing. Without this the
+              ceilings change silently when the target does, and a slider that
+              silently re-scales looks like a glitch rather than the point. */}
+          {catalog && (
+            <p className="param-config__run-note">
+              Limits from {target === 'cloud' ? 'the cloud worker' : 'this machine'}:{' '}
+              {catalog.cpu_cores?.max ?? '?'} cores,{' '}
+              {catalog.ram_limit?.max
+                ? `${(catalog.ram_limit.max / 1024).toFixed(1)} GB`
+                : '? GB'}{' '}
+              RAM
+            </p>
+          )}
 
           <p className="param-config__run-note">
             {platformError
