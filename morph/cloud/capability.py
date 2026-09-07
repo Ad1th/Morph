@@ -67,7 +67,7 @@ class HostCapability:
     """What this machine can do, and where the profile exceeds it."""
 
     total_memory_mb: int
-    logical_cores: int
+    cores: int  # PHYSICAL, to match profile.cpu.cores
     architecture: str
     os_family: str
     shortfalls: list[Shortfall] = field(default_factory=list)
@@ -81,6 +81,29 @@ class HostCapability:
         if self.reproducible_locally:
             return "profile fits this host"
         return "; ".join(str(s) for s in self.shortfalls)
+
+
+def _host_cores() -> int:
+    """This machine's PHYSICAL cores.
+
+    Deliberately not os.cpu_count(), which counts logical processors. The value
+    being compared against is profile.cpu.cores, and the profiler fills that
+    from the physical count (it records logical processors separately, as
+    cpu.logical_processors). On any SMT machine those differ by a factor of
+    two, so mixing them silently doubled the threshold: this laptop reports 8
+    cores and 16 logical, and a request for 16 physical cores -- twice what the
+    box has -- read as reproducible locally.
+
+    Falling back to the logical count is wrong in the same direction, but a
+    missing psutil should not make the check crash; it is the closest number
+    available and the run still reports what it actually got.
+    """
+    try:
+        import psutil
+
+        return psutil.cpu_count(logical=False) or os.cpu_count() or 1
+    except Exception:
+        return os.cpu_count() or 1
 
 
 def _host_memory_mb() -> int:
@@ -115,7 +138,7 @@ def assess_locally(profile: EnvironmentProfile) -> HostCapability:
     """
     cap = HostCapability(
         total_memory_mb=_host_memory_mb(),
-        logical_cores=os.cpu_count() or 1,
+        cores=_host_cores(),
         architecture=platform.machine(),
         os_family=platform.system().lower(),
     )
@@ -134,12 +157,12 @@ def assess_locally(profile: EnvironmentProfile) -> HostCapability:
 
     # --- cores ---
     requested_cores = _as_int(profile.cpu.cores.value if profile.cpu else None)
-    if requested_cores and requested_cores > cap.logical_cores:
+    if requested_cores and requested_cores > cap.cores:
         cap.shortfalls.append(
             Shortfall(
                 "cpu.cores",
                 requested_cores,
-                cap.logical_cores,
+                cap.cores,
                 "cores can be taken away from a process, not added",
             )
         )
