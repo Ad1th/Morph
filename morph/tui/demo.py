@@ -5,6 +5,14 @@ combination fails every time, verdict ENVIRONMENT-CAUSED -- rendered from a
 canned event script with realistic pacing. No root, no network shaping, no
 target application required, so the live views work anywhere.
 
+This replays a REAL fixture with the numbers actually measured from it:
+apps/pool_retry at the 120ms / 18% operating point (see apps/README.md), which
+is the same run `morph tui` performs live. It previously narrated a
+"checkout_service" raising LockLostException -- an application that does not
+exist in this repository, so a judge who asked to see it would have found
+nothing. Since this recording is the fallback when live shaping misbehaves
+(PRD section 39), it has to describe something real.
+
 This is clearly a recording: the status line reads DEMO, and live mode
 (the default) runs the real engine.
 """
@@ -16,19 +24,25 @@ from collections.abc import Callable
 
 from morph.schema.events import TrialEvent
 
-# (condition, per-trial pass/fail). "full_target" = latency + packet loss together.
+# (condition, per-trial pass/fail), replaying apps/pool_retry's measured
+# legs: baseline 0/12, latency alone 0/12, loss alone 1/12, both 12/12.
+# "full_target" = latency + packet loss together.
+_PASS_12 = [True] * 12
+_LOSS_ONLY = [True] * 7 + [False] + [True] * 4  # the single flake in 12
 _SCRIPT: list[tuple[str, list[bool]]] = [
-    ("baseline", [True, True, True, True, True]),
-    ("latency_only", [True, True, True, True, True]),
-    ("loss_only", [True, True, True, True, True]),
-    ("full_target", [False, False, False, False, False]),
+    ("baseline", _PASS_12),
+    ("latency_only", _PASS_12),
+    ("loss_only", _LOSS_ONLY),
+    ("full_target", [False] * 12),
 ]
 
-_STDERR = (
-    "Traceback (most recent call last):\n"
-    '  File "checkout_service/demo_app.py", line 118, in _commit\n'
-    "    raise LockLostException(order_id)\n"
-    "LockLostException: lock for order 8123 expired mid-payment"
+# What the fixture actually prints when the batch misses its deadline. It
+# goes to stdout, not stderr: pool_retry suppresses its own tracebacks so
+# Morph's error parser is not misled by the connection resets that are part
+# of the design.
+_STDOUT = (
+    "[pool_retry] FAIL\n"
+    "  9/12 requests completed in 2607ms (deadline 2400ms, pool 2)"
 )
 
 
@@ -46,10 +60,10 @@ def demo_events() -> list[TrialEvent]:
             events.append(
                 TrialEvent(
                     kind="trial", condition=condition, trial_index=i, total=total,
-                    passed=passed, duration_ms=41.0 if passed else 30021.0,
+                    passed=passed, duration_ms=558.0 if passed else 2607.0,
                     failures_so_far=failures,
-                    error_type=None if passed else "LockLostException",
-                    stderr_tail=None if passed else _STDERR,
+                    error_type=None if passed else "DeadlineExceeded",
+                    stdout_tail=None if passed else _STDOUT,
                 )
             )
         rate = failures / total
@@ -65,7 +79,7 @@ def demo_events() -> list[TrialEvent]:
             TrialEvent(
                 kind="comparison", condition=condition,
                 failures=failures, failure_rate=rate,
-                p_value=0.0079 if significant else 1.0,
+                p_value=7e-07 if significant else 1.0,
                 is_significant=significant,
                 effect_label="significant_increase" if significant else "no_effect",
             )
@@ -74,10 +88,10 @@ def demo_events() -> list[TrialEvent]:
     events.append(
         TrialEvent(
             kind="verdict", phase="isolation", classification="environment_caused",
-            strongest_condition="full_target", p_value=0.0079, is_significant=True,
+            strongest_condition="full_target", p_value=7e-07, is_significant=True,
             extra={
-                "summary": "baseline 0/5; 'full_target' (latency 180ms + loss 2%) 5/5 (p=0.0079). "
-                "Neither latency nor loss alone reproduced it."
+                "summary": "baseline 0/12; 'full_target' (latency 120ms + loss 18%) 12/12 "
+                "(p=7e-07). Neither latency nor loss alone reproduced it."
             },
         )
     )
@@ -86,8 +100,10 @@ def demo_events() -> list[TrialEvent]:
 
 def play(on_event: Callable[[TrialEvent], None], *, speed: float = 1.0) -> None:
     """Emit the recorded events with pacing (call from a worker thread)."""
-    gaps = {"trial": 0.16, "condition_start": 0.35, "condition_done": 0.3,
-            "comparison": 0.6, "phase_start": 0.2, "phase_done": 0.3, "verdict": 0.4}
+    # Tuned for 12 trials a condition (48 in all): a quicker tick reads like a
+    # real batch rather than a slideshow, and keeps the whole playback near 7s.
+    gaps = {"trial": 0.05, "condition_start": 0.25, "condition_done": 0.25,
+            "comparison": 0.45, "phase_start": 0.2, "phase_done": 0.3, "verdict": 0.4}
     for event in demo_events():
         on_event(event)
         time.sleep(gaps.get(event.kind, 0.1) / max(speed, 0.01))

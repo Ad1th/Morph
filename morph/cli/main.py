@@ -216,11 +216,12 @@ def run(
     placement = None
     if env_profile and cloud:
         from morph.cloud import NotReproducibleAnywhere, run_anywhere
+        from morph.config import load_config
 
         try:
             result, placement = run_anywhere(
                 profile=env_profile, command=command, timeout=timeout,
-                controller=controller, cwd=cwd,
+                controller=controller, cwd=cwd, cloud=load_config().cloud,
             )
         except NotReproducibleAnywhere as exc:
             if as_json:
@@ -523,6 +524,7 @@ def cloud(
     """Check the remote worker, and whether a profile even needs one."""
     from morph.cloud import assess_locally
     from morph.cloud.worker import RemoteWorker
+    from morph.config import load_config
 
     if profile:
         if not profile.exists():
@@ -546,7 +548,9 @@ def cloud(
             console.print(table)
             console.print("[yellow]NOT_REPRODUCIBLE_LOCALLY[/yellow] - this run needs a worker.")
 
-    worker = RemoteWorker()
+    # morph.yaml supplies the worker; MORPH_CLOUD_* still overrides it, so a
+    # committed config need not carry the host or the key.
+    worker = RemoteWorker(load_config().cloud)
     console.print()
     if not worker.configured:
         console.print(

@@ -177,8 +177,12 @@ class ExperimentScreen(Screen):
             lane = self._lanes.get(ev.condition)
             if lane is not None:
                 lane.add_trial(bool(ev.passed))
-            if ev.passed is False and (ev.stderr_tail or ev.error_type):
-                head = ev.stderr_tail or ""
+            if ev.passed is False and (ev.stderr_tail or ev.stdout_tail or ev.error_type):
+                # stdout as well as stderr: a fixture that deliberately keeps
+                # stderr clean (apps/pool_retry suppresses its tracebacks so
+                # Morph's error parser is not misled) reports its evidence on
+                # stdout, and showing nothing for those was losing the reason.
+                head = ev.stderr_tail or ev.stdout_tail or ""
                 snippet = head.strip().splitlines()[-1] if head.strip() else (ev.error_type or "")
                 log.write(f"[red3]{ev.condition}[/red3] trial {ev.trial_index}: {snippet}")
 
