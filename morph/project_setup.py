@@ -8,7 +8,6 @@ optionally installs dependencies into a per-project venv, records the result in
 
 from __future__ import annotations
 
-import platform
 import shutil
 from collections.abc import Callable
 from pathlib import Path
@@ -25,7 +24,11 @@ SKIP_DIRS = frozenset({".git", "node_modules", "__pycache__", ".venv", "venv", "
 ENTRYPOINT_NAMES = (
     "__main__.py", "main.py", "app.py", "run.py", "manage.py", "index.js", "server.js",
 )
-PYTHON = "py -3" if platform.system() == "Windows" else "python3"
+# Bare "python3": run_with_telemetry._pin_interpreter rewrites it to
+# sys.executable, so a child gets the interpreter Morph runs under (and
+# therefore Morph's dependencies). The Windows branch used to emit the
+# `py -3` launcher, which resolves to the SYSTEM Python instead.
+PYTHON = "python3"
 
 Logger = Callable[[str], None]
 

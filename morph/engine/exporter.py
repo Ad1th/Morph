@@ -9,7 +9,7 @@ from __future__ import annotations
 
 def generate_invariant_test_code(
     project_name: str = "service",
-    command: str = "py -3 -m apps.timeout test",
+    command: str = "python3 -m apps.timeout test",
     safe_latency_ms: float = 160.0,
     safe_packet_loss: float = 0.01,
     safe_cpu_quota: float = 1.0,
