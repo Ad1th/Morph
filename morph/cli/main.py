@@ -27,6 +27,104 @@ app = typer.Typer(name="morph", help="Morph: Test software in environments you d
 console = Console()
 
 
+
+# --------------------------------------------------------------------------- #
+# projects: `morph connect` a repo/dir once, then `--project <id>` everywhere
+# --------------------------------------------------------------------------- #
+
+
+def _resolve_project(
+    project: str | None, command: str | None, cwd: str | None
+) -> tuple[str, str | None]:
+    """Fill in `command` / `cwd` from a registered project when `--project` is
+    given. An explicit `--command` still wins. Returns (command, cwd)."""
+    if project:
+        from morph import projects as _projects
+
+        try:
+            proj = _projects.load(project)
+        except KeyError as exc:
+            console.print(f"[bold red]Error:[/bold red] {exc}")
+            raise typer.Exit(code=1)
+        command = command or proj.command
+        cwd = cwd or proj.cwd
+        if not command:
+            console.print(
+                f"[bold red]Error:[/bold red] project '{proj.name}' has no detected command; "
+                "pass --command"
+            )
+            raise typer.Exit(code=1)
+    if not command:
+        console.print("[bold red]Error:[/bold red] one of --command or --project is required")
+        raise typer.Exit(code=1)
+    return command, cwd
+
+
+@app.command()
+def connect(
+    source: str = typer.Argument(..., help="owner/repo, a GitHub URL, or a local directory path"),
+    branch: str | None = typer.Option(None, "--branch", "-b", help="Branch to clone"),
+    token: str | None = typer.Option(None, "--token", help="GitHub token (else gh CLI / env)"),
+    install: bool = typer.Option(
+        False, "--install", help="Create an isolated venv and install the project's dependencies"
+    ),
+    name: str | None = typer.Option(None, "--name", help="Registry name (default: repo/dir name)"),
+):
+    """Add a GitHub repo or local directory as a runnable project."""
+    from morph import github, project_setup
+
+    console.print(f"[cyan]Connecting[/cyan] {source} …  [dim](auth: {github.token_source(token)})[/dim]")
+    try:
+        proj = project_setup.connect(
+            source, token=token, branch=branch, install=install, name=name,
+            logger=lambda m: console.print(f"  [dim]{m}[/dim]"),
+        )
+    except (github.GitHubError, FileNotFoundError) as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title=f"Connected: {proj.name}", show_header=False)
+    table.add_column(style="cyan")
+    table.add_column(style="white")
+    table.add_row("id", proj.id)
+    table.add_row("source", proj.source + (f"  ({proj.repo}@{proj.commit})" if proj.repo else ""))
+    table.add_row("path", proj.path)
+    table.add_row("command", proj.command or "[yellow]not detected — pass --command[/yellow]")
+    if proj.venv:
+        table.add_row("venv", proj.venv)
+    table.add_row("files", str(proj.file_count))
+    console.print(table)
+    console.print(f"\n[green]next:[/green]  morph experiment --project {proj.id}")
+
+
+@app.command()
+def projects(
+    remove: str | None = typer.Option(None, "--rm", help="Delete a project by id or name"),
+):
+    """List connected projects (or --rm one)."""
+    from morph import projects as _projects
+
+    if remove:
+        ok = _projects.delete(remove)
+        console.print(f"[green]removed[/green] {remove}" if ok else f"[yellow]no such:[/yellow] {remove}")
+        return
+
+    rows = _projects.list_projects()
+    if not rows:
+        console.print("[dim]no projects — `morph connect <repo|dir>`[/dim]")
+        return
+    table = Table(title="Connected projects")
+    table.add_column("id", style="cyan")
+    table.add_column("name")
+    table.add_column("source")
+    table.add_column("command", style="dim")
+    for proj in rows:
+        src = proj.source + (f" {proj.repo}@{proj.commit}" if proj.repo else "")
+        table.add_row(proj.id, proj.name, src, proj.command or "—")
+    console.print(table)
+
+
+
 @app.command()
 def capture(
     output: Path | None = typer.Option(
@@ -83,14 +181,17 @@ def define(
 
 @app.command()
 def run(
-    command: str = typer.Option(..., "--command", "-c", help="Command to execute"),
+    command: str | None = typer.Option(None, "--command", "-c", help="Command to execute"),
+    project: str | None = typer.Option(None, "--project", help="Connected project id or name"),
     profile: Path | None = typer.Option(None, "--profile", "-p", help="Path to EnvironmentProfile JSON"),
+    cwd: str | None = typer.Option(None, "--cwd", help="Working directory for the command"),
     timeout: float = typer.Option(30.0, "--timeout", help="Timeout in seconds"),
     force_proxy: bool = typer.Option(
         False, "--force-proxy", help="Force user-space TCP proxy instead of native OS tools"
     ),
 ):
     """Run an application under a simulated environment profile."""
+    command, cwd = _resolve_project(project, command, cwd)
     controller = RuntimeController(force_proxy=force_proxy)
 
     env_profile = None
@@ -100,12 +201,12 @@ def run(
             raise typer.Exit(code=1)
         env_profile = EnvironmentProfile.model_validate_json(profile.read_text(encoding="utf-8"))
 
-    console.print(f"[cyan]Executing:[/cyan] {command}")
+    console.print(f"[cyan]Executing:[/cyan] {command}" + (f"  [dim](cwd: {cwd})[/dim]" if cwd else ""))
     if env_profile:
-        result = controller.run(profile=env_profile, command=command, timeout=timeout)
+        result = controller.run(profile=env_profile, command=command, timeout=timeout, cwd=cwd)
     else:
         from morph.runtime.runner import execute_command
-        result = execute_command(command=command, timeout=timeout)
+        result = execute_command(command=command, timeout=timeout, cwd=cwd)
 
     status_style = "bold green" if result.passed else "bold red"
     peak_memory = f"{result.peak_memory_mb:.1f} MB" if result.peak_memory_mb is not None else "N/A"
@@ -130,26 +231,39 @@ def run(
 
 @app.command()
 def experiment(
-    command: str = typer.Option(..., "--command", "-c", help="Command to execute"),
-    profile: Path = typer.Option(..., "--profile", "-p", help="Target EnvironmentProfile JSON path"),
+    command: str | None = typer.Option(None, "--command", "-c", help="Command to execute"),
+    project: str | None = typer.Option(None, "--project", help="Connected project id or name"),
+    profile: Path | None = typer.Option(
+        None, "--profile", "-p", help="Target EnvironmentProfile JSON (default: host + latency/loss)"
+    ),
+    cwd: str | None = typer.Option(None, "--cwd", help="Working directory for every trial"),
     trials: int = typer.Option(5, "--trials", "-n", help="Number of trials per condition"),
     timeout: float = typer.Option(30.0, "--timeout", help="Per-trial timeout in seconds"),
 ):
     """Run an automated causal isolation experiment across baseline and candidate treatments."""
-    if not profile.exists():
-        console.print(f"[bold red]Error:[/bold red] Profile file '{profile}' not found")
-        raise typer.Exit(code=1)
+    command, cwd = _resolve_project(project, command, cwd)
 
-    target = EnvironmentProfile.model_validate_json(profile.read_text(encoding="utf-8"))
+    if profile is not None:
+        if not profile.exists():
+            console.print(f"[bold red]Error:[/bold red] Profile file '{profile}' not found")
+            raise typer.Exit(code=1)
+        target = EnvironmentProfile.model_validate_json(profile.read_text(encoding="utf-8"))
+    else:
+        target = capture_environment()
+        target.network = NetworkInfo(
+            latency_ms=ProfileField(value=120.0, status=FieldStatus.REQUESTED),
+            packet_loss_percent=ProfileField(value=18.0, status=FieldStatus.REQUESTED),
+        )
+
     controller = RuntimeController()
 
     def _make_runner(p=None):
         def _runner() -> bool:
             if p is not None:
-                res = controller.run(profile=p, command=command, timeout=timeout)
+                res = controller.run(profile=p, command=command, timeout=timeout, cwd=cwd)
             else:
                 from morph.runtime.runner import execute_command
-                res = execute_command(command=command, timeout=timeout)
+                res = execute_command(command=command, timeout=timeout, cwd=cwd)
             return res.passed
         return _runner
 
@@ -206,8 +320,12 @@ def experiment(
 
 @app.command()
 def threshold(
-    command: str = typer.Option(..., "--command", "-c", help="Command to execute"),
-    profile: Path = typer.Option(..., "--profile", "-p", help="Base EnvironmentProfile JSON path"),
+    command: str | None = typer.Option(None, "--command", "-c", help="Command to execute"),
+    project: str | None = typer.Option(None, "--project", help="Connected project id or name"),
+    profile: Path | None = typer.Option(
+        None, "--profile", "-p", help="Base EnvironmentProfile JSON (default: captured host)"
+    ),
+    cwd: str | None = typer.Option(None, "--cwd", help="Working directory for every trial"),
     parameter: str = typer.Option(..., "--parameter", help="Parameter to search (e.g. network.latency_ms)"),
     low: float = typer.Option(0.0, "--low", help="Lower bound value"),
     high: float = typer.Option(500.0, "--high", help="Upper bound value"),
@@ -215,18 +333,22 @@ def threshold(
     timeout: float = typer.Option(30.0, "--timeout", help="Per-trial timeout in seconds"),
 ):
     """Search for the failure tipping point of a specific environmental parameter."""
-    if not profile.exists():
-        console.print(f"[bold red]Error:[/bold red] Profile file '{profile}' not found")
-        raise typer.Exit(code=1)
+    command, cwd = _resolve_project(project, command, cwd)
 
-    base = EnvironmentProfile.model_validate_json(profile.read_text(encoding="utf-8"))
+    if profile is not None:
+        if not profile.exists():
+            console.print(f"[bold red]Error:[/bold red] Profile file '{profile}' not found")
+            raise typer.Exit(code=1)
+        base = EnvironmentProfile.model_validate_json(profile.read_text(encoding="utf-8"))
+    else:
+        base = capture_environment()
 
     # Same runner the API's /threshold route uses, so both entry points apply
     # the parameter identically instead of the CLI silently ignoring it when
     # the saved profile has no network section.
     try:
         run_at = make_threshold_run_fn(
-            command=command, profile=base, parameter=parameter, timeout=timeout
+            command=command, profile=base, parameter=parameter, timeout=timeout, cwd=cwd
         )
         set_profile_parameter(with_unconstrained_network(base), parameter, low)
     except ValueError as exc:

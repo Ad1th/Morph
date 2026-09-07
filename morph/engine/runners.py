@@ -36,18 +36,21 @@ def make_run_fn(
     profile: EnvironmentProfile | None,
     timeout: float,
     controller: RuntimeController | None = None,
+    cwd: str | None = None,
 ) -> RunFn:
     """Return a zero-arg callable that runs ``command`` once and reports pass/fail.
 
     ``profile=None`` runs the command unconstrained (the experiment baseline);
-    any other profile is applied through the RuntimeController first.
+    any other profile is applied through the RuntimeController first. ``cwd`` is
+    the working directory for every trial (needed for a project whose command is
+    ``python3 main.py`` rather than a module path).
     """
     ctrl = controller or RuntimeController()
 
     def _run() -> bool:
         if profile is None:
-            return execute_command(command, timeout=timeout).passed
-        return ctrl.run(profile=profile, command=command, timeout=timeout).passed
+            return execute_command(command, timeout=timeout, cwd=cwd).passed
+        return ctrl.run(profile=profile, command=command, timeout=timeout, cwd=cwd).passed
 
     return _run
 
@@ -57,6 +60,7 @@ def build_baseline_and_candidates(
     command: str,
     timeout: float,
     controller: RuntimeController | None = None,
+    cwd: str | None = None,
 ) -> tuple[RunFn, dict[str, RunFn]]:
     """Build the runners for a single-variable isolation experiment.
 
@@ -69,7 +73,7 @@ def build_baseline_and_candidates(
     what to substitute.
     """
     ctrl = controller or RuntimeController()
-    baseline_fn = make_run_fn(command, None, timeout, ctrl)
+    baseline_fn = make_run_fn(command, None, timeout, ctrl, cwd)
 
     candidates: dict[str, RunFn] = {}
     if target_profile is None:
@@ -79,14 +83,14 @@ def build_baseline_and_candidates(
     if net is not None and _field_is_positive(net.latency_ms):
         latency_only = target_profile.model_copy(deep=True)
         latency_only.network.packet_loss_percent.value = 0.0
-        candidates["latency_only"] = make_run_fn(command, latency_only, timeout, ctrl)
+        candidates["latency_only"] = make_run_fn(command, latency_only, timeout, ctrl, cwd)
 
     if net is not None and _field_is_positive(net.packet_loss_percent):
         loss_only = target_profile.model_copy(deep=True)
         loss_only.network.latency_ms.value = 0.0
-        candidates["loss_only"] = make_run_fn(command, loss_only, timeout, ctrl)
+        candidates["loss_only"] = make_run_fn(command, loss_only, timeout, ctrl, cwd)
 
-    candidates["full_treatment"] = make_run_fn(command, target_profile, timeout, ctrl)
+    candidates["full_treatment"] = make_run_fn(command, target_profile, timeout, ctrl, cwd)
     return baseline_fn, candidates
 
 
