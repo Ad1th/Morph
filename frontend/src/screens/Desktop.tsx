@@ -45,6 +45,10 @@ export function Desktop({
           App, so that they stay aligned across every screen. */}
       <div className="desktop__center">
         <h1 className="desktop__wordmark">MORPH</h1>
+        {/* Rendered in every skin but only visible on Windows. Keeping the
+            element in the layout holds the block's height constant, so the
+            wordmark sits at the same spot whichever skin is on screen; the
+            CSS hides it rather than React dropping it. */}
         <p className="desktop__tagline">&ldquo;{TAGLINE}&rdquo;</p>
       </div>
 
