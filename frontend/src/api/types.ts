@@ -83,6 +83,68 @@ export interface RunResult {
   timestamp: string
 }
 
+// --- Project selection (POST /projects/upload, POST /projects/local) ---
+
+export interface ProjectInfo {
+  project_id: string
+  name: string
+  path: string
+  file_count: number
+  entrypoints: string[]
+  /** Null when auto-detection found no entrypoint it recognises. */
+  suggested_command?: string | null
+  suggested_cwd?: string | null
+}
+
+// --- Run targets (GET /platform) ---
+
+export interface RunTarget {
+  id: string
+  family: string
+  label: string
+  available: boolean
+  /** Why the target is unavailable, e.g. "No remote host configured". */
+  reason?: string | null
+  capabilities: Record<string, boolean>
+}
+
+export interface PlatformInfo {
+  host: { family: string; version: string; arch: string }
+  targets: RunTarget[]
+}
+
+// --- Threshold search (POST /threshold) ---
+
+export interface ThresholdRequest {
+  command: string
+  /** Dotted profile path, same shape as ParameterMetadata.field_path. */
+  parameter: string
+  low: number
+  high: number
+  trials?: number
+  precision?: number
+  profile?: EnvironmentProfile | null
+  cwd?: string | null
+  timeout?: number
+  target?: string
+}
+
+/** search_points is list[dict] server-side, so every field is treated as optional. */
+export interface ThresholdPoint {
+  value?: number
+  failure_rate?: number
+  passed?: boolean
+}
+
+// Mirrors morph/schema/comparison.py's ThresholdResult.
+export interface ThresholdResult {
+  parameter: string
+  safe_value: number
+  failure_value: number
+  boundary_estimate: number
+  search_points: ThresholdPoint[]
+}
+
 // Mirrors morph/schema/parameters.py's ParameterMetadata.
 export interface ParameterMetadata {
   name: string
