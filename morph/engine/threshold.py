@@ -65,6 +65,53 @@ def search_threshold(
         )
         return rate
 
+    # 1. Probe high bound first: if high passes, no threshold is in range
+    high_rate = failure_rate_at(high)
+    if high_rate <= failure_rate_threshold:
+        result = ThresholdResult(
+            parameter=parameter,
+            safe_value=high,
+            failure_value=None,
+            boundary_estimate=None,
+            search_points=search_points,
+        )
+        emit(
+            on_event,
+            TrialEvent(
+                kind="phase_done",
+                phase="threshold",
+                condition=parameter,
+                safe_value=high,
+                failure_value=None,
+                boundary_estimate=None,
+            ),
+        )
+        return result
+
+    # 2. Probe low bound: if low already fails, threshold is at/below low
+    low_rate = failure_rate_at(low)
+    if low_rate > failure_rate_threshold:
+        result = ThresholdResult(
+            parameter=parameter,
+            safe_value=None,
+            failure_value=low,
+            boundary_estimate=None,
+            search_points=search_points,
+        )
+        emit(
+            on_event,
+            TrialEvent(
+                kind="phase_done",
+                phase="threshold",
+                condition=parameter,
+                safe_value=None,
+                failure_value=low,
+                boundary_estimate=None,
+            ),
+        )
+        return result
+
+    # 3. Binary search between known safe (low) and known failing (high)
     while (failure_value - safe_value) > precision:
         mid = (safe_value + failure_value) / 2
         if failure_rate_at(mid) > failure_rate_threshold:
@@ -91,3 +138,4 @@ def search_threshold(
         ),
     )
     return result
+

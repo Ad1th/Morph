@@ -6,7 +6,14 @@ interface contract in docs/faultyapps.md section 2.
 
 import sys
 
-from apps.timeout.app import main
+try:
+    from apps.timeout.app import main
+except ModuleNotFoundError:
+    try:
+        from .app import main
+    except ImportError:
+        from app import main
+
 
 if __name__ == "__main__":
     args = sys.argv[1:]

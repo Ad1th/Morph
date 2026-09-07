@@ -7,7 +7,14 @@ LANG/LC_ALL in the environment instead.
 
 import sys
 
-from apps.locale_parse.app import main
+try:
+    from apps.locale_parse.app import main
+except ModuleNotFoundError:
+    try:
+        from .app import main
+    except ImportError:
+        from app import main
+
 
 USAGE = "usage: python -m apps.locale_parse run|test [--fixed] [--locale NAME]"
 

@@ -2,7 +2,14 @@
 
 import sys
 
-from apps.pool_retry.app import main
+try:
+    from apps.pool_retry.app import main
+except ModuleNotFoundError:
+    try:
+        from .app import main
+    except ImportError:
+        from app import main
+
 
 if __name__ == "__main__":
     args = sys.argv[1:]

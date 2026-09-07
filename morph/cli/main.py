@@ -11,6 +11,11 @@ from rich.panel import Panel
 from rich.table import Table
 
 from morph.engine.experiment import run_experiment
+from morph.engine.runners import (
+    make_threshold_run_fn,
+    set_profile_parameter,
+    with_unconstrained_network,
+)
 from morph.engine.threshold import search_threshold
 from morph.profiler.capture import capture_environment
 from morph.regression import export_ci_test, replay_regression, save_regression
@@ -98,7 +103,7 @@ def run(
         f"Duration: {result.duration_ms:.1f}ms\n"
         f"Peak Memory: {peak_memory}\n"
         f"Passed: {result.passed}" + err_text,
-        title=f"Run Result — [{'PASS' if result.passed else 'FAIL'}]",
+        title=f"Run Result [{'PASS' if result.passed else 'FAIL'}]",
         border_style=status_style,
     ))
 
@@ -203,36 +208,46 @@ def threshold(
         raise typer.Exit(code=1)
 
     base = EnvironmentProfile.model_validate_json(profile.read_text(encoding="utf-8"))
-    controller = RuntimeController()
 
-    def _eval_val(val: float) -> bool:
-        p = base.model_copy(deep=True)
-        if parameter == "network.latency_ms" and p.network:
-            p.network.latency_ms.value = val
-        elif parameter == "network.packet_loss_percent" and p.network:
-            p.network.packet_loss_percent.value = val
-
-        res = controller.run(profile=p, command=command, timeout=timeout)
-        return res.passed
+    # Same runner the API's /threshold route uses, so both entry points apply
+    # the parameter identically instead of the CLI silently ignoring it when
+    # the saved profile has no network section.
+    try:
+        run_at = make_threshold_run_fn(
+            command=command, profile=base, parameter=parameter, timeout=timeout
+        )
+        set_profile_parameter(with_unconstrained_network(base), parameter, low)
+    except ValueError as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
 
     console.print(f"[bold cyan]Searching threshold for '{parameter}' between [{low}, {high}]...[/bold cyan]")
     thresh = search_threshold(
         parameter=parameter,
-        run_at=_eval_val,
+        run_at=run_at,
         low=low,
         high=high,
         trials=trials,
     )
 
+    safe_str = f"{thresh.safe_value:.2f}" if thresh.safe_value is not None else "None"
+    fail_str = f"{thresh.failure_value:.2f}" if thresh.failure_value is not None else "None"
+    est_str = (
+        f"{thresh.boundary_estimate:.2f}"
+        if thresh.boundary_estimate is not None
+        else "None (no threshold in range)"
+    )
+
     console.print(Panel(
         f"Parameter: {thresh.parameter}\n"
-        f"Safe Bound: {thresh.safe_value:.2f}\n"
-        f"Failing Bound: {thresh.failure_value:.2f}\n"
-        f"Boundary Estimate: {thresh.boundary_estimate:.2f}\n"
+        f"Safe Bound: {safe_str}\n"
+        f"Failing Bound: {fail_str}\n"
+        f"Boundary Estimate: {est_str}\n"
         f"Probed Points: {len(thresh.search_points)}",
         title="Threshold Search Result",
         border_style="bold green",
     ))
+
 
 
 @app.command()

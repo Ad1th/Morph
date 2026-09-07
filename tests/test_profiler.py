@@ -45,19 +45,37 @@ def test_collect_filesystem():
     fs = collect_filesystem()
     assert fs.case_sensitive.status == FieldStatus.CAPTURED
     assert isinstance(fs.case_sensitive.value, bool)
-    assert fs.filesystem_type.value
+    # fstype detection is best-effort by design: psutil.disk_partitions can
+    # miss the mount, and the collector then leaves the field unset rather than
+    # inventing one. Check the value only when detection actually succeeded.
+    if fs.filesystem_type is not None:
+        assert fs.filesystem_type.status == FieldStatus.CAPTURED
+        assert fs.filesystem_type.value
     assert fs.disk_space_limit_mb.value > 0
 
 
 def test_collect_process_limits_posix_reports_real_ulimits():
     limits = collect_process_limits()
+    assert limits.timeout_s is not None
+    assert limits.timeout_s.status == FieldStatus.CAPTURED
     if os.name == "posix":
         assert limits.max_processes.status == FieldStatus.CAPTURED
         assert limits.fd_limit.status == FieldStatus.CAPTURED
-    else:
-        # No pywin32 dependency: honestly unset rather than a fabricated number.
-        assert limits.max_processes is None
-        assert limits.fd_limit is None
+    elif os.name == "nt":
+        assert limits.fd_limit is not None
+        assert limits.fd_limit.status == FieldStatus.CAPTURED
+
+
+
+def test_collect_network():
+    from morph.profiler.collectors.network import collect_network
+
+    net = collect_network()
+    assert net.latency_ms.status == FieldStatus.CAPTURED
+    assert net.latency_ms.value == 0.0
+    assert net.packet_loss_percent.status == FieldStatus.CAPTURED
+    assert net.packet_loss_percent.value == 0.0
+    assert net.available.value is True
 
 
 def test_capture_environment_assembles_full_profile():
@@ -69,7 +87,10 @@ def test_capture_environment_assembles_full_profile():
     assert profile.memory.total_mb.value > 0
     assert profile.locale.locale.value
     assert profile.filesystem is not None
+    assert profile.network is not None
+    assert profile.network.latency_ms.status == FieldStatus.CAPTURED
 
     # Round-trips through JSON without loss (this is the portable-profile contract).
     restored = type(profile).model_validate_json(profile.model_dump_json())
     assert restored == profile
+

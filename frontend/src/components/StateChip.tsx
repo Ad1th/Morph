@@ -6,7 +6,7 @@ const LABELS: Record<FieldStatus, string> = {
   requested: 'Requested',
   reproduced: 'Reproduced',
   approximated: 'Approximated',
-  unavailable: 'Unavailable',
+  unavailable: 'Not detected',
 }
 
 export function StateChip({ status }: { status: FieldStatus }) {

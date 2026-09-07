@@ -16,7 +16,7 @@ from collections.abc import Callable
 
 from morph.runtime.controller import RuntimeController
 from morph.runtime.runner import execute_command
-from morph.schema.profile import EnvironmentProfile
+from morph.schema.profile import EnvironmentProfile, FieldStatus, NetworkInfo, ProfileField
 
 RunFn = Callable[[], bool]
 RunAtFn = Callable[[float], bool]
@@ -90,6 +90,25 @@ def build_baseline_and_candidates(
     return baseline_fn, candidates
 
 
+def with_unconstrained_network(profile: EnvironmentProfile) -> EnvironmentProfile:
+    """Return ``profile`` with an absent network section filled in as unconstrained.
+
+    Nothing measures host network conditions, so a captured profile carries no
+    network section at all, and a profile round-tripped through the API keeps
+    that ``null``. An absent section means "unconstrained", which is genuinely
+    zero added latency and zero packet loss, so a network parameter search can
+    start from those values instead of failing on the missing section.
+    """
+    if profile.network is not None:
+        return profile
+    filled = profile.model_copy(deep=True)
+    filled.network = NetworkInfo(
+        latency_ms=ProfileField(value=0.0, status=FieldStatus.REQUESTED),
+        packet_loss_percent=ProfileField(value=0.0, status=FieldStatus.REQUESTED),
+    )
+    return filled
+
+
 def set_profile_parameter(
     profile: EnvironmentProfile, dotted_path: str, value: float
 ) -> EnvironmentProfile:
@@ -125,13 +144,20 @@ def make_threshold_run_fn(
     parameter: str,
     timeout: float,
     controller: RuntimeController | None = None,
+    cwd: str | None = None,
 ) -> RunAtFn:
     """Return ``run_at(value)`` for `search_threshold`: set ``parameter`` to
-    ``value`` on the profile, run the command once, and report pass/fail."""
+    ``value`` on the profile, run the command once, and report pass/fail.
+
+    ``cwd`` is the working directory for every trial, needed when the command
+    is a module form (``py -3 -m apps.timeout test``) that only resolves from
+    the project's root.
+    """
     ctrl = controller or RuntimeController()
+    base = with_unconstrained_network(profile)
 
     def _run_at(value: float) -> bool:
-        candidate = set_profile_parameter(profile, parameter, value)
-        return ctrl.run(profile=candidate, command=command, timeout=timeout).passed
+        candidate = set_profile_parameter(base, parameter, value)
+        return ctrl.run(profile=candidate, command=command, timeout=timeout, cwd=cwd).passed
 
     return _run_at

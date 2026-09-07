@@ -173,7 +173,11 @@ class RuntimeController:
             effective_timeout = timeout
             max_processes = fd_limit = None
             if profile.process:
-                if profile.process.timeout_s and profile.process.timeout_s.value is not None:
+                if (
+                    profile.process.timeout_s
+                    and profile.process.timeout_s.value is not None
+                    and float(profile.process.timeout_s.value) > 0
+                ):
                     effective_timeout = float(profile.process.timeout_s.value)
                 if profile.process.max_processes and profile.process.max_processes.value is not None:
                     max_processes = int(profile.process.max_processes.value)
