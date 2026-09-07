@@ -149,6 +149,8 @@ export interface ProjectInfo {
   /** Null when auto-detection found no entrypoint it recognises. */
   suggested_command?: string | null
   suggested_cwd?: string | null
+  /** Install steps that failed (empty = clean, or nothing to install). */
+  deps_failed: string[]
 }
 
 // --- Run targets (GET /platform) ---

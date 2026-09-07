@@ -503,6 +503,24 @@ export function Desktop({
                 {project?.suggested_command && (
                   <p className="desktop__label">Detected: {project.suggested_command}</p>
                 )}
+                {project && project.deps_failed.length > 0 && (
+                  <p className="desktop__label" style={{ color: '#b26a00' }}>
+                    {project.deps_failed.length} dependency step(s) failed:{' '}
+                    {project.deps_failed.join(', ')}.{' '}
+                    <button
+                      type="button"
+                      className="desktop__btn bevel-raised"
+                      style={{ padding: '0 8px', marginLeft: 4 }}
+                      onClick={() =>
+                        void load('Reinstalling dependencies…', () =>
+                          api.installProject(project.project_id),
+                        )
+                      }
+                    >
+                      Retry
+                    </button>
+                  </p>
+                )}
                 <div className="desktop__dialog-actions">
                   <button className="desktop__btn bevel-raised" onClick={() => setView('choose')}>
                     Back
