@@ -7,6 +7,7 @@ from typing import ClassVar
 from textual.app import App
 from textual.binding import Binding
 
+from morph.projects import Project
 from morph.tui.screens.home import HomeScreen
 
 
@@ -24,6 +25,9 @@ class MorphApp(App):
     def __init__(self, demo: bool = False) -> None:
         super().__init__()
         self.demo = demo
+        # Set from the Projects screen; Experiment / Monitor / Threshold read
+        # its command + cwd as their defaults.
+        self.active_project: Project | None = None
 
     def on_mount(self) -> None:
         self.theme = "textual-dark"

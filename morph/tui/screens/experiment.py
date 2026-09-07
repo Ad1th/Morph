@@ -48,15 +48,22 @@ class ExperimentScreen(Screen):
         self._last_profile: EnvironmentProfile | None = None
         self._last_command = ""
         self._last_verdict = ""
+        self._project_cwd: str | None = None
 
     def compose(self) -> ComposeResult:
-        yield Static(" Experiment · causal isolation ", classes="screen-title")
+        project = getattr(self.app, "active_project", None)
+        self._project_cwd = project.cwd if project else None
+        title = " Experiment · causal isolation "
+        if project:
+            title += f"·  {project.name} "
+        yield Static(title, classes="screen-title")
         with Horizontal(id="setup"):
             yield Label("profile")
             yield Input(placeholder=default_profile_hint(), id="in-profile")
             yield Label("command")
             yield Input(
-                value=self._cfg.default_command or "",
+                value=(project.command if project and project.command else self._cfg.default_command)
+                or "",
                 placeholder="python -m apps.timeout",
                 id="in-command",
             )
@@ -139,7 +146,9 @@ class ExperimentScreen(Screen):
             self.post_message(EngineEvent(ev))
 
         try:
-            result = run_experiment_live(profile, command, trials, timeout=30.0, on_event=emit)
+            result = run_experiment_live(
+                profile, command, trials, timeout=30.0, cwd=self._project_cwd, on_event=emit
+            )
             self.post_message(RunFinished(result))
         except Exception as exc:
             self.post_message(RunFinished(None, exc))

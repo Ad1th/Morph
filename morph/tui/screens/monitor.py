@@ -57,6 +57,9 @@ class MonitorScreen(Screen):
         self._pending = False
         self._base: EnvironmentProfile | None = None
         self._last_params: dict[str, float] = {}
+        project = getattr(self.app, "active_project", None)
+        self._project_cwd = project.cwd if project else None
+        self._project_command = project.command if project else None
         cores = os.cpu_count() or 4
         total_mb = int(psutil.virtual_memory().total / (1024 * 1024))
         self._specs = [
@@ -68,10 +71,14 @@ class MonitorScreen(Screen):
         ]
 
     def compose(self) -> ComposeResult:
-        yield Static(" Monitor · live tuning ", classes="screen-title")
+        project = getattr(self.app, "active_project", None)
+        title = " Monitor · live tuning "
+        if project:
+            title += f"·  {project.name} "
+        yield Static(title, classes="screen-title")
         with Horizontal(id="mon-bar"):
             yield Input(
-                value=self._cfg.default_command or "",
+                value=self._project_command or self._cfg.default_command or "",
                 placeholder="python -m apps.timeout",
                 id="mon-command",
             )
@@ -196,7 +203,9 @@ class MonitorScreen(Screen):
                 profile = set_profile_parameter(profile, param, value)
             except ValueError:
                 pass
-        return RuntimeController().run(profile=profile, command=command, timeout=_RUN_TIMEOUT_S)
+        return RuntimeController().run(
+            profile=profile, command=command, timeout=_RUN_TIMEOUT_S, cwd=self._project_cwd
+        )
 
     def _synthetic_run(self, params: dict[str, float]) -> RunResult:
         lat = params.get("network.latency_ms", 0.0)
