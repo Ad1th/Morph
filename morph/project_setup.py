@@ -160,12 +160,14 @@ def connect(
     command, cwd = detect_command(path)
 
     venv: str | None = None
+    deps_failed: list[str] = []
     if install:
         if logger:
             logger(f"preparing environment for {ident}…")
-        venv_path = runenv.prepare(path, VENVS_DIR / f"{ident}", command=command, logger=logger)
-        if venv_path is not None:
-            venv = str(venv_path)
+        result = runenv.prepare(path, VENVS_DIR / f"{ident}", command=command, logger=logger)
+        deps_failed = result.failed
+        if result.venv is not None:
+            venv = str(result.venv)
             command = runenv.command_in_env(command, venv) if command else command
 
     project = Project(
@@ -178,8 +180,43 @@ def connect(
         branch=branch,
         commit=commit,
         venv=venv,
+        deps_failed=deps_failed,
         entrypoints=[n for n in ENTRYPOINT_NAMES if (path / n).is_file()],
         file_count=count_files(path),
     )
     projects.save(project, base=base)
     return project
+
+
+def reinstall(project: Project, *, logger: Logger | None = None) -> Project:
+    """Re-run the dependency install for an already-connected project (no
+    re-clone). Updates the venv, command, and deps_failed on the returned copy."""
+    result = runenv.prepare(
+        Path(project.path), VENVS_DIR / project.name, command=_bare_command(project), logger=logger
+    )
+    updated = project.model_copy(deep=True)
+    updated.deps_failed = result.failed
+    if result.venv is not None:
+        updated.venv = str(result.venv)
+        base_cmd = _bare_command(project)
+        if base_cmd:
+            updated.command = runenv.command_in_env(base_cmd, updated.venv)
+    projects.save(updated)
+    return updated
+
+
+def _bare_command(project: Project) -> str | None:
+    """The project command with any venv path stripped back to `python3` /
+    the script name, so a fresh install can rewrite it cleanly."""
+    if not project.command:
+        return None
+    cmd = project.command
+    if project.venv and project.venv in cmd:
+        # "<venv>/bin/python -m pytest ..." -> "python3 -m pytest ..."
+        _quoted, _sp, rest = cmd.partition(" ")
+        if "/python" in _quoted or "\\python" in _quoted:
+            return f"python3{_sp}{rest}"
+        # "<venv>/bin/sample --help" -> re-detect instead
+        detected, _ = detect_command(Path(project.path))
+        return detected
+    return cmd

@@ -19,3 +19,5 @@ class ProjectInfo(BaseModel):
     entrypoints: list[str] = []
     suggested_command: str | None = None
     suggested_cwd: str | None = None
+    # Install steps that failed (empty = clean, or nothing to install).
+    deps_failed: list[str] = []

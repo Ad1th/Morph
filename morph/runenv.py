@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 
 Logger = Callable[[str], None]
@@ -25,6 +26,18 @@ Logger = Callable[[str], None]
 
 class EnvError(RuntimeError):
     """Dependency installation failed hard (could not even create the venv)."""
+
+
+@dataclass
+class EnvResult:
+    """Outcome of :func:`prepare`."""
+
+    venv: Path | None
+    ok: bool = True  # every dependency step succeeded (or there were none)
+    failed: list[str] = field(default_factory=list)  # human-readable step labels
+
+    def __bool__(self) -> bool:  # keep `if prepare(...):` working
+        return self.venv is not None
 
 
 def _log(logger: Logger | None, message: str) -> None:
@@ -38,21 +51,54 @@ def venv_python(venv: Path) -> Path:
     return venv / "bin" / "python"
 
 
-def _run(cmd: list[str], cwd: Path, logger: Logger | None, timeout: float = 900.0) -> bool:
+# A slow or lossy network is the usual reason a dependency install fails, and
+# it is exactly the class of failure Morph exists to reason about -- so give the
+# child plenty of time and retry the whole step a couple of times.
+_INSTALL_ENV = {"UV_HTTP_TIMEOUT": "120", "PIP_DEFAULT_TIMEOUT": "120"}
+_TRANSIENT = (
+    "timed out", "timeout", "connection", "temporary failure", "network",
+    "reset by peer", "could not resolve", "ssl", "handshake", "503", "502", "429",
+    "failed to fetch", "read error", "eof occurred",
+)
+
+
+def _run(
+    cmd: list[str],
+    cwd: Path,
+    logger: Logger | None,
+    timeout: float = 900.0,
+    retries: int = 0,
+) -> bool:
     """Run one install step. Returns True on success; logs and returns False on
-    a non-fatal failure so the rest of prepare() can continue."""
-    _log(logger, "$ " + " ".join(cmd))
-    try:
-        proc = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, timeout=timeout)
-    except (OSError, subprocess.SubprocessError) as exc:
-        _log(logger, f"  ! {exc}")
-        return False
-    if proc.stdout.strip():
-        _log(logger, proc.stdout.strip()[-1500:])
-    if proc.returncode != 0:
-        _log(logger, "  ! " + (proc.stderr or proc.stdout or "failed").strip()[-1500:])
-        return False
-    return True
+    a non-fatal failure so the rest of prepare() can continue. A failure whose
+    output looks like a network hiccup is retried up to ``retries`` times."""
+    import os
+    import time
+
+    env = {**os.environ, **_INSTALL_ENV}
+    last = ""
+    for attempt in range(retries + 1):
+        if attempt:
+            _log(logger, f"  retry {attempt}/{retries} (looked like a network error)…")
+            time.sleep(2.0 * attempt)
+        _log(logger, "$ " + " ".join(cmd))
+        try:
+            proc = subprocess.run(
+                cmd, cwd=str(cwd), capture_output=True, text=True, timeout=timeout, env=env
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            last = str(exc)
+            _log(logger, f"  ! {last}")
+            continue
+        if proc.stdout.strip():
+            _log(logger, proc.stdout.strip()[-1500:])
+        if proc.returncode == 0:
+            return True
+        last = (proc.stderr or proc.stdout or "failed").strip()
+        _log(logger, "  ! " + last[-1500:])
+        if not any(word in last.lower() for word in _TRANSIENT):
+            break  # deterministic failure -- retrying won't help
+    return False
 
 
 def _pyproject_has_metadata(project_dir: Path) -> bool:
@@ -96,11 +142,13 @@ def prepare(
     *,
     command: str | None = None,
     logger: Logger | None = None,
-) -> Path | None:
+) -> EnvResult:
     """Create ``venv_dir`` and install ``project_dir``'s deps into it.
 
-    Returns the venv path when one was made, else ``None`` (nothing to install,
-    a Node project handled in place, or no usable toolchain).
+    Every install step is retried through transient (network) failures, and if
+    ``uv`` keeps failing it is retried once with the venv's own ``pip``. A step
+    that still fails is recorded in the result's ``failed`` list rather than
+    aborting -- a partly-installed project can still be useful.
     """
     project_dir = Path(project_dir)
     venv_dir = Path(venv_dir)
@@ -109,7 +157,9 @@ def prepare(
     pyproject = project_dir / "pyproject.toml"
     setup_py = project_dir / "setup.py"
     package_json = project_dir / "package.json"
-    wants_pytest = bool(command) and (" pytest" in f" {command}" or command.strip().startswith("pytest"))
+    wants_pytest = bool(command) and (
+        " pytest" in f" {command}" or command.strip().startswith("pytest")
+    )
 
     python_project = requirements.is_file() or pyproject.is_file() or setup_py.is_file()
     if python_project or wants_pytest:
@@ -118,36 +168,50 @@ def prepare(
             if not _run([uv, "venv", str(venv_dir)], project_dir, logger):
                 raise EnvError("could not create the virtualenv")
             py = str(venv_python(venv_dir))
-            pip = [uv, "pip", "install", "--python", py]
+            uv_pip = [uv, "pip", "install", "--python", py]
         else:
             if not _run([sys.executable, "-m", "venv", str(venv_dir)], project_dir, logger):
                 raise EnvError("could not create the virtualenv")
-            pip = [str(venv_python(venv_dir)), "-m", "pip", "install"]
+            uv_pip = None
+        venv_pip = [str(venv_python(venv_dir)), "-m", "pip", "install"]
+
+        failed: list[str] = []
+
+        def install(label: str, args: list[str]) -> None:
+            primary = ([*uv_pip, *args]) if uv_pip else ([*venv_pip, *args])
+            if _run(primary, project_dir, logger, retries=2):
+                return
+            if uv_pip is not None:
+                _log(logger, "  falling back to the venv's own pip…")
+                if _run([*venv_pip, *args], project_dir, logger, retries=1):
+                    return
+            failed.append(label)
 
         if requirements.is_file():
-            _run([*pip, "-r", str(requirements)], project_dir, logger)
+            install("requirements.txt", ["-r", str(requirements)])
         for extra_req in _extra_requirement_files(project_dir):
-            _run([*pip, "-r", str(extra_req)], project_dir, logger)
-
+            install(extra_req.name, ["-r", str(extra_req)])
         if _pyproject_has_metadata(project_dir) or setup_py.is_file():
             extras = _test_extras(project_dir) if wants_pytest else []
             spec = f".[{','.join(extras)}]" if extras else "."
-            _run([*pip, "-e", spec], project_dir, logger)
-
+            install(f"pip install -e {spec}", ["-e", spec])
         if wants_pytest:
-            _run([*pip, "pytest"], project_dir, logger)
+            install("pytest", ["pytest"])
 
-        return venv_dir
+        if failed:
+            _log(logger, f"  [!] some dependencies did not install: {', '.join(failed)}")
+        return EnvResult(venv_dir, ok=not failed, failed=failed)
 
     if package_json.is_file():
         npm = shutil.which("npm")
         if npm:
             lock = project_dir / "package-lock.json"
-            _run([npm, "ci" if lock.is_file() else "install"], project_dir, logger)
-        return None
+            ok = _run([npm, "ci" if lock.is_file() else "install"], project_dir, logger, retries=2)
+            return EnvResult(None, ok=ok, failed=[] if ok else ["npm install"])
+        return EnvResult(None)
 
     _log(logger, "no requirements.txt / pyproject.toml / package.json -- nothing to install")
-    return None
+    return EnvResult(None)
 
 
 def _venv_bin(venv: Path) -> Path:

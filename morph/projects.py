@@ -27,6 +27,7 @@ class Project(BaseModel):
     branch: str | None = None
     commit: str | None = None
     venv: str | None = None  # isolated env prepared for it, if any
+    deps_failed: list[str] = Field(default_factory=list)  # install steps that didn't succeed
     entrypoints: list[str] = Field(default_factory=list)
     file_count: int = 0
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
