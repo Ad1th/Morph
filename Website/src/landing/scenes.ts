@@ -5,7 +5,8 @@ export type Annotation = {
   id: 'cpu' | 'ram' | 'locale' | 'rlimit'
   className: string
   tag: string
-  /* `body` is HTML — a single <b> marks the measured value, nothing else. */
+  /* The instrument readout: the real knob Morph turns, in its real units. */
+  readout: string
   body: string
   from: number
   to: number
@@ -15,9 +16,10 @@ export const ANNOTATIONS: Annotation[] = [
   {
     id: 'cpu',
     className: 'annotation a-cpu',
-    tag: 'cpu / cores',
+    tag: 'cpu',
+    readout: 'cpu.max  40000 100000',
     body:
-      'Child processes are capped with cgroups and frozen by the kernel scheduler when the quota runs out — <b>40 ms of runtime inside every 100 ms window</b>.',
+      'The child process gets 40 ms of CPU in every 100 ms window. When the quota is spent the scheduler freezes it until the next window, which is what a busy four-core laptop feels like from inside.',
     from: 0.29,
     to: 0.46,
   },
@@ -25,17 +27,19 @@ export const ANNOTATIONS: Annotation[] = [
     id: 'ram',
     className: 'annotation a-ram',
     tag: 'memory',
+    readout: 'memory.max  8589934592',
     body:
-      'Memory is bounded by the cgroup memory controller. Overcommit past the limit is settled by the <b>kernel OOM killer</b>, exactly as it would be on the target.',
+      'The cgroup memory controller bounds the process at the captured size. Allocate past it and the kernel OOM killer answers, exactly as it would on the machine you are imitating.',
     from: 0.46,
     to: 0.6,
   },
   {
     id: 'locale',
     className: 'annotation a-locale',
-    tag: 'locale / timezone',
+    tag: 'locale and timezone',
+    readout: 'LANG=en_IN.UTF-8  TZ=Asia/Kolkata',
     body:
-      'Locale and timezone are read from the captured profile and pushed into the sandbox <b>before the process starts</b>, so date and number formatting match.',
+      'Both are read from the captured profile and placed in the environment before the process starts, so dates, decimal separators and DST behave the way they do for the user, not for you.',
     from: 0.6,
     to: 0.74,
   },
@@ -43,8 +47,9 @@ export const ANNOTATIONS: Annotation[] = [
     id: 'rlimit',
     className: 'annotation a-rlimit',
     tag: 'process limits',
+    readout: 'RLIMIT_NOFILE=256  RLIMIT_NPROC=64',
     body:
-      'Threads, file descriptors and process count are constrained before exec with POSIX rlimits — <b>RLIMIT_NOFILE and RLIMIT_NPROC</b>.',
+      'File descriptors and process count are set with POSIX rlimits just before exec. A pool that leaks handles fails here at the same count it failed at in production.',
     from: 0.6,
     to: 0.74,
   },

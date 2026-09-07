@@ -16,9 +16,10 @@ type KF = { p: number; pos: [number, number, number]; tgt: [number, number, numb
 
 /* A 3/4 aerial pass over the board — reads as a circuit far better than a
    table-level shot — dropping close for each annotation stop, then rising for
-   the morph and settling back out in front of the second machine. */
+   the morph and settling back out in front of the laptop, now showing the
+   second machine. */
 const KEYFRAMES: KF[] = [
-  { p: 0.0, pos: [0.0, 1.7, 15.5], tgt: [0.0, 1.6, 6.5] },
+  { p: 0.0, pos: [0.0, 1.9, 15.5], tgt: [0.0, 1.85, 6.5] },
   { p: 0.12, pos: [0.0, 1.9, 8.6], tgt: [0.0, 0.9, -1.0] },
   { p: 0.22, pos: [-1.7, 2.7, 5.6], tgt: [0.5, 0.35, -0.6] },
   { p: 0.33, pos: [1.0, 2.1, 3.0], tgt: [0.3, 0.2, -1.4] },
@@ -26,8 +27,8 @@ const KEYFRAMES: KF[] = [
   { p: 0.52, pos: [-1.4, 1.7, 2.4], tgt: [-3.1, 0.55, -0.4] },
   { p: 0.66, pos: [0.4, 2.3, 3.9], tgt: [-0.4, 0.15, -1.8] },
   { p: 0.8, pos: [0.0, 6.6, 8.2], tgt: [0.0, 0.3, -0.6] },
-  { p: 0.9, pos: [0.0, 2.6, 13.6], tgt: [0.0, 1.5, 3.5] },
-  { p: 1.0, pos: [0.0, 1.7, 16.0], tgt: [0.0, 1.6, 6.5] },
+  { p: 0.9, pos: [0.0, 2.7, 13.6], tgt: [0.0, 1.7, 3.5] },
+  { p: 1.0, pos: [0.0, 1.9, 16.0], tgt: [0.0, 1.85, 6.5] },
 ]
 
 const _a = new THREE.Vector3()
@@ -388,35 +389,104 @@ function Storage() {
   )
 }
 
-function Monitor({ os1, os2 }: { os1: string; os2: string }) {
+/* Keyboard deck texture: a grid of key caps on a dark chassis, drawn once. */
+function useKeyboardTexture() {
+  return useMemo(() => {
+    const c = document.createElement('canvas')
+    c.width = 1024
+    c.height = 448
+    const g = c.getContext('2d')!
+    g.fillStyle = '#0d0409'
+    g.fillRect(0, 0, c.width, c.height)
+    const rows = [14, 14, 13, 12, 12]
+    const keyH = 64
+    const gap = 10
+    for (let r = 0; r < rows.length; r++) {
+      const n = rows[r]
+      const keyW = (c.width - 60 - gap * (n - 1)) / n
+      const y = 24 + r * (keyH + gap)
+      for (let k = 0; k < n; k++) {
+        const x = 30 + k * (keyW + gap)
+        g.fillStyle = '#1a0a12'
+        g.fillRect(x, y, keyW, keyH)
+        g.fillStyle = '#24101a'
+        g.fillRect(x + 4, y + 4, keyW - 8, keyH - 8)
+      }
+    }
+    /* space bar */
+    g.fillStyle = '#1a0a12'
+    g.fillRect(300, 24 + 5 * (keyH + gap), 424, keyH)
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }, [])
+}
+
+/* The machine in front of the board: a laptop, lid open toward the camera.
+   The flight starts looking at its screen (the OS you have), passes through
+   the panel into the silicon, and settles back out in front of the same lid
+   showing the OS you don't. One object, so the two ends match exactly. */
+function Laptop({ os1, os2 }: { os1: string; os2: string }) {
   const [t1, t2] = useTexture([os1, os2])
+  const keys = useKeyboardTexture()
   const m1 = useRef<THREE.MeshBasicMaterial>(null)
   const m2 = useRef<THREE.MeshBasicMaterial>(null)
+  const glow = useRef<THREE.MeshStandardMaterial>(null)
   useFrame(() => {
     const p = flight.p
     if (m1.current) m1.current.opacity = 1 - smoothstep(0.08, 0.16, p)
     if (m2.current) m2.current.opacity = smoothstep(0.86, 0.97, p)
+    /* the lid's back-light follows whichever screen is on */
+    if (glow.current) {
+      glow.current.emissiveIntensity =
+        0.05 * Math.max(1 - smoothstep(0.08, 0.16, p), smoothstep(0.86, 0.97, p))
+    }
   })
+  const LID_TILT = -0.19 /* radians: top of the lid leans away from the camera */
   return (
-    <group position={[0, 1.7, 8.6]}>
-      <mesh position-z={-0.14}>
-        <boxGeometry args={[7.0, 4.6, 0.24]} />
-        <meshStandardMaterial color="#12060c" roughness={0.6} metalness={0.3} />
+    <group position={[0, -0.22, 8.6]}>
+      {/* base / keyboard deck, sitting on the floor plane */}
+      <mesh position-y={0.11}>
+        <boxGeometry args={[7.6, 0.22, 5.0]} />
+        <meshStandardMaterial color="#14070d" roughness={0.55} metalness={0.45} />
       </mesh>
-      <mesh position={[0, -2.75, 0.2]}>
-        <boxGeometry args={[2.4, 1.0, 1.5]} />
-        <meshStandardMaterial color="#12060c" roughness={0.6} metalness={0.3} />
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.225, -0.55]}>
+        <planeGeometry args={[6.4, 2.8]} />
+        <meshStandardMaterial map={keys} roughness={0.8} metalness={0.1} />
       </mesh>
-      {/* screens are colour-graded toward wine so the OS shot reads as a
-          powered display, not an imported palette */}
-      <mesh>
-        <planeGeometry args={[6.3, 3.9]} />
-        <meshBasicMaterial ref={m1} map={t1} color="#8f4a63" transparent toneMapped={false} />
+      {/* trackpad */}
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.226, 1.55]}>
+        <planeGeometry args={[2.0, 1.25]} />
+        <meshStandardMaterial color="#1e0c15" roughness={0.35} metalness={0.5} />
       </mesh>
-      <mesh position-z={0.01}>
-        <planeGeometry args={[6.3, 3.9]} />
-        <meshBasicMaterial ref={m2} map={t2} color="#9a5540" transparent opacity={0} toneMapped={false} />
+      {/* rubber feet shadow line at the front edge */}
+      <mesh position={[0, 0.02, 2.5]}>
+        <boxGeometry args={[7.6, 0.04, 0.06]} />
+        <meshStandardMaterial color="#070203" roughness={1} />
       </mesh>
+
+      {/* lid, hinged along the back edge of the base */}
+      <group position={[0, 0.2, -2.42]} rotation-x={LID_TILT}>
+        <mesh position-y={2.05}>
+          <boxGeometry args={[7.6, 4.1, 0.18]} />
+          <meshStandardMaterial ref={glow} color="#120509" roughness={0.42} metalness={0.55} emissive="#4a0e22" emissiveIntensity={0.05} />
+        </mesh>
+        {/* hinge barrel */}
+        <mesh rotation-z={Math.PI / 2} position-y={0.02}>
+          <cylinderGeometry args={[0.11, 0.11, 7.4, 20]} />
+          <meshStandardMaterial color="#0c0308" roughness={0.6} metalness={0.5} />
+        </mesh>
+        {/* screens are colour-graded toward wine so the OS shot reads as a
+            powered display, not an imported palette */}
+        <mesh position={[0, 2.1, 0.095]}>
+          <planeGeometry args={[6.9, 3.6]} />
+          <meshBasicMaterial ref={m1} map={t1} color="#8f4a63" transparent toneMapped={false} />
+        </mesh>
+        <mesh position={[0, 2.1, 0.105]}>
+          <planeGeometry args={[6.9, 3.6]} />
+          <meshBasicMaterial ref={m2} map={t2} color="#9a5540" transparent opacity={0} toneMapped={false} />
+        </mesh>
+      </group>
     </group>
   )
 }
@@ -492,7 +562,7 @@ function World({ progress }: { progress: React.RefObject<number> }) {
         drive={() => 0.32 * Math.sin(Math.min(1, flight.morph) * Math.PI)}
       />
 
-      <Monitor os1="/wallpapers/macos.jpg" os2="/wallpapers/windows.jpg" />
+      <Laptop os1="/wallpapers/macos.jpg" os2="/wallpapers/windows.jpg" />
     </>
   )
 }
@@ -507,7 +577,7 @@ export function Journey3D({ progress }: { progress: React.RefObject<number> }) {
       className="journey-canvas"
       dpr={dpr}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
-      camera={{ position: [0, 1.7, 15.5], fov: 42, near: 0.1, far: 80 }}
+      camera={{ position: [0, 1.9, 15.5], fov: 42, near: 0.1, far: 80 }}
     >
       <Suspense fallback={null}>
         <World progress={progress} />
