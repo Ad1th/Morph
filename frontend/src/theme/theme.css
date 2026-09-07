@@ -1,5 +1,13 @@
 /* Morph OS themes. One component tree, three skins, switched by [data-os] on <html>. */
 
+/* Desktop icon placement. Both top corners read these, so the folder and the
+   environment badge sit at the same height by construction rather than by two
+   hand-kept numbers that drift apart. */
+:root {
+  --corner-top: 20px;
+  --corner-side: 24px;
+}
+
 * {
   box-sizing: border-box;
 }
