@@ -1,42 +1,48 @@
 .os-switcher {
   position: fixed;
-  top: 16px;
-  right: 20px;
+  /* Nudged above the shared corner line: the badge artwork carries transparent
+     margin around its ring, so a box-aligned badge reads as sitting lower than
+     the folder opposite it. */
+  top: calc(var(--corner-top) - 20px);
+  right: var(--corner-side);
   z-index: 1000;
 }
 
+/* The artwork is the button: the badge image already carries its own bevelled
+   metal ring, so the chrome that used to draw one here is gone. */
 .os-switcher__badge {
-  width: 44px;
-  height: 44px;
+  width: 116px;
+  height: 116px;
+  padding: 0;
+  border: none;
+  background: none;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  filter: drop-shadow(1px 2px 4px rgba(0, 0, 0, 0.45));
+}
+
+.os-switcher__badge-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  /* Keep the pixel art crisp instead of letting the browser smooth it. */
+  image-rendering: pixelated;
+}
+
+.os-switcher__badge:hover {
+  filter: drop-shadow(1px 2px 6px rgba(0, 0, 0, 0.6)) brightness(1.06);
 }
 
 .os-switcher__badge:focus-visible {
   outline: 2px solid var(--accent, #1e4bb8);
-  outline-offset: 2px;
-}
-
-/* Metallic bevel badge, matching the Claude Design Windows reference. */
-:root[data-os='windows'] .os-switcher__badge {
-  width: 62px;
-  height: 62px;
-  background: linear-gradient(160deg, #f2f2f2 0%, #bdbdbd 45%, #8f8f8f 100%);
-  border: 2px solid #4a4a4a;
-  box-shadow:
-    inset 0 0 0 2px rgba(255, 255, 255, 0.6),
-    1px 2px 0 rgba(0, 0, 0, 0.35);
+  outline-offset: 3px;
 }
 
 .os-switcher__menu {
   position: absolute;
-  top: 52px;
+  top: 126px;
   right: 0;
   min-width: 160px;
   background: var(--surface);

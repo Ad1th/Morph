@@ -54,26 +54,56 @@
 
 .desktop__center {
   position: absolute;
-  top: 42%;
-  left: 50%;
+  top: 46%;
+  /* Horizontal anchor is a token so a skin whose wallpaper has its own subject
+     can move the lockup clear of it without redefining the whole block. */
+  left: var(--lockup-x, 50%);
   transform: translate(-50%, -50%);
   text-align: center;
   color: #ffffff;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
-.desktop__wordmark {
-  font-family: var(--font-display);
-  font-size: 48px;
-  letter-spacing: 0.4em;
-  margin: 0 0 20px 0;
+/* Visible on Windows only. `visibility` rather than `display: none` so the line
+   keeps its space and every skin's lockup stays at the same height. */
+.desktop:not([data-os='windows']) .desktop__tagline {
+  visibility: hidden;
 }
 
+/* Linux now uses the shared lockup position and size; the wallpaper moves the
+   dragon out of its way instead (see --wallpaper in theme.css). */
+
+.desktop__wordmark {
+  font-family: var(--font-display);
+  /* Scales with the viewport so it fills the desktop on a large screen and
+     still fits on a laptop. The trailing indent balances the letter-spacing,
+     which otherwise pads only the right side and shifts the word off centre. */
+  /* Windows and macOS keep the original size; only a skin that needs to make
+     room for its wallpaper overrides --lockup-size. */
+  font-size: var(--lockup-size, clamp(48px, 8.5vw, 132px));
+  letter-spacing: 0.4em;
+  text-indent: 0.4em;
+  line-height: 1;
+  margin: 0 0 28px 0;
+  white-space: nowrap;
+}
+
+/* The MORPH lockup is brand, not OS chrome: it must look identical in all three
+   skins so switching is seamless. Hence a pinned family here rather than
+   var(--font-ui), which is DM Mono / Inter / JetBrains Mono per theme and
+   changes the tagline's weight and width on every switch.
+
+   Width is in px, not ch: a ch is the width of "0" in the CURRENT font, so a
+   ch-based max-width measured differently in each theme, re-wrapped the line,
+   and moved the heading above it. min-height reserves both lines so a one-line
+   wrap cannot shift the block either. */
 .desktop__tagline {
-  font-family: var(--font-ui);
-  font-size: 20px;
-  font-weight: 600;
-  max-width: 480px;
+  font-family: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: clamp(16px, 1.7vw, 26px);
+  font-weight: 500;
+  line-height: 1.4;
+  max-width: 520px;
+  min-height: 2.8em;
   margin: 0 auto;
 }
 

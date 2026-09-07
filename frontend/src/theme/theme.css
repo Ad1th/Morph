@@ -1,5 +1,32 @@
 /* Morph OS themes. One component tree, three skins, switched by [data-os] on <html>. */
 
+/* Brand display face: a pixel serif, shared by all three skins so the wordmark
+   and window titles read the same whichever OS is on screen.
+
+   `local()` first so an installed copy is used with no download; the bundled
+   file is the fallback that makes the demo work on a machine where the font
+   was never installed (a judge's laptop, the Pi, a fresh clone). Drop the file
+   at frontend/public/fonts/BlueScreen.ttf -- until then this rule simply does
+   nothing and the stack below takes over. */
+@font-face {
+  font-family: 'Blue Screen';
+  src:
+    local('Blue Screen Personal Use'),
+    local('Blue Screen Personal Use Regular'),
+    url('/fonts/BlueScreen.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Desktop icon placement. Both top corners read these, so the folder and the
+   environment badge sit at the same height by construction rather than by two
+   hand-kept numbers that drift apart. */
+:root {
+  --corner-top: 20px;
+  --corner-side: 24px;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -78,7 +105,7 @@ select {
 
 /* ---------- Windows: retro 98/2000 chrome, clouds wallpaper ---------- */
 :root[data-os='windows'] {
-  --font-display: 'Silkscreen', monospace;
+  --font-display: 'Blue Screen', 'Silkscreen', monospace;
   --font-ui: 'DM Mono', monospace;
   --font-mono: 'DM Mono', monospace;
   --label-transform: uppercase;
@@ -135,13 +162,16 @@ select {
 
 /* ---------- macOS: modern rounded window, Big Sur wave wallpaper ---------- */
 :root[data-os='mac'] {
-  --font-display: 'Silkscreen', monospace;
+  --font-display: 'Blue Screen', 'Silkscreen', monospace;
   --font-ui: 'Inter', -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --label-transform: none;
   --label-tracking: normal;
 
-  --wallpaper: radial-gradient(ellipse 90% 60% at 15% 90%, #3fa0e8 0%, transparent 60%),
+  /* The gradient stack that stood in for this image stays underneath it, so the
+     desktop is the right colour while the photo decodes. */
+  --wallpaper: url('/wallpapers/macos.jpg') center / cover no-repeat,
+    radial-gradient(ellipse 90% 60% at 15% 90%, #3fa0e8 0%, transparent 60%),
     radial-gradient(ellipse 80% 60% at 60% 95%, #e0325a 0%, transparent 55%),
     radial-gradient(ellipse 70% 50% at 90% 100%, #9b4ee8 0%, transparent 55%),
     linear-gradient(160deg, #16152e 0%, #1e1c3d 45%, #241f3f 100%);
@@ -192,14 +222,15 @@ select {
 
 /* ---------- Linux: terminal-first, dark, monospace ---------- */
 :root[data-os='linux'] {
-  --font-display: 'Silkscreen', monospace;
+  --font-display: 'Blue Screen', 'Silkscreen', monospace;
   --font-ui: 'JetBrains Mono', monospace;
   --font-mono: 'JetBrains Mono', monospace;
   --label-transform: none;
   --label-tracking: normal;
 
-  --wallpaper: radial-gradient(ellipse 60% 50% at 10% 20%, #1b2735 0%, transparent 60%),
-    linear-gradient(160deg, #0a0f16 0%, #0d1420 60%, #0a0f16 100%);
+  /* Gradient underneath paints a matching tone while the image decodes. */
+  --wallpaper: url('/wallpapers/linux.jpg') center / cover no-repeat,
+    linear-gradient(150deg, #5b1f45 0%, #7c2a52 55%, #b0454b 100%);
 
   --window-bg: #0e1116;
   --window-border: #2ee6a6;

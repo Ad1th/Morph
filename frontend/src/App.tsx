@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { DesktopCorners } from './components/DesktopCorners'
 import { OsSwitcher } from './components/OsSwitcher'
 import type { EnvironmentProfile, RunResult } from './api/types'
 import { Desktop } from './screens/Desktop'
@@ -16,12 +17,33 @@ type ScreenState =
 export default function App() {
   const { os, setOs } = useOsTheme()
   const [screen, setScreen] = useState<ScreenState>({ name: 'desktop' })
+  const [projectOpen, setProjectOpen] = useState(true)
+
+  /* The folder icon is always on screen, so it has to do the whole job:
+     come back to the desktop AND reopen the project dialog. Setting the
+     screen alone did nothing when the desktop was already showing. */
+  function openProject() {
+    setScreen({ name: 'desktop' })
+    setProjectOpen(true)
+  }
 
   return (
     <>
       <OsSwitcher os={os} onChange={setOs} />
 
-      {screen.name === 'desktop' && <Desktop os={os} onStart={() => setScreen({ name: 'config' })} />}
+      {/* Desktop furniture: present on every screen, so it is rendered once
+          here rather than per screen. Clicking the folder always returns to
+          the desktop, where the upload dialog lives. */}
+      <DesktopCorners os={os} onFolderClick={openProject} />
+
+      {screen.name === 'desktop' && (
+        <Desktop
+          os={os}
+          open={projectOpen}
+          onOpenChange={setProjectOpen}
+          onStart={() => setScreen({ name: 'config' })}
+        />
+      )}
 
       {screen.name === 'config' && (
         <ParameterConfiguration

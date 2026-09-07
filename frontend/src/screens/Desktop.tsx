@@ -2,12 +2,23 @@ import { useRef, useState, type ChangeEvent } from 'react'
 import type { OsName } from '../theme/useOsTheme'
 import './Desktop.css'
 
-const TAGLINE = 'The quieter you become, the more you are able to hear'
+const TAGLINE = 'Now it breaks on your machine too'
 
 type DialogView = 'choose' | 'github' | 'done'
 
-export function Desktop({ os, onStart }: { os: OsName; onStart: () => void }) {
-  const [open, setOpen] = useState(true)
+export function Desktop({
+  os,
+  open,
+  onOpenChange,
+  onStart,
+}: {
+  os: OsName
+  /** Controlled by App so the desktop folder icon can reopen this dialog from
+      any screen, not just when the desktop happens to be mounted. */
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onStart: () => void
+}) {
   const [view, setView] = useState<DialogView>('choose')
   const [repo, setRepo] = useState('')
   const [note, setNote] = useState('')
@@ -30,10 +41,14 @@ export function Desktop({ os, onStart }: { os: OsName; onStart: () => void }) {
 
   return (
     <div className="desktop" data-os={os}>
-      <FolderGlyph os={os} onClick={() => setOpen(true)} />
-
+      {/* The folder and badge icons are rendered once by <DesktopCorners> in
+          App, so that they stay aligned across every screen. */}
       <div className="desktop__center">
         <h1 className="desktop__wordmark">MORPH</h1>
+        {/* Rendered in every skin but only visible on Windows. Keeping the
+            element in the layout holds the block's height constant, so the
+            wordmark sits at the same spot whichever skin is on screen; the
+            CSS hides it rather than React dropping it. */}
         <p className="desktop__tagline">&ldquo;{TAGLINE}&rdquo;</p>
       </div>
 
@@ -52,7 +67,7 @@ export function Desktop({ os, onStart }: { os: OsName; onStart: () => void }) {
             </span>
             <button
               className="desktop__dialog-close bevel-raised"
-              onClick={() => setOpen(false)}
+              onClick={() => onOpenChange(false)}
               aria-label="Close"
             >
               ×
@@ -119,32 +134,5 @@ export function Desktop({ os, onStart }: { os: OsName; onStart: () => void }) {
 
       <input ref={fileRef} type="file" multiple onChange={handleFiles} style={{ display: 'none' }} />
     </div>
-  )
-}
-
-function FolderGlyph({ os, onClick }: { os: OsName; onClick: () => void }) {
-  if (os === 'windows') {
-    return (
-      <div className="desktop__folder desktop__folder--win98" title="Upload Project" onClick={onClick}>
-        <div className="desktop__folder-tab" />
-        <div className="desktop__folder-body">
-          <div className="desktop__folder-highlight" />
-        </div>
-      </div>
-    )
-  }
-  const color = os === 'mac' ? '#5aa7f5' : '#4a8fd6'
-  return (
-    <svg
-      className="desktop__folder"
-      width="44"
-      height="36"
-      viewBox="0 0 44 36"
-      aria-hidden
-      onClick={onClick}
-      style={{ cursor: 'pointer' }}
-    >
-      <path d="M2 6a2 2 0 0 1 2-2h12l4 4h20a2 2 0 0 1 2 2v22a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6z" fill={color} />
-    </svg>
   )
 }
