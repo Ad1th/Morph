@@ -30,23 +30,26 @@ github:
   scope: repo,read:user
 
 cloud:
+  # Flip to true once `morph cloud` reports the worker usable.
+  enabled: true
+
   # Provenance only. The transport is SSH whoever supplies the box, so a GCP
   # instance, a Raspberry Pi and a laptop across the room all work the same way.
-  provider: ssh
+  provider: gcp
 
-  # Leave the host blank in the committed file so unit tests and CI never open
-  # an SSH connection. Point Morph at a worker from the environment instead;
-  # the environment wins over this file either way. For the Pi on the desk:
+  # The instance's EXTERNAL ip, from the GCP console. The environment wins
+  # over this file either way, so a laptop can point at the Pi on the desk:
   #
-  #     export MORPH_CLOUD_HOST=rbpi.local
-  #     export MORPH_CLOUD_USER=rbpi
+  #     export MORPH_CLOUD_HOST=rbpi.local MORPH_CLOUD_USER=rbpi
   #     export MORPH_CLOUD_SSH_KEY=~/.ssh/id_ed25519   # optional
   #
-  # (MORPH_WORKER_HOST / MORPH_WORKER_USER / MORPH_WORKER_SSH_KEY are aliases.)
-  host: ""
-  user: ""
+  # (MORPH_WORKER_* are aliases.) A run only goes to the worker on an explicit
+  # `morph run --cloud`; tests and CI set MORPH_NO_NETWORK=1 and never connect.
+  host: "34.93.95.6"
+  user: "morph-worker"
+  ssh_key: ~/.ssh/morph_gcp
 
-  # Interpreter and checkout on the worker. scripts/setup_gcp_worker.sh builds
-  # this venv. A bare "python3" also works.
-  python: ~/morph/.venv/bin/python
-  workdir: ~/morph
+  # Interpreter and checkout on the worker, built by scripts/setup_gcp_worker.sh.
+  # A bare "python3" also works.
+  python: /home/morph-worker/morph/.venv/bin/python
+  workdir: /home/morph-worker/morph

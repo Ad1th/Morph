@@ -18,8 +18,17 @@ import type {
   ThresholdResult,
 } from './types'
 
-// Vite's dev proxy rewrites /api/* -> http://127.0.0.1:8000/* (vite.config.ts).
-const BASE = '/api'
+// Same origin by default: the Vite dev proxy rewrites /api/* -> 127.0.0.1:8000
+// Same origin by default: the Vite dev proxy rewrites /api/* -> 127.0.0.1:8000
+// and strips the /api prefix (see vite.config.ts), so a bundled deploy where
+// the API is served alongside the static build needs nothing else. Set
+// VITE_API_URL (no trailing slash, e.g. https://api.morph.dev) when the
+// frontend is deployed separately from the backend — such as the static build
+// on Vercel talking to a Morph Fleet worker — and requests go straight to the
+// API's real paths (no /api prefix; there is no proxy to strip it for you).
+// See frontend/.env.example.
+const API_URL = import.meta.env.VITE_API_URL?.replace(/\/+$/, '')
+const BASE = API_URL ?? '/api'
 
 /** A failed request, with the backend's `detail` already unwrapped. */
 export class ApiError extends Error {
@@ -179,8 +188,13 @@ export const api = {
     request<ExportInvariantResponse>('/export/invariant', json(req)),
 }
 
-/** WebSocket URL for a job. Vite proxies /ws to the API in dev; same-origin in a bundle. */
+/** WebSocket URL for a job. Vite proxies /ws to the API in dev and a bundled
+ *  same-origin deploy needs nothing else. When VITE_API_URL points at a separate
+ *  host, the socket's host is derived from it (http -> ws, https -> wss). */
 export function jobSocketUrl(kind: 'experiment' | 'threshold', id: string): string {
+  if (API_URL) {
+    return `${API_URL.replace(/^http/, 'ws')}/ws/${kind}/${encodeURIComponent(id)}`
+  }
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
   return `${proto}://${window.location.host}/ws/${kind}/${encodeURIComponent(id)}`
 }

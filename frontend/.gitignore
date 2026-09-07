@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+!.env.example
 
 # Local Playwright visual-verification script and its output -- not part
 # of the app, just how changes get eyeballed in a real browser during dev.
