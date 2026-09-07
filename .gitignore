@@ -56,3 +56,7 @@ graphify-out/manifest.json
 # Temporary / Draft Specs
 Morph_Design_Spec.md
 Morph_PRD.md
+
+# local venv symlink (worktree) and runtime state
+.venv
+.morph/
