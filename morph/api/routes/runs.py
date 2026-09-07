@@ -22,11 +22,20 @@ class RunRequest(BaseModel):
     # from profile.env_vars (the Environment Variables editor screen) via
     # RuntimeController.run().
     env_overrides: dict[str, str] = {}
+    # Where the run executes. Only the host machine is wired up; a remote
+    # target is rejected outright rather than silently run locally.
+    target: str = "local"
 
 
 @router.post("", response_model=RunResult)
 def execute_run(req: RunRequest) -> RunResult:
     """Execute a single run of a command under an environment profile."""
+    if req.target != "local":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Run target '{req.target}' is not available. Only 'local' is supported "
+            "until a remote host is configured.",
+        )
     controller = RuntimeController(force_proxy=req.force_proxy)
     try:
         if req.profile is not None:
