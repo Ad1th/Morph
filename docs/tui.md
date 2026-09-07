@@ -96,7 +96,9 @@ Numeric knobs are sliders (`←/→` nudge, `Shift+←/→` jump, `Home/End` to 
 ends); choices and toggles cycle with the same keys. `Tab` moves between them
 and the pane scrolls. Every knob shows its fidelity badge for this host:
 `REPRODUCED`, `APPROXIMATED` or `UNAVAILABLE` (a Mac cannot cgroup-limit CPU
-or RAM, so those read `UNAVAILABLE` rather than pretending), or `CAPTURED`
+or RAM, so cores, quota and ram are carried as runtime hints such as
+`OMP_NUM_THREADS`, `GOMAXPROCS` and `NODE_OPTIONS` and read `APPROXIMATED`,
+never `REPRODUCED`), or `CAPTURED`
 when the value is simply recorded into the profile.
 
 Changing a knob re-runs the command under the new conditions (debounced, one

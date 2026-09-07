@@ -18,6 +18,46 @@ if TYPE_CHECKING:  # imported lazily at runtime so `python -m ...adapters.proxy`
 PROXY_DETAIL = "user-space proxy: only traffic routed through MORPH_PROXY_* is shaped"
 ENV_HINT_DETAIL = "env hint only ({var}); nothing on this host enforces it"
 
+# Without cgroups (macOS, Windows, the proxy adapter) CPU and memory limits are
+# approximated through the environment variables most runtimes honour: thread
+# pools size themselves from the *_NUM_THREADS family and GOMAXPROCS, Node and
+# the JVM cap their heaps from NODE_OPTIONS / JAVA_TOOL_OPTIONS, Go from
+# GOMEMLIMIT. A program that ignores them is not constrained, so this is
+# APPROXIMATED, never REPRODUCED.
+RUNTIME_HINT_DETAIL = "exported as {vars}; honoured by runtimes that read them, not enforced by the kernel"
+
+
+def cpu_hint_env(max_cores: int) -> dict[str, str]:
+    n = str(int(max_cores))
+    return {
+        "MORPH_MAX_CORES": n,
+        "OMP_NUM_THREADS": n,
+        "MKL_NUM_THREADS": n,
+        "OPENBLAS_NUM_THREADS": n,
+        "NUMEXPR_NUM_THREADS": n,
+        "GOMAXPROCS": n,
+        "UV_THREADPOOL_SIZE": n,
+        "RAYON_NUM_THREADS": n,
+    }
+
+
+def quota_hint_env(quota_percent: float) -> dict[str, str]:
+    return {"MORPH_CPU_QUOTA_PERCENT": str(quota_percent)}
+
+
+def memory_hint_env(limit_mb: int) -> dict[str, str]:
+    mb = int(limit_mb)
+    return {
+        "MORPH_MEMORY_LIMIT_MB": str(mb),
+        "NODE_OPTIONS": f"--max-old-space-size={mb}",
+        "JAVA_TOOL_OPTIONS": f"-Xmx{mb}m",
+        "GOMEMLIMIT": f"{mb}MiB",
+    }
+
+
+def _vars(env: dict[str, str]) -> str:
+    return ", ".join(env)
+
 
 @dataclass
 class Fidelity:
@@ -93,7 +133,8 @@ class BaseAdapter(ABC):
 
         Keys are profile field paths ("network.latency_ms"). Populated by the
         adapter that applied each condition, so a proxy-shaped network is
-        APPROXIMATED, an env-var CPU knob nothing reads is UNAVAILABLE, and a
+        APPROXIMATED, a CPU or memory limit carried only by runtime hints is
+        APPROXIMATED too, and a
         tc netem rule is REPRODUCED. Empty for fields not applied.
         """
         return dict(self._fidelity)
@@ -303,15 +344,20 @@ class ProxyAdapter(BaseAdapter):
 
     def apply_cpu(self, max_cores: int | None = None, quota_percent: float | None = None) -> None:
         if max_cores is not None and max_cores > 0:
-            self._note("cpu.cores", FieldStatus.UNAVAILABLE, "none", "proxy adapter cannot pin cores")
+            self._env_overrides.update(cpu_hint_env(max_cores))
+            self._note("cpu.cores", FieldStatus.APPROXIMATED, "runtime hints",
+                       RUNTIME_HINT_DETAIL.format(vars=_vars(cpu_hint_env(max_cores))))
         if quota_percent is not None and quota_percent > 0:
-            self._note("cpu.quota_percent", FieldStatus.UNAVAILABLE, "none",
-                       "proxy adapter cannot throttle CPU")
+            self._env_overrides.update(quota_hint_env(quota_percent))
+            self._note("cpu.quota_percent", FieldStatus.APPROXIMATED, "runtime hints",
+                       RUNTIME_HINT_DETAIL.format(vars="MORPH_CPU_QUOTA_PERCENT")
+                       + "; the demo corpus throttles itself from it")
 
     def apply_memory(self, limit_mb: int | None = None) -> None:
         if limit_mb is not None and limit_mb > 0:
-            self._note("memory.total_mb", FieldStatus.UNAVAILABLE, "none",
-                       "proxy adapter cannot limit memory")
+            self._env_overrides.update(memory_hint_env(limit_mb))
+            self._note("memory.total_mb", FieldStatus.APPROXIMATED, "runtime hints",
+                       RUNTIME_HINT_DETAIL.format(vars=_vars(memory_hint_env(limit_mb))))
 
     def apply_locale(
         self, locale_str: str | None = None, timezone: str | None = None
@@ -381,13 +427,13 @@ def plan_proxy_path(profile: Any, *, native_cpu_mem: bool, windows: bool) -> dic
         for path in ("network.latency_ms", "network.packet_loss_percent"):
             out[path] = Fidelity(FieldStatus.REPRODUCED, "none needed", "no shaping requested")
     if not native_cpu_mem:
-        out["cpu.cores"] = Fidelity(FieldStatus.UNAVAILABLE, "env hint",
-                                    ENV_HINT_DETAIL.format(var="MORPH_MAX_CORES"))
+        out["cpu.cores"] = Fidelity(FieldStatus.APPROXIMATED, "runtime hints",
+                                    RUNTIME_HINT_DETAIL.format(vars=_vars(cpu_hint_env(1))))
         if getattr(profile, "cpu", None) and profile.cpu.quota_percent:
-            out["cpu.quota_percent"] = Fidelity(FieldStatus.UNAVAILABLE, "env hint",
-                                                ENV_HINT_DETAIL.format(var="MORPH_CPU_QUOTA_PERCENT"))
-        out["memory.total_mb"] = Fidelity(FieldStatus.UNAVAILABLE, "env hint",
-                                          ENV_HINT_DETAIL.format(var="MORPH_MEMORY_LIMIT_MB"))
+            out["cpu.quota_percent"] = Fidelity(FieldStatus.APPROXIMATED, "runtime hints",
+                                                RUNTIME_HINT_DETAIL.format(vars="MORPH_CPU_QUOTA_PERCENT"))
+        out["memory.total_mb"] = Fidelity(FieldStatus.APPROXIMATED, "runtime hints",
+                                          RUNTIME_HINT_DETAIL.format(vars=_vars(memory_hint_env(1))))
     loc = getattr(profile, "locale", None)
     if loc:
         if windows:

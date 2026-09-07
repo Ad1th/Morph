@@ -1,7 +1,7 @@
 """Windows runtime adapter: ProxyAdapter for the network; CPU/RAM/locale honestly reported.
 
 There is no Job Object wiring (it needs pywin32, a dependency this project does
-not have), so CPU and memory are env hints and reported UNAVAILABLE. The MSVC
+not have), so CPU and memory travel as runtime hints and are reported APPROXIMATED. The MSVC
 CRT ignores LC_ALL/TZ, so locale and timezone are APPROXIMATED: a target that
 reads the variables itself (apps/locale_parse) honours them, `setlocale(LC_ALL,
 "")` does not.
@@ -10,11 +10,15 @@ reads the variables itself (apps/locale_parse) honours them, `setlocale(LC_ALL,
 from __future__ import annotations
 
 from morph.runtime.adapters.base import (
-    ENV_HINT_DETAIL,
+    RUNTIME_HINT_DETAIL,
     BaseAdapter,
     Fidelity,
     ProxyAdapter,
+    _vars,
+    cpu_hint_env,
+    memory_hint_env,
     plan_proxy_path,
+    quota_hint_env,
 )
 from morph.schema.profile import FieldStatus
 
@@ -58,22 +62,20 @@ class WindowsAdapter(BaseAdapter):
 
     def apply_cpu(self, max_cores: int | None = None, quota_percent: float | None = None) -> None:
         if max_cores is not None and max_cores > 0:
-            self._env_overrides["MORPH_MAX_CORES"] = str(max_cores)
-            self._note("cpu.cores", FieldStatus.UNAVAILABLE, "env hint",
-                       ENV_HINT_DETAIL.format(var="MORPH_MAX_CORES"))
+            self._env_overrides.update(cpu_hint_env(max_cores))
+            self._note("cpu.cores", FieldStatus.APPROXIMATED, "runtime hints",
+                       RUNTIME_HINT_DETAIL.format(vars=_vars(cpu_hint_env(max_cores))))
         if quota_percent is not None and quota_percent > 0:
-            # No Job Object CPU-rate-control wiring here yet: needs pywin32,
-            # a dependency this project doesn't have. Honest hint, not a fake apply.
-            self._env_overrides["MORPH_CPU_QUOTA_PERCENT"] = str(quota_percent)
-            self._note("cpu.quota_percent", FieldStatus.UNAVAILABLE, "env hint",
-                       ENV_HINT_DETAIL.format(var="MORPH_CPU_QUOTA_PERCENT")
+            self._env_overrides.update(quota_hint_env(quota_percent))
+            self._note("cpu.quota_percent", FieldStatus.APPROXIMATED, "runtime hints",
+                       RUNTIME_HINT_DETAIL.format(vars="MORPH_CPU_QUOTA_PERCENT")
                        + "; Job Object rate control needs pywin32")
 
     def apply_memory(self, limit_mb: int | None = None) -> None:
         if limit_mb is not None and limit_mb > 0:
-            self._env_overrides["MORPH_MEMORY_LIMIT_MB"] = str(limit_mb)
-            self._note("memory.total_mb", FieldStatus.UNAVAILABLE, "env hint",
-                       ENV_HINT_DETAIL.format(var="MORPH_MEMORY_LIMIT_MB")
+            self._env_overrides.update(memory_hint_env(limit_mb))
+            self._note("memory.total_mb", FieldStatus.APPROXIMATED, "runtime hints",
+                       RUNTIME_HINT_DETAIL.format(vars=_vars(memory_hint_env(limit_mb)))
                        + "; Job Object memory limit needs pywin32")
 
     def apply_locale(

@@ -4,7 +4,8 @@ A dnctl pipe on its own shapes nothing -- packets only enter it through a pf
 rule. When root, the adapter installs a pipe AND a `morph` pf anchor that
 routes loopback TCP through it, and removes both on cleanup. Both steps are
 recorded in the state file so a crashed run can be undone by `morph doctor`.
-CPU/RAM have no native control on macOS: reported UNAVAILABLE, never faked.
+CPU/RAM have no native control on macOS: carried as runtime hints and reported
+APPROXIMATED, never REPRODUCED.
 """
 
 from __future__ import annotations
@@ -16,12 +17,16 @@ import subprocess
 
 from morph.runtime import state
 from morph.runtime.adapters.base import (
-    ENV_HINT_DETAIL,
+    RUNTIME_HINT_DETAIL,
     BaseAdapter,
     Fidelity,
     ProxyAdapter,
+    _vars,
+    cpu_hint_env,
+    memory_hint_env,
     no_native_side_effects,
     plan_proxy_path,
+    quota_hint_env,
 )
 from morph.schema.profile import FieldStatus
 
@@ -133,21 +138,21 @@ class MacOSAdapter(BaseAdapter):
 
     def apply_cpu(self, max_cores: int | None = None, quota_percent: float | None = None) -> None:
         if max_cores is not None and max_cores > 0:
-            self._env_overrides["MORPH_MAX_CORES"] = str(max_cores)
-            self._note("cpu.cores", FieldStatus.UNAVAILABLE, "env hint",
-                       ENV_HINT_DETAIL.format(var="MORPH_MAX_CORES") + "; macOS has no core pinning")
+            self._env_overrides.update(cpu_hint_env(max_cores))
+            self._note("cpu.cores", FieldStatus.APPROXIMATED, "runtime hints",
+                       RUNTIME_HINT_DETAIL.format(vars=_vars(cpu_hint_env(max_cores))))
         if quota_percent is not None and quota_percent > 0:
-            self._env_overrides["MORPH_CPU_QUOTA_PERCENT"] = str(quota_percent)
-            self._note("cpu.quota_percent", FieldStatus.UNAVAILABLE, "env hint",
-                       ENV_HINT_DETAIL.format(var="MORPH_CPU_QUOTA_PERCENT")
-                       + "; macOS has no cgroups (needs a Linux worker)")
+            self._env_overrides.update(quota_hint_env(quota_percent))
+            self._note("cpu.quota_percent", FieldStatus.APPROXIMATED, "runtime hints",
+                       RUNTIME_HINT_DETAIL.format(vars="MORPH_CPU_QUOTA_PERCENT")
+                       + "; macOS has no cgroups, a Linux worker enforces it")
 
     def apply_memory(self, limit_mb: int | None = None) -> None:
         if limit_mb is not None and limit_mb > 0:
-            self._env_overrides["MORPH_MEMORY_LIMIT_MB"] = str(limit_mb)
-            self._note("memory.total_mb", FieldStatus.UNAVAILABLE, "env hint",
-                       ENV_HINT_DETAIL.format(var="MORPH_MEMORY_LIMIT_MB")
-                       + "; macOS has no per-process memory cap (needs a Linux worker)")
+            self._env_overrides.update(memory_hint_env(limit_mb))
+            self._note("memory.total_mb", FieldStatus.APPROXIMATED, "runtime hints",
+                       RUNTIME_HINT_DETAIL.format(vars=_vars(memory_hint_env(limit_mb)))
+                       + "; macOS has no per-process cap, a Linux worker enforces it")
 
     def apply_locale(
         self, locale_str: str | None = None, timezone: str | None = None

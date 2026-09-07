@@ -176,7 +176,7 @@ Stated up front:
 
 - **Physical hardware.** Software controls can't reproduce hardware that doesn't exist locally (mitigated by explicit cloud execution).
 - **OS-level behaviour.** Some behaviour genuinely can't be reproduced from a different OS.
-- **CPU and memory on macOS and Windows.** Only Linux cgroups enforce quotas; elsewhere those fields are reported `UNAVAILABLE`, and the demo apps expose root-free stand-in knobs.
+- **CPU and memory on macOS and Windows.** Only Linux cgroups enforce quotas; elsewhere those limits travel as runtime hints (`OMP_NUM_THREADS`, `GOMAXPROCS`, `NODE_OPTIONS`, `JAVA_TOOL_OPTIONS`, `GOMEMLIMIT`) that most runtimes honour, and are reported `APPROXIMATED`, never `REPRODUCED`.
 - **Network realism.** Shaping reproduces latency, loss and bandwidth, not every property of a real path.
 - **Nondeterminism.** Timing and concurrency failures need repeated trials; that is what the sequential engine is for.
 
