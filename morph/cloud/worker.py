@@ -104,9 +104,11 @@ def resolve_config(config: CloudConfig | None) -> CloudConfig:
     `MORPH_CLOUD_*` is canonical; `MORPH_WORKER_*` are accepted as aliases.
     """
     cfg = (config or CloudConfig()).model_copy(deep=True)
-    cfg.host = cfg.host or _env("MORPH_CLOUD_HOST", "MORPH_WORKER_HOST")
-    cfg.user = cfg.user or _env("MORPH_CLOUD_USER", "MORPH_WORKER_USER")
-    cfg.ssh_key = cfg.ssh_key or _env("MORPH_CLOUD_SSH_KEY", "MORPH_WORKER_SSH_KEY")
+    # The environment wins over the committed file, per field: a laptop can point
+    # a checked-in GCP config at the Pi on the desk without editing morph.yaml.
+    cfg.host = _env("MORPH_CLOUD_HOST", "MORPH_WORKER_HOST") or cfg.host
+    cfg.user = _env("MORPH_CLOUD_USER", "MORPH_WORKER_USER") or cfg.user
+    cfg.ssh_key = _env("MORPH_CLOUD_SSH_KEY", "MORPH_WORKER_SSH_KEY") or cfg.ssh_key
     if _env("MORPH_CLOUD_HOST", "MORPH_WORKER_HOST"):
         cfg.enabled = True
     return cfg

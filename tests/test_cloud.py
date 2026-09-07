@@ -267,15 +267,26 @@ def test_there_is_exactly_one_worker_config():
     assert MorphConfig.model_validate(MorphConfig(cloud=cfg).model_dump()).cloud == cfg
 
 
-def test_committed_morph_yaml_has_no_worker_host():
-    """Unit tests and CI must never SSH: the checked-in config points nowhere."""
+def test_committed_morph_yaml_never_connects_under_no_network(monkeypatch):
+    """The checked-in config may name the team's worker; unit tests and CI must
+    still never SSH. MORPH_NO_NETWORK (set in conftest and CI) guarantees it."""
     from pathlib import Path
 
     from morph.config import load_config
 
+    monkeypatch.setenv("MORPH_NO_NETWORK", "1")
+    monkeypatch.delenv("MORPH_CLOUD_HOST", raising=False)
     cfg = load_config(Path(__file__).resolve().parent.parent / "morph.yaml")
-    assert not cfg.cloud.host
-    assert not cfg.cloud.enabled
+    info = RemoteWorker(cfg.cloud).check()
+    assert info.reachable is False
+
+
+def test_environment_wins_over_committed_worker(monkeypatch):
+    monkeypatch.setenv("MORPH_CLOUD_HOST", "rbpi.local")
+    monkeypatch.setenv("MORPH_CLOUD_USER", "rbpi")
+    cfg = resolve_config(CloudConfig(host="34.93.95.6", user="morph-worker", provider="gcp"))
+    assert cfg.host == "rbpi.local" and cfg.user == "rbpi"
+    assert cfg.provider == "gcp"  # provenance from the file is kept
 
 
 def test_worker_env_vars_are_aliases_of_cloud_env_vars(monkeypatch):
