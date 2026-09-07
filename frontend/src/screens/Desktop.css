@@ -243,6 +243,10 @@
   margin-top: 16px;
 }
 
+.desktop__field + .desktop__field {
+  margin-top: 10px;
+}
+
 .desktop__label {
   display: block;
   font-size: 12px;
