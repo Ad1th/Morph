@@ -21,7 +21,7 @@ adapters:
 
 cloud:
   # Flip to true once `morph cloud` reports the worker usable.
-  enabled: false
+  enabled: true
 
   # Provenance only. The transport is SSH whoever supplies the box, so a GCP
   # instance, a Pi and a laptop across the room all work the same way.
@@ -30,12 +30,12 @@ cloud:
   # The instance's EXTERNAL ip, from the GCP console.
   # Leave blank and export MORPH_CLOUD_HOST instead if you would rather not
   # commit it; the environment wins over this file either way.
-  host: ""
-  user: ""
+  host: "34.93.95.6"
+  user: "morph-worker"
   ssh_key: ~/.ssh/morph_gcp
 
   # Set by scripts/setup_gcp_worker.sh, which builds a venv on the worker.
   # A bare "python3" also works: Morph rewrites it to the interpreter it is
   # running under, which is how the worker gets Morph's own dependencies.
-  python: ~/morph/.venv/bin/python
-  workdir: ~/morph
+  python: /home/morph-worker/morph/.venv/bin/python
+  workdir: /home/morph-worker/morph
