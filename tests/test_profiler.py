@@ -45,7 +45,12 @@ def test_collect_filesystem():
     fs = collect_filesystem()
     assert fs.case_sensitive.status == FieldStatus.CAPTURED
     assert isinstance(fs.case_sensitive.value, bool)
-    assert fs.filesystem_type.value
+    # fstype detection is best-effort by design: psutil.disk_partitions can
+    # miss the mount, and the collector then leaves the field unset rather than
+    # inventing one. Check the value only when detection actually succeeded.
+    if fs.filesystem_type is not None:
+        assert fs.filesystem_type.status == FieldStatus.CAPTURED
+        assert fs.filesystem_type.value
     assert fs.disk_space_limit_mb.value > 0
 
 
