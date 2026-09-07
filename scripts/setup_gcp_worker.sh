@@ -73,6 +73,24 @@ if ! sudo grep -qsF "$RULE" /etc/sudoers.d/morph-tc 2>/dev/null; then
 fi
 ok "granted: $RULE"
 
+say "3b/4  A delegated cgroup for CPU/RAM limits (opt-in)"
+# Morph only writes cpu.max / memory.max into a cgroup it was explicitly
+# pointed at (MORPH_CGROUP_PATH); it never touches the root cgroup. Create one
+# owned by this user so quota/memory profiles are REPRODUCED here, not hinted.
+CG="/sys/fs/cgroup/morph"
+if [ -d /sys/fs/cgroup ] && [ -f /sys/fs/cgroup/cgroup.controllers ]; then
+  sudo mkdir -p "$CG" 2>/dev/null || true
+  sudo chown -R "$(whoami)" "$CG" 2>/dev/null || true
+  if echo "+cpu +memory" | sudo tee /sys/fs/cgroup/cgroup.subtree_control >/dev/null 2>&1 \
+     && [ -w "$CG/cgroup.procs" ]; then
+    ok "cgroup $CG is writable; export MORPH_CGROUP_PATH=$CG before running"
+  else
+    bad "could not delegate $CG; CPU quota / memory limits will be env hints only"
+  fi
+else
+  bad "no cgroup v2 at /sys/fs/cgroup; CPU quota / memory limits will be env hints only"
+fi
+
 say "4/4  Proving the box can actually shape traffic"
 # The whole reason for a worker: if this fails, network experiments cannot run
 # here no matter what else is installed.
@@ -94,13 +112,14 @@ else
 fi
 
 printf '\n\033[32mWorker ready.\033[0m Point Morph at it with:\n\n'
+printf '    export MORPH_CLOUD_HOST=%s\n' "$(hostname -I 2>/dev/null | awk '{print $1}')"
+printf '    export MORPH_CLOUD_USER=%s\n' "$(whoami)"
+printf '    export MORPH_CLOUD_SSH_KEY=~/.ssh/morph_gcp\n\n'
+printf 'or, in morph.yaml (keep host/user out of a committed file):\n\n'
 printf '    cloud:\n'
-printf '      enabled: true\n'
 printf '      provider: gcp\n'
-printf '      host: %s\n' "$(hostname -I 2>/dev/null | awk '{print $1}')"
-printf '      user: %s\n' "$(whoami)"
-printf '      ssh_key: ~/.ssh/morph_gcp\n'
 printf '      python: %s/.venv/bin/python\n' "$WORKDIR"
 printf '      workdir: %s\n\n' "$WORKDIR"
+printf 'Runs only leave your machine with `morph run --cloud`.\n'
 printf 'Note the host above is the INTERNAL ip; use the external one from the\n'
 printf 'GCP console if you are connecting from outside the VPC.\n'

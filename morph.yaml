@@ -1,9 +1,11 @@
 # Morph project configuration.
 #
 # Cloud is a fallback, not a default (PRD section 25). A run only leaves this
-# machine when the profile asks for more than this machine physically has --
-# more RAM, more cores, another architecture or another OS -- because the
-# alternative would be pretending to reproduce conditions we cannot.
+# machine when you ask for it (`morph run --cloud`) AND the profile asks for
+# more than this machine physically has -- more RAM, more cores, another
+# architecture or another OS -- because the alternative would be pretending to
+# reproduce conditions we cannot. A configured worker never changes a plain
+# `morph run`.
 #
 # Check the routing decision and the worker at any time with:
 #     morph cloud --profile target.json
@@ -20,18 +22,23 @@ adapters:
   locale: native
 
 cloud:
-  enabled: true
-  provider: pi
-  host: rbpi.local
-  user: rbpi
+  # Provenance only. The transport is SSH whoever supplies the box, so a GCP
+  # instance, a Raspberry Pi and a laptop across the room all work the same way.
+  provider: ssh
+
+  # Leave the host blank in the committed file so unit tests and CI never open
+  # an SSH connection. Point Morph at a worker from the environment instead;
+  # the environment wins over this file either way. For the Pi on the desk:
+  #
+  #     export MORPH_CLOUD_HOST=rbpi.local
+  #     export MORPH_CLOUD_USER=rbpi
+  #     export MORPH_CLOUD_SSH_KEY=~/.ssh/id_ed25519   # optional
+  #
+  # (MORPH_WORKER_HOST / MORPH_WORKER_USER / MORPH_WORKER_SSH_KEY are aliases.)
+  host: ""
+  user: ""
+
+  # Interpreter and checkout on the worker. scripts/setup_gcp_worker.sh builds
+  # this venv. A bare "python3" also works.
   python: ~/morph/.venv/bin/python
   workdir: ~/morph
-
-worker:
-  enabled: true
-  provider: pi
-  host: rbpi.local
-  user: rbpi
-  python: ~/morph/.venv/bin/python
-  workdir: ~/morph
-

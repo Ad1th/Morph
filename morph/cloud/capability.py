@@ -136,13 +136,13 @@ def assess_locally(profile: EnvironmentProfile) -> HostCapability:
     requested_quota = _as_float(
         profile.cpu.quota_percent.value if (profile.cpu and profile.cpu.quota_percent) else None
     )
-    if requested_quota is not None and requested_quota < 100.0 and cap.os_family != "linux":
+    if requested_quota is not None and requested_quota < 100.0 and not _same_os("linux", cap.os_family):
         cap.shortfalls.append(
             Shortfall(
                 "cpu.quota_percent",
                 requested_quota,
                 100.0,
-                "CPU quota throttling requires cgroups (not supported on macOS/Windows; needs Linux worker)",
+                "CPU quota throttling needs cgroups, which only Linux has",
             )
         )
 
@@ -204,4 +204,3 @@ def _as_str(value: object) -> str | None:
         return None
     text = str(value).strip()
     return text or None
-

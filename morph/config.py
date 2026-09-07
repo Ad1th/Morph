@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 import yaml
@@ -12,14 +13,19 @@ DEFAULT_CONFIG_FILENAMES = ["morph.yaml", "morph.yml"]
 
 
 def find_config_path(start_dir: Path | str | None = None) -> Path | None:
-    """Find morph.yaml in start_dir or parent directories."""
+    """Find morph.yaml in start_dir or parent directories.
+
+    The walk stops at a git root or the home directory, so a stray
+    ``~/morph.yaml`` cannot silently configure every project below it.
+    """
     current = Path(start_dir or Path.cwd()).resolve()
+    home = Path.home().resolve()
     while True:
         for name in DEFAULT_CONFIG_FILENAMES:
             candidate = current / name
             if candidate.is_file():
                 return candidate
-        if current.parent == current:
+        if (current / ".git").exists() or current == home or current.parent == current:
             break
         current = current.parent
     return None
@@ -47,7 +53,10 @@ def load_config(path_or_dir: Path | str | None = None) -> MorphConfig:
             content = config_file.read_text(encoding="utf-8")
             data = yaml.safe_load(content) or {}
             return MorphConfig.model_validate(data)
-        except Exception:
+        except Exception as exc:
+            # A typo in morph.yaml used to yield defaults in silence; the user
+            # lost their worker without a word.
+            warnings.warn(f"ignoring malformed {config_file}: {exc}", stacklevel=2)
             return MorphConfig()
 
     return MorphConfig()

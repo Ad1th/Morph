@@ -123,3 +123,52 @@ def test_export_ci_test(tmp_path):
     content = exported.read_text()
     assert "def test_morph_test_checkout_001_environment_invariant" in content
     assert "replay_regression" in content
+
+
+# --------------------------------------------------------------- security
+
+
+def test_delete_refuses_anything_that_is_not_a_bare_id(tmp_path):
+    """`DELETE /regressions/..` used to rmtree the parent of the server's CWD."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    store = tmp_path / "store"
+    save_regression(make_sample_artifact("keep-me"), base_dir=store)
+
+    for bad in ("..", ".", str(outside), "/", "a/b", "../outside", "keep-me/..", ""):
+        assert delete_regression(bad, base_dir=store) is False, bad
+    assert outside.is_dir()
+    assert (store / "keep-me").is_dir()
+
+    # A Path is accepted only when it names a bundle directly inside the store.
+    assert delete_regression(tmp_path, base_dir=store) is False
+    assert delete_regression(store, base_dir=store) is False
+    assert delete_regression(store / "keep-me", base_dir=store) is True
+
+
+def test_load_refuses_traversal_ids(tmp_path):
+    import pytest
+
+    store = tmp_path / "store"
+    save_regression(make_sample_artifact("ok-1"), base_dir=store)
+    # A bundle that exists OUTSIDE the store must not be reachable by id.
+    save_regression(make_sample_artifact("leak"), base_dir=tmp_path)
+
+    for bad in ("..", ".", "a/b", "../leak", "leak/../leak", "..\\leak"):
+        with pytest.raises(FileNotFoundError):
+            load_regression(bad, base_dir=store)
+    assert load_regression("ok-1", base_dir=store).regression_id == "ok-1"
+    # The CLI convenience -- an explicit, existing bundle path -- still works
+    # (an HTTP path segment can never carry a separator, so the API cannot use it).
+    assert load_regression(tmp_path / "leak").regression_id == "leak"
+    assert load_regression(str(tmp_path / "leak")).regression_id == "leak"
+
+
+def test_save_refuses_a_traversal_id(tmp_path):
+    import pytest
+
+    from morph.regression.artifact import InvalidRegressionId
+
+    with pytest.raises(InvalidRegressionId):
+        save_regression(make_sample_artifact("../escape"), base_dir=tmp_path / "store")
+    assert not (tmp_path / "escape").exists()

@@ -256,34 +256,84 @@ def test_the_profile_sent_to_the_worker_is_the_one_requested(host):
     assert captured["mem"] == 65536
 
 
-def test_worker_config_roundtrip():
-    from morph.schema.config import MorphConfig, WorkerConfig
+def test_there_is_exactly_one_worker_config():
+    """`worker:` was a duplicate of `cloud:`; WorkerConfig is now just an alias."""
+    from morph.schema.config import CloudConfig, MorphConfig, WorkerConfig
 
-    w_cfg = WorkerConfig(
-        enabled=True,
-        provider="pi",
-        host="rbpi.local",
-        user="rbpi",
-        python="~/morph/.venv/bin/python",
-        workdir="~/morph",
-        connect_timeout=10.0,
-    )
-    raw = w_cfg.model_dump()
-    reconstructed = WorkerConfig.model_validate(raw)
-    assert reconstructed == w_cfg
-
-    m_cfg = MorphConfig(worker=w_cfg)
-    m_raw = m_cfg.model_dump()
-    m_reconstructed = MorphConfig.model_validate(m_raw)
-    assert m_reconstructed.worker.host == "rbpi.local"
-    assert m_reconstructed.worker.user == "rbpi"
+    assert WorkerConfig is CloudConfig
+    assert "worker" not in MorphConfig.model_fields
+    cfg = CloudConfig(enabled=True, provider="pi", host="rbpi.local", user="rbpi",
+                      python="~/morph/.venv/bin/python", workdir="~/morph")
+    assert MorphConfig.model_validate(MorphConfig(cloud=cfg).model_dump()).cloud == cfg
 
 
-def test_worker_config_env_vars(monkeypatch):
+def test_committed_morph_yaml_has_no_worker_host():
+    """Unit tests and CI must never SSH: the checked-in config points nowhere."""
+    from pathlib import Path
+
+    from morph.config import load_config
+
+    cfg = load_config(Path(__file__).resolve().parent.parent / "morph.yaml")
+    assert not cfg.cloud.host
+    assert not cfg.cloud.enabled
+
+
+def test_worker_env_vars_are_aliases_of_cloud_env_vars(monkeypatch):
     monkeypatch.setenv("MORPH_WORKER_HOST", "192.168.1.100")
     monkeypatch.setenv("MORPH_WORKER_USER", "pi_user")
     cfg = resolve_config(None)
-    assert cfg.host == "192.168.1.100"
-    assert cfg.user == "pi_user"
-    assert cfg.enabled is True
+    assert (cfg.host, cfg.user, cfg.enabled) == ("192.168.1.100", "pi_user", True)
 
+    monkeypatch.setenv("MORPH_CLOUD_HOST", "10.0.0.9")  # canonical wins over the alias
+    assert resolve_config(None).host == "10.0.0.9"
+
+
+def test_no_network_guard_refuses_to_ssh(monkeypatch):
+    """conftest sets MORPH_NO_NETWORK=1; a worker must fail before opening a socket."""
+    import subprocess
+
+    def boom(*a, **k):  # pragma: no cover - must never be reached
+        raise AssertionError("subprocess.run was called: an SSH connection was attempted")
+
+    monkeypatch.setattr(subprocess, "run", boom)
+    worker = RemoteWorker(CloudConfig(host="rbpi.local", user="rbpi"))
+    with pytest.raises(WorkerUnavailable, match="MORPH_NO_NETWORK"):
+        worker.run(make_profile(), "true")
+    assert worker.check().reachable is False
+
+
+def test_ssh_argv_pins_host_key_policy():
+    argv = RemoteWorker(CloudConfig(host="h")).ssh_argv("true")
+    assert "StrictHostKeyChecking=accept-new" in argv
+    assert "BatchMode=yes" in argv
+
+
+def _fake_ssh(worker, stdout, returncode=0, stderr=""):
+    worker._ssh = lambda *a, **k: type("P", (), {"stdout": stdout, "stderr": stderr,
+                                                  "returncode": returncode})()
+
+
+def test_worker_error_document_is_a_refusal_not_a_result():
+    """`morph run --json` prints {"error": "not_reproducible"} on exit 2."""
+    worker = RemoteWorker(CloudConfig(host="h"))
+    _fake_ssh(worker, '{"error": "not_reproducible", "detail": "memory.total_mb: requested 65536"}', 2)
+    with pytest.raises(WorkerUnavailable, match=r"refused.*65536"):
+        worker.run(make_profile(), "true")
+
+
+def test_worker_command_not_found_is_unavailable_not_a_failed_trial():
+    """A command the worker cannot find (project files are not synced) must not
+    be counted as an application failure attributed to the environment."""
+    worker = RemoteWorker(CloudConfig(host="h", workdir="~/morph"))
+    missing = RunResult(exit_code=127, passed=False, error_type="FileNotFoundError",
+                        stderr="No such file").model_dump_json()
+    _fake_ssh(worker, missing, 1)
+    with pytest.raises(WorkerUnavailable, match="routable"):
+        worker.run(make_profile(), "/Users/me/.morph/venvs/x/bin/python main.py")
+
+
+def test_worker_errors_are_redacted():
+    from morph.cloud.worker import redact
+
+    assert "ghp_" not in redact("fatal: https://x:ghp_abcdefghijklmnopqrstuvwxyz1234@github.com")
+    assert "c2VjcmV0" not in redact("AUTHORIZATION: basic c2VjcmV0")
