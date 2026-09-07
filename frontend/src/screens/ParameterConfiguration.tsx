@@ -93,7 +93,7 @@ export function ParameterConfiguration({
               <i />
             </span>
           )}
-          <span>{os === 'linux' ? '$ configure-environment' : 'Parameter Configuration — Morph'}</span>
+          <span>{os === 'linux' ? '$ configure-environment' : 'Parameter Configuration - Morph'}</span>
         </div>
 
         <div className="param-config__summary">{summary || 'All parameters at host defaults'}</div>

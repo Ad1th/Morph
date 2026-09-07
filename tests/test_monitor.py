@@ -139,7 +139,7 @@ async def test_slider_keys_adjust_clamp_and_notify():
         await pilot.pause()
         assert slider.value == 400  # clamped to max
 
-        await pilot.press("right")  # no-op at the ceiling — no new message
+        await pilot.press("right")  # no-op at the ceiling, no new message
         await pilot.pause()
         assert slider.value == 400
 

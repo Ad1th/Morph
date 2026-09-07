@@ -103,7 +103,7 @@ def run(
         f"Duration: {result.duration_ms:.1f}ms\n"
         f"Peak Memory: {peak_memory}\n"
         f"Passed: {result.passed}" + err_text,
-        title=f"Run Result — [{'PASS' if result.passed else 'FAIL'}]",
+        title=f"Run Result [{'PASS' if result.passed else 'FAIL'}]",
         border_style=status_style,
     ))
 
