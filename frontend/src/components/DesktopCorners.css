@@ -1,0 +1,119 @@
+/* Both desktop icons are positioned from a single pair of tokens, so the two
+   corners stay optically level on every screen and in every skin. Changing the
+   inset moves both; there is no per-screen override to drift out of sync. */
+.corners {
+  /* Height/side come from the shared --corner-* tokens so this corner stays
+     level with the environment badge opposite it. */
+  --corner-size: 68px;
+
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.corners__slot {
+  position: absolute;
+  top: var(--corner-top);
+  width: 96px;
+  pointer-events: auto;
+
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 6px;
+
+  padding: 4px;
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font: inherit;
+  color: #fff;
+}
+
+.corners__slot--left {
+  left: var(--corner-side);
+}
+
+/* One fixed-size box for both glyphs, so a 44x36 folder and a square badge
+   still line up on the same baseline. */
+.corners__glyph {
+  width: var(--corner-size);
+  height: var(--corner-size);
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(1px 2px 3px rgba(0, 0, 0, 0.45));
+}
+
+.corners__label {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  line-height: 1.2;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  user-select: none;
+}
+
+.corners[data-os='windows'] .corners__label {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: #000;
+  text-shadow: none;
+}
+
+.corners[data-os='windows'] .corners__glyph {
+  width: 80px;
+  height: 80px;
+  margin-top: -15px;
+}
+
+.corners[data-os='windows'] .corners__slot {
+  gap: 0;
+}
+
+.corners__slot--left:hover,
+.corners__slot--left:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+/* ---- Win98 folder, drawn from boxes to match the pixel reference ---- */
+.corners__folder--win98 {
+  position: relative;
+  width: var(--corner-size);
+  height: var(--corner-size);
+  display: block;
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.45));
+}
+
+.corners__folder-tab {
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 30px;
+  height: 10px;
+  background: #f5e79e;
+  border: 2px solid #4a4526;
+  border-bottom: none;
+}
+
+.corners__folder-body {
+  position: absolute;
+  left: 2px;
+  top: 17px;
+  width: 62px;
+  height: 42px;
+  background: #f7e9a0;
+  border: 2px solid #4a4526;
+}
+
+.corners__folder-highlight {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 50px;
+  height: 6px;
+  background: #fffbe0;
+}

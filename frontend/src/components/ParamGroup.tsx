@@ -8,7 +8,8 @@ export function ParamGroup({
   children,
 }: {
   name: string
-  nonDefaultCount: number
+  /** Omitted by groups that are not parameter lists, e.g. the threshold search. */
+  nonDefaultCount?: number
   defaultOpen?: boolean
   children: ReactNode
 }) {
@@ -19,7 +20,9 @@ export function ParamGroup({
       <button className="param-group__header" onClick={() => setOpen((v) => !v)}>
         <span className="param-group__chevron">{open ? '▾' : '▸'}</span>
         <span className="param-group__name">{name}</span>
-        <span className="param-group__count">{nonDefaultCount} non-default</span>
+        {nonDefaultCount !== undefined && (
+          <span className="param-group__count">{nonDefaultCount} non-default</span>
+        )}
       </button>
       {open && <div className="param-group__body">{children}</div>}
     </div>

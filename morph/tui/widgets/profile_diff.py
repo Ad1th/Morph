@@ -60,14 +60,14 @@ class ProfileDiff(DataTable):
         self._col_value = keys[1]
         self._col_status = keys[2]
         for label, path in _ROWS:
-            self.add_row(label, "—", "—", key=path)
+            self.add_row(label, "-", "-", key=path)
 
     def show(self, profile: EnvironmentProfile) -> None:
         for _label, path in _ROWS:
             fld = _field(profile, path)
             if fld is None:
                 value_cell = Text("n/a", style="grey37")
-                status_cell = Text("—", style="grey37")
+                status_cell = Text("-", style="grey37")
             else:
                 editable = path in EDITABLE
                 value_cell = Text(str(fld.value), style="white" if editable else "grey70")

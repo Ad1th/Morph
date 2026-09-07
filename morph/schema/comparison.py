@@ -40,7 +40,8 @@ class ComparisonResult(BaseModel):
 
 class ThresholdResult(BaseModel):
     parameter: str
-    safe_value: float
-    failure_value: float
-    boundary_estimate: float
+    safe_value: float | None = None
+    failure_value: float | None = None
+    boundary_estimate: float | None = None
     search_points: list[dict] = []
+

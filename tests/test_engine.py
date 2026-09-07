@@ -106,6 +106,27 @@ def test_search_threshold_converges_on_boundary():
     assert 150 <= result.boundary_estimate <= 210
 
 
+def test_search_threshold_returns_none_when_high_bound_passes():
+    def run_at(_v: float) -> bool:
+        return True  # never fails
+
+    result = search_threshold("network.latency_ms", run_at, low=0, high=400, trials=1, precision=5)
+    assert result.safe_value == 400
+    assert result.failure_value is None
+    assert result.boundary_estimate is None
+
+
+def test_search_threshold_returns_none_when_low_bound_fails():
+    def run_at(_v: float) -> bool:
+        return False  # always fails
+
+    result = search_threshold("network.latency_ms", run_at, low=100, high=400, trials=1, precision=5)
+    assert result.safe_value is None
+    assert result.failure_value == 100
+    assert result.boundary_estimate is None
+
+
+
 def test_search_threshold_search_points_recorded():
     calls = itertools.count()
 

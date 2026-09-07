@@ -138,6 +138,67 @@ export type ExperimentFrame =
   | ({ type: 'event' } & TrialEvent)
   | { type: 'done'; result: ExperimentResult }
   | { type: 'error'; message: string }
+// --- Project selection (POST /projects/upload, POST /projects/local) ---
+
+export interface ProjectInfo {
+  project_id: string
+  name: string
+  path: string
+  file_count: number
+  entrypoints: string[]
+  /** Null when auto-detection found no entrypoint it recognises. */
+  suggested_command?: string | null
+  suggested_cwd?: string | null
+}
+
+// --- Run targets (GET /platform) ---
+
+export interface RunTarget {
+  id: string
+  family: string
+  label: string
+  available: boolean
+  /** Why the target is unavailable, e.g. "No remote host configured". */
+  reason?: string | null
+  capabilities: Record<string, boolean>
+}
+
+export interface PlatformInfo {
+  host: { family: string; version: string; arch: string }
+  targets: RunTarget[]
+}
+
+// --- Threshold search (POST /threshold) ---
+
+export interface ThresholdRequest {
+  command: string
+  /** Dotted profile path, same shape as ParameterMetadata.field_path. */
+  parameter: string
+  low: number
+  high: number
+  trials?: number
+  precision?: number
+  profile?: EnvironmentProfile | null
+  cwd?: string | null
+  timeout?: number
+  target?: string
+}
+
+/** search_points is list[dict] server-side, so every field is treated as optional. */
+export interface ThresholdPoint {
+  value?: number
+  failure_rate?: number
+  passed?: boolean
+}
+
+// Mirrors morph/schema/comparison.py's ThresholdResult.
+export interface ThresholdResult {
+  parameter: string
+  safe_value: number
+  failure_value: number
+  boundary_estimate: number
+  search_points: ThresholdPoint[]
+}
 
 // Mirrors morph/schema/parameters.py's ParameterMetadata.
 export interface ParameterMetadata {
@@ -152,4 +213,104 @@ export interface ParameterMetadata {
   controllable: boolean
   experimentable: boolean
   platform_support: Record<string, string>
+}
+
+// --- 2D Failure Surface, Differential Blame & Invariant Exporter ---
+
+export interface SurfaceGridPoint {
+  x: number
+  y: number
+  passed: boolean
+  failure_rate: number
+  runs: number
+  exit_code?: number | null
+  duration_ms?: number | null
+  stdout?: string | null
+  stderr?: string | null
+}
+
+export interface SafeBoundaryPoint {
+  x: number
+  y: number
+  status: string
+}
+
+export interface BlameTrace {
+  run_type: 'PASS' | 'FAIL'
+  parameter_val: string
+  file?: string | null
+  line?: number | null
+  function?: string | null
+  operation?: string | null
+  status_or_exception?: string | null
+  duration_ms?: number | null
+  summary_line: string
+}
+
+export interface DifferentialBlameResult {
+  culpable_file?: string | null
+  culpable_line?: number | null
+  culpable_code?: string | null
+  pass_trace?: BlameTrace | null
+  fail_trace?: BlameTrace | null
+  divergence_summary: string
+  explanation: string
+  suggested_fix?: string | null
+}
+
+export interface SurfaceResult {
+  param_x: string
+  param_y: string
+  param_x_label: string
+  param_y_label: string
+  param_x_unit: string
+  param_y_unit: string
+  x_values: number[]
+  y_values: number[]
+  grid: SurfaceGridPoint[][]
+  points: SurfaceGridPoint[]
+  safe_boundary: SafeBoundaryPoint[]
+  passing_count: number
+  failing_count: number
+  total_points: number
+  highest_passing_point?: SurfaceGridPoint | null
+  lowest_failing_point?: SurfaceGridPoint | null
+  blame?: DifferentialBlameResult | null
+  summary: string
+}
+
+export interface SurfaceRequest {
+  project_path: string
+  command?: string | null
+  cwd?: string | null
+  param_x?: string
+  param_y?: string
+  x_values?: number[] | null
+  y_values?: number[] | null
+  x_min?: number | null
+  x_max?: number | null
+  x_steps?: number | null
+  y_min?: number | null
+  y_max?: number | null
+  y_steps?: number | null
+  runs_per_point?: number
+  adapter_name?: string
+  supplied_profile?: EnvironmentProfile | null
+}
+
+export interface ExportInvariantRequest {
+  project_name: string
+  command?: string
+  safe_latency_ms?: number
+  safe_packet_loss?: number
+  safe_cpu_quota?: number
+  param_name?: string
+  boundary_estimate?: number | null
+  divergence_summary?: string | null
+}
+
+export interface ExportInvariantResponse {
+  filename: string
+  code: string
+  summary: string
 }

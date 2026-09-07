@@ -34,5 +34,10 @@ def collect_filesystem() -> FilesystemInfo:
     return FilesystemInfo(
         case_sensitive=ProfileField(value=case_sensitive, status=FieldStatus.CAPTURED),
         filesystem_type=ProfileField(value=fstype, status=FieldStatus.CAPTURED) if fstype else None,
+        read_only=ProfileField(value=False, status=FieldStatus.CAPTURED),
         disk_space_limit_mb=ProfileField(value=free_mb, status=FieldStatus.CAPTURED),
+        disk_read_latency_ms=ProfileField(value=0.0, status=FieldStatus.CAPTURED),
+        disk_write_latency_ms=ProfileField(value=0.0, status=FieldStatus.CAPTURED),
     )
+
+

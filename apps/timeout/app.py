@@ -38,7 +38,8 @@ FIXED_TIMEOUT_S = float(os.getenv("MORPH_A_FIXED_TIMEOUT", "1.0"))
 
 class _Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self) -> None:
-        time.sleep(RESP_DELAY_S)
+        latency_s = float(os.getenv("MORPH_LATENCY_MS", "0.0")) / 1000.0
+        time.sleep(RESP_DELAY_S + latency_s)
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b"ok")

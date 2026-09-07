@@ -273,3 +273,99 @@ came back `no_effect`. Also `/ws/experiment/{id}` was a handshake-only stub and
   designed in `architecture.md` §12 but not implemented).
 - `@app.on_event` was removed in favour of per-request `bind_loop()`; if a
   lifespan handler is added later for other reasons, fold the bind into it.
+---
+
+# Session handoff: frontend/backend connection (2026-09-07)
+
+Base at session start: `b22ec2a` (teammate PR #19). Nine commits added, **nothing pushed**.
+
+## Done and verified
+
+Four disconnects between the working backend and the finished UI were closed.
+
+| Was | Now |
+|---|---|
+| `handleFiles` counted files and threw them away | `POST /projects/upload` (multipart) and `POST /projects/local`, real folder upload via `webkitdirectory` |
+| `Preparing` ran a hardcoded `python -c "print(1)"` | Runs the selected project with its detected command and cwd |
+| OS switcher changed theme only | `GET /platform` plus a run-target selector, unavailable targets disabled with an honest reason |
+| `search_threshold` unreachable from HTTP/UI | `POST /threshold` plus a threshold panel |
+
+Commits (all authored `parth-garg01 <parth.garg2024@vitstudent.ac.in>`, no co-author trailers):
+`562f85a` project endpoints, `9e1ccc4` platform, `b36b8f9` threshold, `aab0acd` router registration + run target gate,
+`d61c4a5` frontend client/types, `e01615d` desktop dialog wiring, `25586ba` run target + threshold UI,
+`34fd351` filesystem test flake fix, `0d958fd` em dash sweep.
+
+Verified: 188 tests pass, `npm run build` green, `oxlint src` clean.
+Live HTTP confirmed `/projects/local` on `apps/timeout` returns a runnable command,
+`/platform` reports real adapter capabilities, and `/run` genuinely executes the demo app
+(exit 0, real JSON stdout).
+
+## BLOCKER: threshold verification produces fabricated numbers
+
+This is the most important open item. It is not a cosmetic bug.
+
+A real search against the timeout app, `network.latency_ms`, low 0, high 300, 3 trials, returned:
+
+```
+boundary_estimate: 295.3125     safe: 290.625   fails at: 300.0
+  {'value': 150.0,    'failure_rate': 0.0, 'passed': True}
+  {'value': 225.0,    'failure_rate': 0.0, 'passed': True}
+  {'value': 262.5,    'failure_rate': 0.0, 'passed': True}
+  {'value': 281.25,   'failure_rate': 0.0, 'passed': True}
+  {'value': 290.625,  'failure_rate': 0.0, 'passed': True}
+```
+
+**Every probe passed, yet it reported a confident boundary.** The documented flip point is ~50ms.
+
+Two independent root causes:
+
+1. **`morph/engine/threshold.py: search_threshold` trusts `high` without probing it.**
+   It takes "high is a known-failing value" on faith. When nothing fails, it still converges on
+   the upper bound and emits a number. It must probe `high` first and return "no threshold in
+   range" when `high` passes. Note the CLI `morph threshold` shares this function, so a fix
+   reaches both. This is fabricated precision and contradicts the project's own honesty rule.
+
+2. **Injected latency never reaches the timeout app.** `apps/timeout/app.py:71` binds its own
+   server on `127.0.0.1:<ephemeral port>` and line 88 connects straight to it, so it never
+   traverses Morph's TCP proxy. `apps/README.md` already concedes this: timeout's condition was
+   "simulated, server-side delay", still needing "real injection".
+
+   The app is fine. Proof, using its own documented knob:
+   `MORPH_A_RESP_DELAY_S=0.5 py -3 -m apps.timeout test` -> `{"result": "fail",
+   "signal": "TimeoutException", "detail": "deadline 250ms exceeded"}`; baseline passes.
+
+   Fix direction: make the app honour a proxy endpoint Morph controls, or have the adapter
+   intercept loopback connections. Until then no latency threshold for this app is trustworthy.
+
+## Not done
+
+- **Playwright MCP end-to-end run of the faulty apps.** Not completed. The API-level finding
+  above supersedes it: fix the threshold blocker first, or the browser test just re-renders a
+  fabricated number.
+- **race app cannot be tested on this machine at all.** It needs cgroup `cpu.max`, which is
+  Linux-only. `apps/race/README.md` is explicit that core pinning is not a substitute and can
+  even suppress the race. This is genuinely blocked on the Raspberry Pi, not on code.
+- **Threshold panel defaults are placeholders** (low 0, high 1, trials 1), which is how the
+  meaningless "boundary 0.5" screenshot arose. Defaults should follow the selected parameter,
+  and the UI should warn when `high` was never shown to fail.
+- **Not pushed.** Committing was authorized, pushing was not.
+- **GitHub OAuth device flow** is mid-flight from another workstream, uncommitted.
+
+## Owned by another agent, do not touch
+
+`morph/profiler/collectors/network.py` (new), `morph/profiler/capture.py`,
+`frontend/src/components/StateChip.tsx`. Context: the profiler has no network collector, so
+`capture_environment()` returns `network = None` and every network row renders `unavailable`.
+The profiler is not buggy, the collector was simply never written. Separately, the word
+`unavailable` conflates "not detected" with "not supported", which is why it sits confusingly
+beside a green `local` control badge.
+
+## Cautions for whoever continues
+
+- `stash@{0}` holds parked Linux redesign work. Do not pop or drop it.
+- `pytest-randomly` is active, so ordering varies. Run the suite several times before trusting green.
+- The GitHub clone embeds the token in the clone URL, so it appears in the process argv.
+  It is redacted from error output and uses an argv list (no shell injection), but the argv
+  exposure is worth closing.
+- Commit identity is mandatory: `parth-garg01 <parth.garg2024@vitstudent.ac.in>`, never any
+  Claude or AI attribution. No em dashes anywhere in UI copy or commits.

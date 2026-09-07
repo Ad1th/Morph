@@ -2,7 +2,13 @@
 
 import sys
 
-from apps.race.app import main
+try:
+    from apps.race.app import main
+except ModuleNotFoundError:
+    try:
+        from .app import main
+    except ImportError:
+        from app import main
 
 if __name__ == "__main__":
     args = sys.argv[1:]

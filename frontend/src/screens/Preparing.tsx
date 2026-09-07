@@ -16,19 +16,20 @@ type StepState = 'pending' | 'ok' | 'failed'
 // /ws/experiment/{id} already does for experiments.
 const STEPS = ['CPU', 'Memory', 'Network', 'Locale', 'Filesystem', 'Dependencies', 'Starting application']
 
-const DEMO_COMMANDS: Record<OsName, string> = {
-  windows: 'python -c "print(1)"',
-  mac: 'python3 -c "print(1)"',
-  linux: 'python3 -c "print(1)"',
-}
-
 export function Preparing({
   os,
   profile,
+  command,
+  cwd,
+  target,
   onDone,
 }: {
   os: OsName
   profile: EnvironmentProfile
+  /** The user's project command, confirmed (and editable) on the config screen. */
+  command: string
+  cwd?: string
+  target: string
   onDone: (result: RunResult) => void
 }) {
   const [stepStates, setStepStates] = useState<StepState[]>(STEPS.map(() => 'pending'))
@@ -54,7 +55,7 @@ export function Preparing({
     }, 220)
 
     api
-      .run({ command: DEMO_COMMANDS[os], profile, timeout: 30 })
+      .run({ command, cwd, target, profile, timeout: 60 })
       .then((result) => {
         if (cancelled) return
         clearInterval(tick)
@@ -89,6 +90,7 @@ export function Preparing({
     <div className="preparing" data-os={os}>
       <div className="preparing__panel">
         <h2 className="preparing__title">Preparing environment</h2>
+        <p className="preparing__command">{command}</p>
         <ul className="preparing__list">
           {STEPS.map((step, i) => (
             <li key={step} data-state={stepStates[i]}>
