@@ -22,6 +22,14 @@
   text-transform: var(--label-transform);
 }
 
+.preparing__command {
+  margin: -8px 0 16px 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
 .preparing__list {
   list-style: none;
   margin: 0;
