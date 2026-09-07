@@ -15,12 +15,16 @@ import subprocess
 
 from morph.runtime import state
 from morph.runtime.adapters.base import (
-    ENV_HINT_DETAIL,
+    RUNTIME_HINT_DETAIL,
     BaseAdapter,
     Fidelity,
     ProxyAdapter,
+    _vars,
+    cpu_hint_env,
+    memory_hint_env,
     no_native_side_effects,
     plan_proxy_path,
+    quota_hint_env,
 )
 from morph.schema.profile import FieldStatus
 
@@ -76,7 +80,8 @@ class LinuxAdapter(BaseAdapter):
             try:
                 res = subprocess.run(
                     ["sudo", "-n", _tc_bin(), "qdisc", "show", "dev", self.interface],
-                    capture_output=True, timeout=5,
+                    capture_output=True,
+                    timeout=5,
                 )
                 cached = res.returncode == 0
             except (OSError, subprocess.SubprocessError):
@@ -97,12 +102,19 @@ class LinuxAdapter(BaseAdapter):
             out["cpu.quota_percent"] = Fidelity(FieldStatus.REPRODUCED, "cgroup v2 cpu.max", base)
         else:
             hint = "; set MORPH_CGROUP_PATH to a writable cgroup to enforce it"
-            out["memory.total_mb"] = Fidelity(FieldStatus.UNAVAILABLE, "env hint",
-                                              ENV_HINT_DETAIL.format(var="MORPH_MEMORY_LIMIT_MB") + hint)
-            out["cpu.quota_percent"] = Fidelity(FieldStatus.UNAVAILABLE, "env hint",
-                                                ENV_HINT_DETAIL.format(var="MORPH_CPU_QUOTA_PERCENT") + hint)
-        out["cpu.cores"] = Fidelity(FieldStatus.UNAVAILABLE, "env hint",
-                                    ENV_HINT_DETAIL.format(var="MORPH_MAX_CORES"))
+            out["memory.total_mb"] = Fidelity(
+                FieldStatus.APPROXIMATED,
+                "runtime hints",
+                RUNTIME_HINT_DETAIL.format(vars=_vars(memory_hint_env(1))) + hint,
+            )
+            out["cpu.quota_percent"] = Fidelity(
+                FieldStatus.APPROXIMATED,
+                "runtime hints",
+                RUNTIME_HINT_DETAIL.format(vars="MORPH_CPU_QUOTA_PERCENT") + hint,
+            )
+        out["cpu.cores"] = Fidelity(
+            FieldStatus.APPROXIMATED, "runtime hints", RUNTIME_HINT_DETAIL.format(vars=_vars(cpu_hint_env(1)))
+        )
         return out
 
     # -------------------------------------------------------------- network
@@ -133,19 +145,26 @@ class LinuxAdapter(BaseAdapter):
                 args.extend(["loss", f"{packet_loss_percent}%"])
             if bandwidth_mbps:
                 args.extend(["rate", f"{float(bandwidth_mbps)}mbit"])
-            entry = state.record(state.StateEntry(
-                kind="tc",
-                detail=f"netem on {self.interface}: {latency_ms}ms / {packet_loss_percent}%",
-                undo=self._tc("qdisc", "del", "dev", self.interface, "root"),
-            ))
+            entry = state.record(
+                state.StateEntry(
+                    kind="tc",
+                    detail=f"netem on {self.interface}: {latency_ms}ms / {packet_loss_percent}%",
+                    undo=self._tc("qdisc", "del", "dev", self.interface, "root"),
+                )
+            )
             try:
                 subprocess.run(self._tc(*args), check=True, capture_output=True, timeout=15)
                 self._tc_entry = entry
                 mech = f"tc netem on {self.interface}"
-                self._note("network.latency_ms", FieldStatus.REPRODUCED, mech,
-                           "netem delay applied to the interface")
-                self._note("network.packet_loss_percent", FieldStatus.REPRODUCED, mech,
-                           "netem loss applied to the interface")
+                self._note(
+                    "network.latency_ms", FieldStatus.REPRODUCED, mech, "netem delay applied to the interface"
+                )
+                self._note(
+                    "network.packet_loss_percent",
+                    FieldStatus.REPRODUCED,
+                    mech,
+                    "netem loss applied to the interface",
+                )
                 if bandwidth_mbps:
                     self._note("network.bandwidth_mbps", FieldStatus.REPRODUCED, mech, "netem rate")
                 return
@@ -168,7 +187,7 @@ class LinuxAdapter(BaseAdapter):
         """Explicit opt-in only: MORPH_CGROUP_PATH names a cgroup-v2 directory
         Morph may write to (created and delegated by the operator, e.g.
         `sudo mkdir /sys/fs/cgroup/morph && sudo chown $USER ...`). Without it
-        nothing is throttled, and that is reported as UNAVAILABLE rather than
+        nothing is throttled, and that is reported as APPROXIMATED (runtime hints) rather than
         silently writing to a shared or root cgroup."""
         path = (os.environ.get("MORPH_CGROUP_PATH") or "").strip()
         if not path or not _is_linux() or no_native_side_effects():
@@ -176,9 +195,13 @@ class LinuxAdapter(BaseAdapter):
         return path if os.path.isdir(path) else None
 
     def _write_cgroup(self, path: str, value: str, restore_value: str, detail: str) -> bool:
-        entry = state.record(state.StateEntry(
-            kind="cgroup", detail=detail, restore={"path": path, "value": restore_value},
-        ))
+        entry = state.record(
+            state.StateEntry(
+                kind="cgroup",
+                detail=detail,
+                restore={"path": path, "value": restore_value},
+            )
+        )
         try:
             with open(path, "w") as f:
                 f.write(value)
@@ -193,9 +216,13 @@ class LinuxAdapter(BaseAdapter):
 
     def apply_cpu(self, max_cores: int | None = None, quota_percent: float | None = None) -> None:
         if max_cores is not None and max_cores > 0:
-            self._env_overrides["MORPH_MAX_CORES"] = str(max_cores)
-            self._note("cpu.cores", FieldStatus.UNAVAILABLE, "env hint",
-                       ENV_HINT_DETAIL.format(var="MORPH_MAX_CORES"))
+            self._env_overrides.update(cpu_hint_env(max_cores))
+            self._note(
+                "cpu.cores",
+                FieldStatus.APPROXIMATED,
+                "runtime hints",
+                RUNTIME_HINT_DETAIL.format(vars=_vars(cpu_hint_env(max_cores))),
+            )
 
         if quota_percent is not None and quota_percent > 0:
             base = self._cgroup_base()
@@ -204,18 +231,25 @@ class LinuxAdapter(BaseAdapter):
                 period_us = 100_000
                 quota_us = int(period_us * quota_percent / 100)
                 applied = self._write_cgroup(
-                    os.path.join(base, "cpu.max"), f"{quota_us} {period_us}", "max 100000",
+                    os.path.join(base, "cpu.max"),
+                    f"{quota_us} {period_us}",
+                    "max 100000",
                     f"cpu.max={quota_percent}% in {base}",
                 )
             if applied:
                 self._cgroup_dir = base
-                self._note("cpu.quota_percent", FieldStatus.REPRODUCED, "cgroup v2 cpu.max",
-                           f"child joins {base}")
+                self._note(
+                    "cpu.quota_percent", FieldStatus.REPRODUCED, "cgroup v2 cpu.max", f"child joins {base}"
+                )
             else:
-                self._env_overrides["MORPH_CPU_QUOTA_PERCENT"] = str(quota_percent)
-                self._note("cpu.quota_percent", FieldStatus.UNAVAILABLE, "env hint",
-                           ENV_HINT_DETAIL.format(var="MORPH_CPU_QUOTA_PERCENT")
-                           + "; set MORPH_CGROUP_PATH to a writable cgroup to enforce it")
+                self._env_overrides.update(quota_hint_env(quota_percent))
+                self._note(
+                    "cpu.quota_percent",
+                    FieldStatus.APPROXIMATED,
+                    "runtime hints",
+                    RUNTIME_HINT_DETAIL.format(vars="MORPH_CPU_QUOTA_PERCENT")
+                    + "; set MORPH_CGROUP_PATH to a writable cgroup to enforce it",
+                )
 
     def apply_memory(self, limit_mb: int | None = None) -> None:
         if limit_mb is not None and limit_mb > 0:
@@ -223,24 +257,29 @@ class LinuxAdapter(BaseAdapter):
             applied = False
             if base:
                 applied = self._write_cgroup(
-                    os.path.join(base, "memory.max"), str(limit_mb * 1024 * 1024), "max",
+                    os.path.join(base, "memory.max"),
+                    str(limit_mb * 1024 * 1024),
+                    "max",
                     f"memory.max={limit_mb}MB in {base}",
                 )
             if applied:
                 self._cgroup_dir = base
-                self._note("memory.total_mb", FieldStatus.REPRODUCED, "cgroup v2 memory.max",
-                           f"child joins {base}")
+                self._note(
+                    "memory.total_mb", FieldStatus.REPRODUCED, "cgroup v2 memory.max", f"child joins {base}"
+                )
             else:
-                self._env_overrides["MORPH_MEMORY_LIMIT_MB"] = str(limit_mb)
-                self._note("memory.total_mb", FieldStatus.UNAVAILABLE, "env hint",
-                           ENV_HINT_DETAIL.format(var="MORPH_MEMORY_LIMIT_MB")
-                           + "; set MORPH_CGROUP_PATH to a writable cgroup to enforce it")
+                self._env_overrides.update(memory_hint_env(limit_mb))
+                self._note(
+                    "memory.total_mb",
+                    FieldStatus.APPROXIMATED,
+                    "runtime hints",
+                    RUNTIME_HINT_DETAIL.format(vars=_vars(memory_hint_env(limit_mb)))
+                    + "; set MORPH_CGROUP_PATH to a writable cgroup to enforce it",
+                )
 
     # -------------------------------------------------------------- locale
 
-    def apply_locale(
-        self, locale_str: str | None = None, timezone: str | None = None
-    ) -> None:
+    def apply_locale(self, locale_str: str | None = None, timezone: str | None = None) -> None:
         self._apply_locale_env(locale_str, timezone)
 
     # ------------------------------------------------------------- cleanup

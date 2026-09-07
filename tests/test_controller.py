@@ -215,8 +215,8 @@ def test_reconcile_uses_the_adapters_fidelity_not_class_booleans():
 
     assert reconciled.network.latency_ms.status == FieldStatus.APPROXIMATED
     assert reconciled.network.packet_loss_percent.status == FieldStatus.APPROXIMATED
-    assert reconciled.cpu.cores.status == FieldStatus.UNAVAILABLE
-    assert reconciled.memory.total_mb.status == FieldStatus.UNAVAILABLE
+    assert reconciled.cpu.cores.status == FieldStatus.APPROXIMATED
+    assert reconciled.memory.total_mb.status == FieldStatus.APPROXIMATED
     assert reconciled.locale.locale.status == FieldStatus.REPRODUCED
     assert reconciled.locale.timezone.status == FieldStatus.REPRODUCED
 
@@ -256,7 +256,7 @@ def test_run_result_carries_provenance_and_fidelity():
     assert res.profile_hash and len(res.profile_hash) == 64
     assert res.morph_version and res.host_fingerprint
     assert res.fidelity["network.latency_ms"].status == "approximated"
-    assert res.fidelity["cpu.cores"].status == "unavailable"
+    assert res.fidelity["cpu.cores"].status == "approximated"
     # JSON round-trip keeps all of it.
     assert RunResult.model_validate_json(res.model_dump_json()) == res
 

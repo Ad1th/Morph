@@ -46,8 +46,8 @@ def test_macos_adapter_capabilities_and_locale():
     assert overrides["MORPH_MEMORY_LIMIT_MB"] == "1024"
 
     fid = adapter.fidelity()
-    assert fid["cpu.cores"].status == FieldStatus.UNAVAILABLE
-    assert fid["memory.total_mb"].status == FieldStatus.UNAVAILABLE
+    assert fid["cpu.cores"].status == FieldStatus.APPROXIMATED
+    assert fid["memory.total_mb"].status == FieldStatus.APPROXIMATED
     assert "MORPH_MEMORY_LIMIT_MB" in fid["memory.total_mb"].detail
     assert fid["locale.locale"].status == FieldStatus.REPRODUCED
     assert fid["locale.timezone"].status == FieldStatus.REPRODUCED
@@ -72,7 +72,7 @@ def test_linux_adapter_capabilities_and_locale():
     assert overrides["LC_ALL"] == "fr_FR.UTF-8"
     assert overrides["TZ"] == "Europe/Paris"
     assert overrides["MORPH_MAX_CORES"] == "4"
-    assert adapter.fidelity()["cpu.cores"].status == FieldStatus.UNAVAILABLE
+    assert adapter.fidelity()["cpu.cores"].status == FieldStatus.APPROXIMATED
 
     adapter.cleanup()
     assert adapter.get_env_overrides() == {}
@@ -101,25 +101,25 @@ def test_windows_adapter_capabilities_and_locale():
 
 def test_cpu_quota_hint_on_windows_and_macos():
     # Neither has a wired-up native quota mechanism (needs pywin32 / no
-    # cgroups) -- an honest env-var hint, reported UNAVAILABLE.
+    # cgroups) -- carried as runtime hints, reported APPROXIMATED.
     for adapter in (WindowsAdapter(), MacOSAdapter()):
         adapter.apply_cpu(max_cores=2, quota_percent=150.0)
         assert adapter.get_env_overrides()["MORPH_CPU_QUOTA_PERCENT"] == "150.0"
-        assert adapter.fidelity()["cpu.quota_percent"].status == FieldStatus.UNAVAILABLE
+        assert adapter.fidelity()["cpu.quota_percent"].status == FieldStatus.APPROXIMATED
         adapter.cleanup()
 
 
 def test_linux_cpu_quota_is_a_hint_without_an_opted_in_cgroup():
     """No MORPH_CGROUP_PATH -> nothing is written anywhere (root cgroup included)
-    and the field is UNAVAILABLE with a hint on how to enable it."""
+    and the field is APPROXIMATED with a hint on how to enforce it."""
     adapter = LinuxAdapter()
     adapter.apply_cpu(max_cores=2, quota_percent=150.0)
     adapter.apply_memory(limit_mb=512)
     assert adapter.get_env_overrides()["MORPH_CPU_QUOTA_PERCENT"] == "150.0"
     fid = adapter.fidelity()
-    assert fid["cpu.quota_percent"].status == FieldStatus.UNAVAILABLE
+    assert fid["cpu.quota_percent"].status == FieldStatus.APPROXIMATED
     assert "MORPH_CGROUP_PATH" in fid["cpu.quota_percent"].detail
-    assert fid["memory.total_mb"].status == FieldStatus.UNAVAILABLE
+    assert fid["memory.total_mb"].status == FieldStatus.APPROXIMATED
     assert adapter.cgroup_path() is None
     assert state.pending() == []
     adapter.cleanup()
