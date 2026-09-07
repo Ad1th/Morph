@@ -27,18 +27,22 @@ python -m apps.<name> run --fixed     # runs the fixed variant
 ### Failure B, the interaction fixture
 
 Verified against the [§7 acceptance table](../docs/faultyapps.md#7-manual-verification-protocol)
-under **real** injected conditions, 20 trials per leg:
+under **real** injected conditions, end to end through `morph experiment` (the
+runtime's proxy adapter hands the conditions to the app via `MORPH_NET_*`, the
+app fronts its own server with morph's TCP proxy). Operating point **120ms /
+18%**, 12-20 trials per leg:
 
 | leg | target | measured |
 |---|---|---|
-| baseline | < 5% | 0/20 ✓ |
-| latency alone (90ms) | < 15% | 0/20 ✓ |
-| loss alone (12%) | < 15% | 1/20 ✓ |
-| latency + loss | > 90% | **19/20** ✓ |
-| `--fixed` under both | < 5% | 0/20 ✓ |
+| baseline | < 5% | 0/12 ✓ |
+| latency alone (120ms) | < 15% | 0/12 ✓ |
+| loss alone (18%) | < 15% | 1/12 ✓ |
+| latency + loss | > 90% | **12/12** ✓ (`p ≈ 7e-7`) |
+| `--fixed` under both | < 5% | 0/8 ✓ |
 
 Neither condition alone breaks it; together they do, and the one-line fix
-survives the exact condition that breaks the app.
+survives the exact condition that breaks the app. `morph define -t high-latency`
+emits this operating point.
 
 ## Verification status
 
@@ -48,13 +52,20 @@ proves the app's logic, not that the environment can actually drive it.
 
 | App | Condition applied by | Still needs |
 |---|---|---|
-| pool_retry (B) | **real** — morph's TCP proxy, genuine delay and chunk drops | `tc netem` cross-check |
+| pool_retry (B) | **real** — morph's TCP proxy, genuine delay and chunk drops, driven end to end by `morph experiment` | `tc netem` cross-check |
+| timeout (A) | **real** — same proxy path via `MORPH_NET_*` | `tc netem` cross-check |
 | locale_parse (D) | **real** — `setlocale` | nothing |
-| timeout (A) | simulated — server-side delay | real injection; the proxy can now do this |
-| race (C) | simulated — interpreter switch interval | real cgroup `cpu.max` on the Pi |
+| race (C) | simulated — interpreter switch interval | real cgroup `cpu.max` on the Pi (self-tests fail on macOS by design) |
+
+Apps that host their own localhost server (`timeout`, `pool_retry`) read the
+generic `MORPH_NET_LATENCY_MS` / `MORPH_NET_PACKET_LOSS_PCT` the runtime exports
+on its unprivileged proxy path (see `apps/netshape.py`); `MORPH_B_PROXY_*` /
+`MORPH_A_*` still override per app. When morph shapes the real interface
+natively (root + `tc netem` / `dnctl`) those vars are absent and the in-process
+proxy is a no-op.
 
 **Latency is applied per direction**, both through the proxy and through `netem`
-on loopback, so round-trip is ~2x the configured value: `90ms` is ~180ms RTT.
+on loopback, so round-trip is ~2x the configured value: `120ms` is ~240ms RTT.
 Any threshold Morph reports will be about twice the parameter that was dialled
 in unless it corrects for this.
 

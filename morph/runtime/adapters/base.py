@@ -104,6 +104,15 @@ class ProxyAdapter(BaseAdapter):
         if latency_ms <= 0.0 and packet_loss_percent <= 0.0:
             return
 
+        # Generic condition hand-off for targets that host their own localhost
+        # server (they cannot be routed through an external proxy). Such an app
+        # reads these and puts Morph's own TCP proxy in front of its server
+        # in-process -- same delay/drop code, applied where the app can see it.
+        # Only ever set on the unprivileged proxy path; the native tc/dnctl
+        # adapters shape the real interface and return before reaching here.
+        self._env_overrides["MORPH_NET_LATENCY_MS"] = str(latency_ms)
+        self._env_overrides["MORPH_NET_PACKET_LOSS_PCT"] = str(packet_loss_percent)
+
         self.proxy = ProxyServer(
             upstream_host=self.upstream_host,
             upstream_port=self.upstream_port,

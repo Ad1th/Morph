@@ -6,7 +6,15 @@ const TAGLINE = 'The quieter you become, the more you are able to hear'
 
 type DialogView = 'choose' | 'github' | 'done'
 
-export function Desktop({ os, onStart }: { os: OsName; onStart: () => void }) {
+export function Desktop({
+  os,
+  onStart,
+  onExperiment,
+}: {
+  os: OsName
+  onStart: () => void
+  onExperiment: () => void
+}) {
   const [open, setOpen] = useState(true)
   const [view, setView] = useState<DialogView>('choose')
   const [repo, setRepo] = useState('')
@@ -108,8 +116,11 @@ export function Desktop({ os, onStart }: { os: OsName; onStart: () => void }) {
                 <button className="desktop__btn bevel-raised" onClick={() => setView('choose')}>
                   Back
                 </button>
+                <button className="desktop__btn bevel-raised" onClick={onExperiment}>
+                  Run experiment
+                </button>
                 <button className="desktop__btn desktop__btn--primary bevel-raised" onClick={onStart}>
-                  OK
+                  Run once
                 </button>
               </div>
             )}

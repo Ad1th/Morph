@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import signal
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -22,6 +24,21 @@ from morph.telemetry.parser import (
 
 _MONITOR_INTERVAL_S = 0.02
 _KILL_GRACE_S = 3.0
+
+# A bare `python` / `python3` / `python3.12` as the command's first token is
+# ambiguous: on PATH it may resolve to an interpreter that lacks Morph's or the
+# target corpus's dependencies (the classic "works on my machine"). Morph runs
+# targets as separate processes, not by importing them, so pinning the launcher
+# to the interpreter Morph itself runs under is safe and removes that whole
+# failure class from the demo. An explicit path (``/usr/bin/python3``, ``.venv/
+# bin/python``) never matches this pattern and is passed through untouched.
+_BARE_PYTHON_RE = re.compile(r"^python(?:3(?:\.\d+)?)?$")
+
+
+def _pin_interpreter(argv: list[str]) -> list[str]:
+    if argv and _BARE_PYTHON_RE.match(argv[0]):
+        return [sys.executable, *argv[1:]]
+    return argv
 
 
 def _now_iso() -> str:
@@ -162,13 +179,18 @@ def run_with_telemetry(
         # strings: `posix=False` corrupted shlex.join()-built commands, and
         # `posix=True` corrupted raw Windows paths (their backslashes are
         # POSIX escape characters), breaking one calling style or the other.
+        # Only the leading bare-`python` token is rewritten (see _pin_interpreter);
+        # the rest of the command line is left exactly as given.
+        head, sep, tail = command.partition(" ")
+        if _BARE_PYTHON_RE.match(head):
+            command = f'"{sys.executable}"{sep}{tail}'
         popen_target: str | list[str] = command
         popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
     else:
         # POSIX Popen (shell=False) requires an argv list; shlex.split with
         # posix=True is the correct, standard way to tokenize a shell-style
         # command string here.
-        popen_target = shlex.split(command, posix=True)
+        popen_target = _pin_interpreter(shlex.split(command, posix=True))
         popen_kwargs["start_new_session"] = True
 
     start = time.perf_counter()

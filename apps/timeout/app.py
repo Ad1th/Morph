@@ -29,6 +29,8 @@ import time
 
 import httpx
 
+from apps.netshape import start_proxy
+
 RESP_DELAY_S = float(os.getenv("MORPH_A_RESP_DELAY_S", "0.20"))
 DEFAULT_TIMEOUT_S = float(os.getenv("MORPH_A_TIMEOUT", "0.25"))
 FIXED_TIMEOUT_S = float(os.getenv("MORPH_A_FIXED_TIMEOUT", "1.0"))
@@ -71,7 +73,11 @@ def _run_once(client_timeout: float) -> dict:
     srv = _QuietServer(("127.0.0.1", 0), _Handler)
     thread = threading.Thread(target=srv.serve_forever, daemon=True)
     thread.start()
-    port = srv.server_address[1]
+
+    # When Morph shapes the loopback natively (tc netem / dnctl) this is a
+    # no-op; when it can't (no root), it passes the latency through
+    # MORPH_NET_LATENCY_MS and we front our own server with Morph's TCP proxy.
+    port, proxy_shutdown = start_proxy(srv.server_address[1])
 
     # httpx.get() would build a fresh httpx.Client() per call -- on some
     # machines that alone costs ~300ms+ (proxy/env/netrc probing), *outside*
@@ -97,6 +103,8 @@ def _run_once(client_timeout: float) -> dict:
     duration_ms = (time.monotonic() - t0) * 1000
     client.close()
 
+    if proxy_shutdown is not None:
+        proxy_shutdown()
     srv.shutdown()
     thread.join(timeout=2)
     return {

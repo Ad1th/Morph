@@ -209,3 +209,67 @@ Three things it implies were checked:
   (12 tests), all passing.
 
 108/108 core tests pass (`tests/` + these 16 new ones), ruff clean.
+
+## Integration pass: end-to-end network shaping + live dashboard (Adith)
+
+Context: `morph experiment` had never actually shaped a network for the demo
+apps. The runtime's proxy adapter started a proxy pointed at `127.0.0.1:80`
+that nothing connected to; the apps only honoured their own `MORPH_B_PROXY_*` /
+`MORPH_A_*` knobs, which nothing in the runtime set. So every isolation run
+came back `no_effect`. Also `/ws/experiment/{id}` was a handshake-only stub and
+`morph define -t high-latency` silently produced `network: null`.
+
+### Fixed
+
+- **Interpreter pin** (`morph/telemetry/collector.py`): a command whose first
+  token is a bare `python` / `python3` / `python3.x` now runs under
+  `sys.executable`. Removes the "wrong interpreter has no deps" failure class
+  (system Python 3.14 here is PEP-668 locked, no httpx). Explicit paths pass
+  through untouched. POSIX + Windows.
+- **`define -t high-latency`** (`morph/cli/main.py`): synthesizes a
+  `NetworkInfo` section (capture never populates `network`), set to the
+  validated flagship operating point **120 ms / 18 %**.
+- **Generic condition hand-off** (`morph/runtime/adapters/base.py`): the
+  unprivileged `ProxyAdapter.apply_network` now also exports
+  `MORPH_NET_LATENCY_MS` / `MORPH_NET_PACKET_LOSS_PCT`. The three OS adapters
+  already copy `ProxyAdapter`'s overrides on their fallback path, so all inherit
+  it; native `tc`/`dnctl` paths return earlier and never set them.
+- **`apps/netshape.py`** (new): `net_conditions()` + `start_proxy(upstream_port)`.
+  `apps/timeout` and `apps/pool_retry` call it to front their own localhost
+  server with morph's real `ProxyServer` when a condition is set. `MORPH_B_PROXY_*`
+  / `MORPH_A_*` still override.
+- **Streaming experiments** (`morph/api/routes/experiments.py`,
+  `morph/api/routes/ws.py`): new `POST /experiments/stream` runs the engine in
+  a worker thread and forwards every `TrialEvent` to `/ws/experiment/{id}` as
+  `{"type":"event",...}`, closing with `{"type":"done","result":...}` /
+  `{"type":"error",...}`. `ConnectionManager` gained a per-experiment replay
+  log (late subscribers get the whole run) and `emit_threadsafe` /
+  `bind_loop` (worker thread -> server loop; self-heals across test clients,
+  the `asyncio.Lock` is recreated with the loop). Blocking `POST /experiments`
+  and `GET /experiments/{id}` unchanged.
+- **React dashboard** (`frontend/src/screens/Experiment.tsx` + `.css`, new;
+  `App.tsx`, `Desktop.tsx`, `api/client.ts`, `api/types.ts`): "Run experiment"
+  on the desktop dialog opens a live causal-isolation view — one lane per
+  condition, per-trial pass/fail ticks, failure-rate bar, `p`-value +
+  `SIGNIFICANT ↑` stamp, and a verdict card. Consumes `/experiments/stream` +
+  the WebSocket. `openExperimentSocket()` in `api/client.ts`.
+
+### Verified
+
+- `pytest tests/` — **161 pass** (159 + `tests/test_ws_stream.py`), ruff clean.
+- `apps/pool_retry`, `apps/timeout`, `apps/locale_parse` self-tests — **19 pass**
+  at 120/18. `apps/race` self-tests fail on macOS (CPU-throttle sim, needs the
+  Pi) — pre-existing, unrelated to this pass.
+- End to end through `POST /experiments/stream` + the WebSocket, flagship
+  profile 120/18: baseline 0/12, latency_only 0/12, loss_only 1/12,
+  full_treatment **12/12 (p ≈ 7e-7)** -> `environment_caused`.
+- `frontend`: `npm run build` + `oxlint` clean.
+
+### Still not done (unchanged from before this pass)
+
+- CPU / memory shaping on macOS is still unenforced env-var stubs; Failure C
+  (race) needs the Pi's real cgroup `cpu.max`.
+- No cloud / remote-worker backend wired (the "beyond local specs" routing is
+  designed in `architecture.md` §12 but not implemented).
+- `@app.on_event` was removed in favour of per-request `bind_loop()`; if a
+  lifespan handler is added later for other reasons, fold the bind into it.

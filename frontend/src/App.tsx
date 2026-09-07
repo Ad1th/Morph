@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { OsSwitcher } from './components/OsSwitcher'
 import type { EnvironmentProfile, RunResult } from './api/types'
 import { Desktop } from './screens/Desktop'
+import { Experiment } from './screens/Experiment'
 import { ParameterConfiguration } from './screens/ParameterConfiguration'
 import { Preparing } from './screens/Preparing'
 import { Verdict } from './screens/Verdict'
@@ -12,6 +13,7 @@ type ScreenState =
   | { name: 'config' }
   | { name: 'preparing'; profile: EnvironmentProfile }
   | { name: 'verdict'; result: RunResult }
+  | { name: 'experiment' }
 
 export default function App() {
   const { os, setOs } = useOsTheme()
@@ -21,7 +23,17 @@ export default function App() {
     <>
       <OsSwitcher os={os} onChange={setOs} />
 
-      {screen.name === 'desktop' && <Desktop os={os} onStart={() => setScreen({ name: 'config' })} />}
+      {screen.name === 'desktop' && (
+        <Desktop
+          os={os}
+          onStart={() => setScreen({ name: 'config' })}
+          onExperiment={() => setScreen({ name: 'experiment' })}
+        />
+      )}
+
+      {screen.name === 'experiment' && (
+        <Experiment os={os} onBack={() => setScreen({ name: 'desktop' })} />
+      )}
 
       {screen.name === 'config' && (
         <ParameterConfiguration

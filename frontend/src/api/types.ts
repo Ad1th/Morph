@@ -83,6 +83,62 @@ export interface RunResult {
   timestamp: string
 }
 
+// Mirrors morph/schema/events.py's TrialEvent. Only the fields the dashboard
+// reads are typed narrowly; the rest ride along as optional.
+export interface TrialEvent {
+  kind:
+    | 'phase_start'
+    | 'condition_start'
+    | 'trial'
+    | 'condition_done'
+    | 'comparison'
+    | 'search_probe'
+    | 'verdict'
+    | 'phase_done'
+  condition: string
+  phase: string
+  trial_index?: number | null
+  total?: number | null
+  passed?: boolean | null
+  duration_ms?: number | null
+  failures_so_far?: number | null
+  error_type?: string | null
+  failures?: number | null
+  failure_rate?: number | null
+  p_value?: number | null
+  is_significant?: boolean | null
+  effect_label?: string | null
+  classification?: string | null
+  strongest_condition?: string | null
+}
+
+export interface ComparisonResult {
+  condition_label: string
+  baseline_failures: number
+  baseline_total: number
+  treatment_failures: number
+  treatment_total: number
+  p_value: number
+  is_significant: boolean
+  effect_label: string
+}
+
+export interface ExperimentResult {
+  experiment_id?: string | null
+  classification: string
+  strongest_condition: string
+  summary: string
+  comparisons: ComparisonResult[]
+  target_profile?: EnvironmentProfile | null
+}
+
+// WebSocket frames from /ws/experiment/{id}.
+export type ExperimentFrame =
+  | { type: 'connected'; experiment_id: string; status: string }
+  | ({ type: 'event' } & TrialEvent)
+  | { type: 'done'; result: ExperimentResult }
+  | { type: 'error'; message: string }
+
 // Mirrors morph/schema/parameters.py's ParameterMetadata.
 export interface ParameterMetadata {
   name: string

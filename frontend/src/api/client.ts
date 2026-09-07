@@ -1,4 +1,4 @@
-import type { EnvironmentProfile, ParameterMetadata, RunResult } from './types'
+import type { EnvironmentProfile, ExperimentResult, ParameterMetadata, RunResult } from './types'
 
 // Vite dev proxy rewrites /api/* -> http://127.0.0.1:8000/* (see vite.config.ts).
 const BASE = '/api'
@@ -36,4 +36,24 @@ export const api = {
     force_proxy?: boolean
     env_overrides?: Record<string, string>
   }) => request<RunResult>('/run', { method: 'POST', body: JSON.stringify(payload) }),
+
+  startExperimentStream: (payload: {
+    command: string
+    target_profile?: EnvironmentProfile
+    trials?: number
+    timeout_sec?: number
+  }) =>
+    request<{ experiment_id: string; status: string }>('/experiments/stream', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getExperiment: (id: string) => request<ExperimentResult>(`/experiments/${id}`),
+}
+
+// Open the progress WebSocket for a running experiment. Vite proxies /ws to the
+// API in dev; in a bundled deploy it is same-origin.
+export function openExperimentSocket(experimentId: string): WebSocket {
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  return new WebSocket(`${proto}://${window.location.host}/ws/experiment/${experimentId}`)
 }

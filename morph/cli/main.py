@@ -15,7 +15,7 @@ from morph.engine.threshold import search_threshold
 from morph.profiler.capture import capture_environment
 from morph.regression import export_ci_test, replay_regression, save_regression
 from morph.runtime.controller import RuntimeController
-from morph.schema.profile import EnvironmentProfile
+from morph.schema.profile import EnvironmentProfile, FieldStatus, NetworkInfo, ProfileField
 from morph.schema.regression import RegressionArtifact
 
 app = typer.Typer(name="morph", help="Morph: Test software in environments you don't physically have.")
@@ -50,9 +50,21 @@ def define(
 ):
     """Generate a template environment profile JSON for editing."""
     base = capture_environment()
-    if template == "high-latency" and base.network:
-        base.network.latency_ms.value = 200.0
-        base.network.packet_loss_percent.value = 2.0
+    if template == "high-latency":
+        # capture_environment() does not populate `network` (no local network
+        # collector), so synthesize the section the template is meant to request.
+        if base.network is None:
+            base.network = NetworkInfo(
+                latency_ms=ProfileField(value=0.0, status=FieldStatus.REQUESTED),
+                packet_loss_percent=ProfileField(value=0.0, status=FieldStatus.REQUESTED),
+            )
+        # 120 ms / 18 % is the validated operating point for the flagship
+        # interaction fixture (apps/pool_retry): neither condition alone moves
+        # the failure rate, the pair drives it to ~100 %. See apps/README.md.
+        base.network.latency_ms.value = 120.0
+        base.network.latency_ms.status = FieldStatus.REQUESTED
+        base.network.packet_loss_percent.value = 18.0
+        base.network.packet_loss_percent.status = FieldStatus.REQUESTED
     elif template == "constrained":
         if base.cpu and base.cpu.cores:
             base.cpu.cores.value = 2
