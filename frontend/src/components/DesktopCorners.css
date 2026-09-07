@@ -59,6 +59,18 @@
   font-family: var(--font-display);
   font-size: 12px;
   letter-spacing: 0.06em;
+  color: #000;
+  text-shadow: none;
+}
+
+.corners[data-os='windows'] .corners__glyph {
+  width: 80px;
+  height: 80px;
+  margin-top: -15px;
+}
+
+.corners[data-os='windows'] .corners__slot {
+  gap: 0;
 }
 
 .corners__slot--left:hover,

@@ -28,12 +28,12 @@ export function DesktopCorners({ os, onFolderClick }: { os: OsName; onFolderClic
 function FolderGlyph({ os }: { os: OsName }) {
   if (os === 'windows') {
     return (
-      <span className="corners__glyph corners__folder--win98" aria-hidden>
-        <span className="corners__folder-tab" />
-        <span className="corners__folder-body">
-          <span className="corners__folder-highlight" />
-        </span>
-      </span>
+      <img
+        className="corners__glyph"
+        src="/icons/image 3 (4).png"
+        alt=""
+        aria-hidden
+      />
     )
   }
 
