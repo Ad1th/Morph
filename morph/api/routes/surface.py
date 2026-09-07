@@ -28,7 +28,7 @@ class BlameRequest(BaseModel):
 
 class ExportInvariantRequest(BaseModel):
     project_name: str = "service"
-    command: str = "py -3 -m apps.timeout test"
+    command: str = "python3 -m apps.timeout test"
     safe_latency_ms: float = 160.0
     safe_packet_loss: float = 0.01
     safe_cpu_quota: float = 1.0

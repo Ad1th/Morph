@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import os
-import platform
 import re
 import shutil
 import subprocess
@@ -51,7 +50,10 @@ SKIP_DIRS = frozenset({".git", "node_modules", "__pycache__", ".venv", "venv", "
 # Ordered: the first one present is the most likely thing the user runs.
 ENTRYPOINT_NAMES = ("__main__.py", "main.py", "app.py", "run.py", "manage.py", "index.js", "server.js")
 
-PYTHON = "py -3" if platform.system() == "Windows" else "python3"
+# Bare "python3": run_with_telemetry._pin_interpreter rewrites it to
+# sys.executable, so the child gets the interpreter Morph is running under
+# (and therefore Morph's dependencies) on every platform.
+PYTHON = "python3"
 
 
 class LocalProjectRequest(BaseModel):
