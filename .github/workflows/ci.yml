@@ -17,6 +17,12 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Nothing in CI may reach a remote worker or GitHub's API: the doctor,
+  # cloud and projects code paths honour this and report "skipped".
+  MORPH_NO_NETWORK: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
 jobs:
   guard:
     name: guard
@@ -24,8 +30,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Reject merge-conflict markers
+        # Only the 7-char markers followed by a space or branch name; a bare
+        # "=======" is a Markdown setext underline, so .md files are skipped.
         run: |
-          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)( |$)' -- ':!.github/workflows/ci.yml'; then
+          if git grep -nE '^(<<<<<<< |=======$|>>>>>>> )' -- ':!.github/workflows/ci.yml' ':!*.md'; then
             echo "::error::Unresolved merge-conflict markers found"
             exit 1
           fi
@@ -43,17 +51,39 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             apps/requirements.txt
+            pyproject.toml
       - run: python -m pip install --upgrade pip
       - run: pip install -r requirements.txt
       - name: ruff check
         run: ruff check morph/ tests/ apps/
+      - name: ruff format --check (advisory)
+        continue-on-error: true
+        run: ruff format --check morph/ tests/ apps/
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
 
   test:
-    name: test
-    runs-on: ubuntu-latest
+    name: test (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
         python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +94,7 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             apps/requirements.txt
+            pyproject.toml
       - run: python -m pip install --upgrade pip
       - name: Install project + demo-app deps
         run: |
@@ -71,20 +102,53 @@ jobs:
           pip install -r apps/requirements.txt
           pip install -e .
       - name: Unit + integration tests
-        run: pytest -q --timeout=120
-      - name: Demo-app failure corpus (advisory)
-        # Several corpus tests need real OS-level constraint injection
-        # (cgroup CPU limits, tc/netem) with privileges the runner lacks, so
-        # this is reported but non-blocking. PRD section 22: do not block on
-        # reproduction campaigns. Track C owns stabilising this.
+        # Runs unprivileged on both OSes: tests that need root for tc/netem or
+        # cgroups skip themselves (os.geteuid() != 0) and the rest use the
+        # user-space proxy path, so this passes without sudo.
+        run: pytest -q --timeout=120 -p no:randomly
+      - name: Demo-app failure corpus (contract tier, blocking)
+        # Baseline passes, the condition fails, exit codes and the JSON line
+        # are right: a few subprocess runs per app through the same root-free
+        # paths Morph's runtime uses (MORPH_NET_* proxy hand-off, LC_ALL/TZ,
+        # setrlimit). Tests that need a Linux cgroup or root skip themselves;
+        # the de_DE legs skip unless the locale is generated, so generate it.
+        run: |
+          sudo locale-gen de_DE.UTF-8 en_US.UTF-8 en_IN.UTF-8 || true
+          pytest -q --timeout=120 -p no:randomly apps/ -m "not slow"
+      - name: Demo-app failure corpus (statistical tier, advisory)
+        # The acceptance rates from docs/faultyapps.md section 7 over 10 to 20
+        # trials per leg with binomial-aware bounds. Timing-sensitive on a
+        # shared runner, so reported but non-blocking (PRD section 22).
         continue-on-error: true
-        run: pytest -q --timeout=120 apps/
+        run: pytest -q --timeout=300 -p no:randomly apps/ -m slow
       - name: CLI smoke test
         run: |
           morph --help
+          morph --version
           morph tui --help
+          morph doctor --no-network || echo "::warning::morph doctor reported failures"
           morph capture --output /tmp/profile.json
           python -c "from morph.schema.profile import EnvironmentProfile; EnvironmentProfile.model_validate_json(open('/tmp/profile.json').read())"
+          morph capture --json | python -c "import json,sys; json.load(sys.stdin)"
+          morph define -o /tmp/target.json -t high-latency
           morph run --command "python -c 'print(1)'"
+          morph run --json --command "python -c 'print(1)'" | python -c "import json,sys; json.load(sys.stdin)"
+          # A setup error must exit 2 and never masquerade as an app failure.
+          set +e; morph run --command "no-such-binary-xyz"; rc=$?; set -e
+          test "$rc" -eq 2
+          morph experiment --json --command "python -c 'print(1)'" --max-rounds 2 | python -c "import json,sys; json.load(sys.stdin)"
+          set +e; morph threshold --json --command "python -c 'print(1)'" --parameter network.latency_ms --low 0 --high 50 --max-trials 4 > /tmp/thr.json; rc=$?; set -e
+          test "$rc" -eq 3   # no boundary in range: the command always passes
+          python -c "import json; d=json.load(open('/tmp/thr.json')); assert d['outcome'] == 'never_fails', d"
+      - name: API smoke test
+        run: |
+          morph serve --port 8765 > /tmp/serve.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8765/health && break; sleep 1; done
+          curl -sf http://127.0.0.1:8765/health
+          curl -sf http://127.0.0.1:8765/api/v1/version
+          curl -sf http://127.0.0.1:8765/openapi.json > /dev/null
+          # A foreign origin must not be granted CORS.
+          test -z "$(curl -s -o /dev/null -D - -X OPTIONS -H 'Origin: https://evil.example' -H 'Access-Control-Request-Method: POST' http://127.0.0.1:8765/run | grep -i access-control-allow-origin)"
+          kill %1
       - name: Proxy adapter self-check
         run: python -m morph.runtime.adapters.proxy

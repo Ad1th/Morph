@@ -1,4 +1,9 @@
-"""Tests for /projects, /platform, and the /run target guard."""
+"""Tests for /projects, /platform, and the /run target guard.
+
+Everything here runs against a temporary HOME: the registry, checkouts and
+venvs are pointed at ``tmp_path`` so nothing is written to the developer's
+real ``~/.morph``.
+"""
 
 from pathlib import Path
 
@@ -12,8 +17,25 @@ from morph.api.routes.projects import REPO_ROOT, _safe_relative
 client = TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def _temp_home(tmp_path, monkeypatch):
+    """A throwaway HOME for every test in this module (conftest also patches the
+    registry / checkouts / venvs module attributes, this covers anything that
+    computes ``Path.home()`` afresh)."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    # CI sets MORPH_NO_NETWORK=1; the GitHub tests below stub the network out.
+    monkeypatch.delenv("MORPH_NO_NETWORK", raising=False)
+    yield home
+
+
 def _upload(files):
     return client.post("/projects/upload", files=files)
+
+
+# --- upload: trust boundary ------------------------------------------------ #
 
 
 def test_upload_rejects_parent_traversal():
@@ -52,13 +74,15 @@ def test_upload_writes_tree_and_skips_junk_dirs():
             ("files", ("myapp/__pycache__/app.pyc", b"junk", "application/octet-stream")),
         ]
     )
-    assert res.status_code == 200
+    assert res.status_code == 200, res.text
     info = res.json()
 
     assert info["name"] == "myapp"
     assert info["file_count"] == 2
     assert info["entrypoints"] == ["app.py"]
     assert info["project_id"].startswith("proj-")
+    assert info["source"] == "upload"
+    assert info["suggested_command"] == "python3 app.py"
 
     root = Path(info["path"])
     assert (root / "src" / "util.py").is_file()
@@ -78,16 +102,43 @@ def test_upload_over_cap_is_413_and_leaves_no_temp_dir(monkeypatch, tmp_path):
     assert not (tmp_path / "proj").exists()
 
 
+def test_upload_too_many_files_is_413(monkeypatch):
+    from morph.api.routes import projects
+
+    monkeypatch.setattr(projects, "MAX_UPLOAD_FILES", 2)
+    res = _upload([("files", (f"myapp/f{i}.py", b"x", "text/plain")) for i in range(3)])
+    assert res.status_code == 413
+
+
+def test_upload_never_follows_a_symlink_out_of_the_temp_dir(monkeypatch, tmp_path):
+    from morph.api.routes import projects
+
+    root = tmp_path / "proj"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / "myapp").symlink_to(outside, target_is_directory=True)
+    monkeypatch.setattr(projects.tempfile, "mkdtemp", lambda **kw: str(root))
+
+    res = _upload([("files", ("myapp/escaped.py", b"pwned", "text/plain"))])
+    assert res.status_code == 400
+    assert not (outside / "escaped.py").exists()
+
+
+# --- local: same detection as `morph connect` ----------------------------- #
+
+
 def test_local_project_detects_timeout_app_module_command():
     res = client.post("/projects/local", json={"path": str(REPO_ROOT / "apps" / "timeout")})
     assert res.status_code == 200
     info = res.json()
 
     assert info["name"] == "timeout"
-    assert info["suggested_command"].endswith("-m apps.timeout test")
+    assert info["suggested_command"].endswith("-m apps.timeout")
     assert Path(info["suggested_cwd"]) == REPO_ROOT
     assert "__main__.py" in info["entrypoints"]
     assert info["file_count"] > 0
+    assert info["source"] == "local"
 
 
 def test_local_project_accepts_repo_relative_path():
@@ -127,17 +178,19 @@ def test_local_project_unrecognised_returns_null_command(tmp_path):
     assert res.json()["suggested_command"] is None
 
 
-def test_module_command_is_null_when_dir_name_is_not_importable(tmp_path):
-    # "morph-project-8jodbogg" (an upload temp dir) cannot be imported, so
-    # "python3 -m morph-project-8jodbogg" would fail every time it ran.
+def test_api_and_cli_agree_on_detected_command(tmp_path):
+    """The API must delegate to project_setup.detect_command, not re-implement it."""
+    from morph import project_setup
+
     project = tmp_path / "morph-project-8jodbogg"
     project.mkdir()
     (project / "__main__.py").write_text("print(1)\n", encoding="utf-8")
 
     res = client.post("/projects/local", json={"path": str(project)})
     assert res.status_code == 200
-    assert res.json()["suggested_command"] is None
-    assert res.json()["suggested_cwd"] is None
+    expected_cmd, expected_cwd = project_setup.detect_command(project)
+    assert res.json()["suggested_command"] == expected_cmd
+    assert res.json()["suggested_cwd"] == expected_cwd
 
 
 def test_module_command_is_returned_when_dir_name_is_importable(tmp_path):
@@ -147,7 +200,10 @@ def test_module_command_is_returned_when_dir_name_is_importable(tmp_path):
 
     res = client.post("/projects/local", json={"path": str(project)})
     assert res.status_code == 200
-    assert res.json()["suggested_command"].endswith("-m myapp")
+    assert res.json()["suggested_command"].endswith("__main__.py")
+
+
+# --- platform / run target --------------------------------------------------- #
 
 
 def test_platform_shape_matches_adapter_capabilities():
@@ -173,9 +229,16 @@ def test_platform_shape_matches_adapter_capabilities():
     assert local["capabilities"] == get_default_adapter().capabilities()
 
     remote = targets["remote-ssh"]
-    assert remote["available"] is False
-    assert remote["reason"]
     assert remote["capabilities"] == {}
+    assert isinstance(remote["available"], bool)
+
+
+def test_platform_reflects_configured_worker(monkeypatch):
+    monkeypatch.setenv("MORPH_CLOUD_HOST", "worker.example")
+    res = client.get("/platform")
+    remote = {t["id"]: t for t in res.json()["targets"]}["remote-ssh"]
+    assert remote["available"] is True
+    assert "worker.example" in remote["label"]
 
 
 def test_run_rejects_non_local_target():
@@ -189,7 +252,10 @@ def test_run_defaults_to_local_target():
     assert res.status_code == 200
 
 
-def test_threshold_returns_contract_shape_with_captured_profile():
+# --- threshold ------------------------------------------------------------- #
+
+
+def test_threshold_bisect_returns_contract_shape_with_captured_profile():
     # profile=null means "capture the host", and a captured profile has no
     # network section; the route must still be able to search network.*.
     res = client.post(
@@ -202,28 +268,22 @@ def test_threshold_returns_contract_shape_with_captured_profile():
             "trials": 1,
             "precision": 150,
             "timeout": 30,
+            "method": "bisect",
         },
     )
-    assert res.status_code == 200
+    assert res.status_code == 200, res.text
     data = res.json()
-    assert set(data) == {
-        "parameter",
-        "safe_value",
-        "failure_value",
-        "boundary_estimate",
-        "search_points",
-    }
+    assert {"parameter", "safe_value", "failure_value", "boundary_estimate", "search_points",
+            "outcome", "method"} <= set(data)
     assert data["parameter"] == "network.latency_ms"
+    assert data["method"] == "bisection"
+    assert data["outcome"] == "never_fails"
     assert data["search_points"]
-    assert set(data["search_points"][0]) == {"value", "failure_rate", "passed"}
+    assert {"value", "failure_rate", "passed"} <= set(data["search_points"][0])
 
 
 def test_threshold_accepts_supplied_profile_without_network_section():
-    # Captured profiles now collect baseline host network conditions.
     profile = client.post("/profiles/capture").json()
-    assert profile["network"] is not None
-    assert profile["network"]["latency_ms"]["status"] == "captured"
-
     # If a supplied profile has an absent network section, threshold search
     # treats it as unconstrained and still runs without answering 400.
     profile["network"] = None
@@ -234,15 +294,13 @@ def test_threshold_accepts_supplied_profile_without_network_section():
             "parameter": "network.latency_ms",
             "low": 0,
             "high": 400,
-            "trials": 1,
-            "precision": 150,
+            "max_trials": 4,
             "profile": profile,
             "timeout": 30,
         },
     )
     assert res.status_code == 200, res.text
     assert res.json()["parameter"] == "network.latency_ms"
-
 
 
 def test_threshold_rejects_non_local_target():
@@ -266,72 +324,46 @@ def test_threshold_rejects_non_positive_precision():
         "/threshold",
         json={"command": "echo hi", "parameter": "network.latency_ms", "precision": 0},
     )
-    assert res.status_code == 400
+    assert res.status_code == 422
 
 
-def test_normalize_github_repo_formats():
-    from morph.api.routes.projects import _normalize_github_repo
-
-    assert _normalize_github_repo("owner/repo") == (
-        "https://github.com/owner/repo.git",
-        "owner",
-        "repo",
-    )
-    assert _normalize_github_repo("https://github.com/owner/repo") == (
-        "https://github.com/owner/repo.git",
-        "owner",
-        "repo",
-    )
-    assert _normalize_github_repo("https://github.com/owner/repo.git") == (
-        "https://github.com/owner/repo.git",
-        "owner",
-        "repo",
-    )
-    assert _normalize_github_repo("git@github.com:owner/repo.git") == (
-        "https://github.com/owner/repo.git",
-        "owner",
-        "repo",
-    )
-    assert _normalize_github_repo("owner/repo", token="ghp_secret123") == (
-        "https://x-access-token:ghp_secret123@github.com/owner/repo.git",
-        "owner",
-        "repo",
-    )
+# --- github ---------------------------------------------------------------- #
 
 
-def test_normalize_github_repo_rejects_invalid():
-    from morph.api.routes.projects import _normalize_github_repo
-
-    with pytest.raises(HTTPException) as excinfo:
-        _normalize_github_repo("")
-    assert excinfo.value.status_code == 400
-
-    with pytest.raises(HTTPException) as excinfo:
-        _normalize_github_repo("-flag/repo")
-    assert excinfo.value.status_code == 400
-
-    with pytest.raises(HTTPException) as excinfo:
-        _normalize_github_repo("invalid_format_without_slash")
-    assert excinfo.value.status_code == 400
+def test_github_project_rejects_invalid_repo():
+    for repo in ("", "-flag/repo", "invalid_format_without_slash"):
+        res = client.post("/projects/github", json={"repo": repo})
+        assert res.status_code in (400, 422), repo
 
 
-def test_github_project_clones_and_describes(monkeypatch, tmp_path):
-    from morph.api.routes import projects
+def test_github_project_clones_into_checkouts_and_describes(monkeypatch, tmp_path):
+    from morph import github, project_setup
 
-    def fake_clone(clone_url, repo_name, branch=None, token=None):
-        repo_dir = tmp_path / repo_name
+    seen = {}
+
+    def fake_clone(repo, dest, *, token=None, branch=None, **kw):
+        seen["dest"] = Path(dest)
+        seen["token"] = token
+        repo_dir = Path(dest) / "sample-app"
         repo_dir.mkdir(parents=True, exist_ok=True)
         (repo_dir / "main.py").write_text("print('hello')", encoding="utf-8")
-        return repo_dir
+        return repo_dir, "abc1234"
 
-    monkeypatch.setattr(projects, "_clone_github_repo", fake_clone)
+    monkeypatch.setattr(github, "clone", fake_clone)
 
     res = client.post("/projects/github", json={"repo": "myorg/sample-app", "token": "ghp_tok"})
-    assert res.status_code == 200
+    assert res.status_code == 200, res.text
     info = res.json()
     assert info["name"] == "sample-app"
     assert "main.py" in info["entrypoints"]
     assert info["file_count"] == 1
+    assert info["source"] == "github"
+    assert info["repo"] == "myorg/sample-app"
+    assert info["commit"] == "abc1234"
+    # Cloned where docs/projects.md says, not into /tmp.
+    assert seen["dest"] == project_setup.CHECKOUTS_DIR / "myorg-sample-app"
+    assert seen["token"] == "ghp_tok"
+    assert "ghp_tok" not in res.text
 
 
 def test_github_project_redacts_token_on_clone_error(monkeypatch):
@@ -358,6 +390,18 @@ def test_github_project_redacts_token_on_clone_error(monkeypatch):
     assert "ghp_supersecret" not in res.text
 
 
+def test_github_cli_token_endpoint_is_gone_and_auth_status_has_no_token(monkeypatch):
+    from morph import github
+
+    assert client.post("/projects/github/cli-token").status_code in (404, 405)
+
+    monkeypatch.setattr(github, "_gh_cli_token", lambda: "gho_live_token_value")
+    res = client.get("/projects/github/auth-status")
+    assert res.status_code == 200
+    assert res.json() == {"authenticated": True, "source": "gh cli"}
+    assert "gho_live_token_value" not in res.text
+
+
 def test_github_device_code_and_poll(monkeypatch):
     from morph.api.routes import projects
 
@@ -373,6 +417,7 @@ def test_github_device_code_and_poll(monkeypatch):
         if "oauth/access_token" in url:
             return {"access_token": "gho_access_token_123", "token_type": "bearer"}
         if "user/repos" in url:
+            assert token == "gho_access_token_123"
             return [
                 {
                     "full_name": "Ad1th/Morph",
@@ -405,15 +450,24 @@ def test_github_device_code_and_poll(monkeypatch):
     assert repos[0]["full_name"] == "Ad1th/Morph"
 
 
+def test_github_repos_resolves_token_server_side(monkeypatch):
+    from morph import github
+    from morph.api.routes import projects
 
+    monkeypatch.setattr(projects, "_github_http_json", lambda url, method="GET", payload=None, token=None: [])
+    monkeypatch.setattr(github, "_gh_cli_token", lambda: None)
+    for var in ("MORPH_GITHUB_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"):
+        monkeypatch.delenv(var, raising=False)
+    assert client.post("/projects/github/repos", json={}).status_code == 401
+
+    monkeypatch.setenv("MORPH_GITHUB_TOKEN", "ghp_from_env")
+    assert client.post("/projects/github/repos", json={}).status_code == 200
+
+
+# --- registry -------------------------------------------------------------- #
 
 
 def test_projects_registry_endpoints(tmp_path):
-    from fastapi.testclient import TestClient
-
-    from morph.api.app import app
-
-    client = TestClient(app)
     proj_dir = tmp_path / "regproj"
     proj_dir.mkdir()
     (proj_dir / "main.py").write_text("print('x')\n")
@@ -431,9 +485,29 @@ def test_projects_registry_endpoints(tmp_path):
     assert one.json()["name"] == "regproj"
     assert one.json()["suggested_command"] == "python3 main.py"
 
-    token = client.post("/projects/github/cli-token")
-    assert token.status_code == 200
-    assert set(token.json()) == {"token", "source"}
+    updated = client.put(f"/projects/{pid}", json={"command": "python3 other.py"})
+    assert updated.status_code == 200
+    assert updated.json()["suggested_command"] == "python3 other.py"
+    assert client.get(f"/projects/{pid}").json()["suggested_command"] == "python3 other.py"
 
     assert client.delete(f"/projects/{pid}").json() == {"deleted": True}
     assert client.get(f"/projects/{pid}").status_code == 404
+    assert client.delete(f"/projects/{pid}").status_code == 404
+
+
+def test_project_ids_are_validated():
+    # An encoded slash never reaches the handler (no single-segment match);
+    # anything that does reach it must satisfy the id pattern.
+    assert client.get("/projects/..%2F..%2Fetc").status_code in (404, 422)
+    assert client.get("/projects/has%20space").status_code == 422
+    assert client.get("/projects/bad%24id").status_code == 422
+    assert client.delete("/projects/" + "x" * 65).status_code == 422
+    assert client.post("/projects/bad%24id/install").status_code == 422
+
+
+def test_nothing_written_outside_temp_home(tmp_path, _temp_home):
+    """Guard for the guard: the registry the routes write to is under tmp_path."""
+    import morph.projects as registry
+
+    assert str(registry.REGISTRY_DIR).startswith(str(tmp_path))
+    assert str(Path.home()).startswith(str(tmp_path))

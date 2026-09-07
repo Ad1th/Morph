@@ -1,3 +1,1 @@
-from morph.cli.main import app
-
-__all__ = ["app"]
+"""Morph command-line interface (see ``morph.cli.main``)."""
