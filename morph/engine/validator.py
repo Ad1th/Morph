@@ -34,6 +34,11 @@ class ValidationResult(BaseModel):
         return not any(issue.severity == "block" for issue in self.issues)
 
 
+def _is_number(value: object) -> bool:
+    """A real numeric value: ``None`` (an UNAVAILABLE field) and ``bool`` are not."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
 def _resolve(profile: EnvironmentProfile, field_path: str):
     """Walks a dotted field_path (e.g. "network.bandwidth_mbps") and returns
     the ProfileField at the end, or None if any hop along the way is absent."""
@@ -51,7 +56,7 @@ def check_thresholds(profile: EnvironmentProfile) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     for meta in PARAMETER_CATALOG.values():
         field = _resolve(profile, meta.field_path)
-        if field is None or not isinstance(field.value, (int, float)):
+        if field is None or not _is_number(field.value):
             continue
         value = field.value
         if meta.min is not None and value < meta.min:
@@ -74,7 +79,10 @@ def check_cross_field_rules(profile: EnvironmentProfile) -> list[ValidationIssue
 
     latency = _resolve(profile, "network.latency_ms")
     jitter = _resolve(profile, "network.jitter_ms")
-    if latency and jitter and isinstance(jitter.value, (int, float)) and jitter.value > (latency.value or 0):
+    if (
+        latency and jitter and _is_number(jitter.value)
+        and jitter.value > (latency.value if _is_number(latency.value) else 0)
+    ):
         issues.append(ValidationIssue(
             field="network.jitter_ms", severity="block",
             message=f"jitter ({jitter.value} ms) must not exceed latency ({latency.value} ms)",
@@ -82,7 +90,7 @@ def check_cross_field_rules(profile: EnvironmentProfile) -> list[ValidationIssue
 
     cores = _resolve(profile, "cpu.cores")
     quota = _resolve(profile, "cpu.quota_percent")
-    if cores and quota and isinstance(quota.value, (int, float)):
+    if cores and quota and _is_number(quota.value) and _is_number(cores.value):
         ceiling = cores.value * 100
         if quota.value > ceiling:
             issues.append(ValidationIssue(
@@ -105,7 +113,11 @@ def check_worker_required(
 
     requested_cores = _resolve(profile, "cpu.cores")
     host_cores = _resolve(host, "cpu.logical_processors")
-    if requested_cores and host_cores and requested_cores.value > host_cores.value:
+    if (
+        requested_cores and host_cores
+        and _is_number(requested_cores.value) and _is_number(host_cores.value)
+        and requested_cores.value > host_cores.value
+    ):
         issues.append(ValidationIssue(
             field="cpu.cores", severity="warn",
             message=f"needs a worker for: CPU cores {requested_cores.value} (host has {host_cores.value})",
@@ -113,7 +125,11 @@ def check_worker_required(
 
     requested_ram = _resolve(profile, "memory.total_mb")
     host_ram = _resolve(host, "memory.total_mb")
-    if requested_ram and host_ram and requested_ram.value > host_ram.value:
+    if (
+        requested_ram and host_ram
+        and _is_number(requested_ram.value) and _is_number(host_ram.value)
+        and requested_ram.value > host_ram.value
+    ):
         issues.append(ValidationIssue(
             field="memory.total_mb", severity="warn",
             message=f"needs a worker for: RAM {requested_ram.value} MiB (host has {host_ram.value} MiB)",

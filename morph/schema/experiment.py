@@ -1,27 +1,25 @@
-"""TrialBatch and ExperimentResult: aggregated outcomes of a full experiment run."""
+"""ExperimentConfig and ExperimentResult: aggregated outcomes of a full experiment run.
+
+``TrialBatch`` is defined in :mod:`morph.schema.trials` and re-exported here.
+"""
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from morph.schema.comparison import ComparisonResult, ThresholdResult
 from morph.schema.profile import EnvironmentProfile
-from morph.schema.telemetry import RunResult
+from morph.schema.trials import TrialBatch
 
-
-class TrialBatch(BaseModel):
-    condition_label: str
-    profile_overrides: dict[str, Any] = Field(default_factory=dict)
-    total_runs: int
-    failures: int
-    failure_rate: float | None = None
-    run_results: list[RunResult] = Field(default_factory=list)
-
-    def model_post_init(self, __context: Any) -> None:
-        if self.failure_rate is None:
-            self.failure_rate = self.failures / self.total_runs if self.total_runs else 0.0
+Classification = Literal[
+    "environment_caused",     # baseline clean, treatment significantly worse
+    "environment_exposed",    # baseline has some failures, treatment amplifies them
+    "application_internal",   # baseline already fails often regardless of environment
+    "no_effect",              # no candidate produced a significant increase
+    "unknown",
+]
 
 
 class ExperimentConfig(BaseModel):
@@ -40,6 +38,12 @@ class ExperimentResult(BaseModel):
     comparisons: list[ComparisonResult] = Field(default_factory=list)
     interactions: list[ComparisonResult] = Field(default_factory=list)
     thresholds: list[ThresholdResult] = Field(default_factory=list)
-    classification: str = "unknown"  # "environment_caused" | "environment_exposed" | "application_internal"
+    classification: Classification = "unknown"
     strongest_condition: str = ""
     summary: str = ""
+    # Honesty notes a UI must show next to the verdict, e.g. "n=3 can never
+    # reach significance". Empty when nothing needs saying.
+    warnings: list[str] = Field(default_factory=list)
+
+
+__all__ = ["Classification", "ExperimentConfig", "ExperimentResult", "TrialBatch"]

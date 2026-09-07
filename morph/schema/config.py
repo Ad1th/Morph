@@ -13,7 +13,7 @@ class AdaptersConfig(BaseModel):
 
 
 class CloudConfig(BaseModel):
-    """A remote worker Morph can hand a run to when this host is too small.
+    """A remote worker Morph can hand a run to when this host cannot honour a profile.
 
     Transport is plain SSH whoever the provider is: the worker runs the SAME
     `morph run` against the SAME profile, so there is no second execution
@@ -21,19 +21,42 @@ class CloudConfig(BaseModel):
     box came from (it appears in run provenance); it does not change the code
     path.
 
-    Nothing here is required until `enabled` is set. Credentials may equally
-    come from the environment, so a config file can be committed without them:
+    Nothing here is required until a host is set. Credentials may equally come
+    from the environment, so a config file can be committed without them:
         MORPH_CLOUD_HOST, MORPH_CLOUD_USER, MORPH_CLOUD_SSH_KEY
+    (`MORPH_WORKER_*` are accepted as aliases.)
+
+    Dispatch is always explicit (`morph run --cloud`, `run_anywhere`): a
+    configured worker never causes a plain local run to leave the machine.
     """
 
     enabled: bool = False
-    provider: str = "gcp"  # "gcp" | "ssh" -- provenance only
+    provider: str = "ssh"  # "ssh" | "gcp" | "pi" -- provenance only
     host: str | None = None  # external IP or hostname of the worker
     user: str | None = None  # SSH login
     ssh_key: str | None = None  # path to the private key
     python: str = "python3"  # interpreter on the worker
     workdir: str = "~/morph"  # Morph checkout on the worker
     connect_timeout: float = 15.0
+
+
+# Backwards-compatible name: there is exactly one worker configuration.
+WorkerConfig = CloudConfig
+
+
+class GithubConfig(BaseModel):
+    """GitHub sign-in for the dashboard's "Connect through GitHub" dialog.
+
+    The device flow (a page opens, you enter a code, no password or token is
+    ever typed into Morph) needs the public client id of a GitHub OAuth App
+    with "Enable Device Flow" ticked. Register one at
+    github.com/settings/developers, paste its client id here (or export
+    GITHUB_CLIENT_ID). It is not a secret. Without it Morph still works
+    through `gh auth login` or MORPH_GITHUB_TOKEN.
+    """
+
+    client_id: str | None = None
+    scope: str = "repo,read:user"
 
 
 class MorphConfig(BaseModel):
@@ -44,4 +67,5 @@ class MorphConfig(BaseModel):
     proxy_port: int = 9876
     adapters: AdaptersConfig = Field(default_factory=AdaptersConfig)
     cloud: CloudConfig = Field(default_factory=CloudConfig)
+    github: GithubConfig = Field(default_factory=GithubConfig)
     metadata: dict[str, str] = Field(default_factory=dict)

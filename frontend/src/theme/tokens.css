@@ -1,0 +1,110 @@
+/* Morph design tokens. Dark-first, wine-black ground with a rose accent.
+   The light theme redefines only the colour tokens under [data-theme="light"]. */
+
+:root {
+  color-scheme: dark;
+
+  /* surfaces */
+  --bg-0: #140407;
+  --bg-1: #17030a;
+  --bg-2: #2b060f;
+  --bg-3: #4a0e22;
+  --line-1: rgba(245, 237, 230, 0.09);
+  --line-2: rgba(245, 237, 230, 0.16);
+  --line-3: rgba(245, 237, 230, 0.28);
+
+  /* text */
+  --fg-0: #f5ede6;
+  --fg-1: #bd93a1;
+  --fg-2: #8f6e79;
+  --fg-inv: #160308;
+
+  /* accent: primary actions only */
+  --accent: #e0447c;
+  --accent-hover: #ea5f90;
+  --accent-soft: rgba(224, 68, 124, 0.16);
+  --accent-ring: rgba(224, 68, 124, 0.55);
+
+  /* secondary: evidence, thresholds, approximations */
+  --gold: #d8a24a;
+  --gold-soft: rgba(216, 162, 74, 0.16);
+
+  /* semantic (always paired with a label or icon) */
+  --ok: #4fbf7a;
+  --ok-soft: rgba(79, 191, 122, 0.16);
+  --warn: #e2b04a;
+  --warn-soft: rgba(226, 176, 74, 0.16);
+  --fail: #ff5c8a;
+  --fail-soft: rgba(255, 92, 138, 0.16);
+  --info: #bd93a1;
+
+  /* type */
+  --font-display: 'Instrument Serif', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+  --font-mono: 'JetBrains Mono', 'DM Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --t-xs: 11px;
+  --t-sm: 12px;
+  --t-base: 13px;
+  --t-md: 14px;
+  --t-lg: 16px;
+  --t-xl: 20px;
+  --t-display-sm: 28px;
+  --t-display: 36px;
+  --t-display-lg: 48px;
+  --lh-body: 1.5;
+  --lh-tight: 1.1;
+
+  /* spacing, 4-pt */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  /* radii: one step per nesting level */
+  --r-1: 4px;
+  --r-2: 8px;
+  --r-3: 12px;
+
+  --ring: 0 0 0 2px var(--bg-0), 0 0 0 4px var(--accent-ring);
+  --shadow-2: 0 16px 40px rgba(0, 0, 0, 0.55);
+
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-1: 120ms;
+  --dur-2: 220ms;
+  --dur-3: 480ms;
+
+  --rail-w: 208px;
+  --content-w: 1120px;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg-0: #faf5f3;
+  --bg-1: #ffffff;
+  --bg-2: #f4e6ea;
+  --bg-3: #ead3da;
+  --line-1: rgba(27, 10, 15, 0.08);
+  --line-2: rgba(27, 10, 15, 0.16);
+  --line-3: rgba(27, 10, 15, 0.3);
+  --fg-0: #1b0a0f;
+  --fg-1: #63454f;
+  --fg-2: #8a6d77;
+  --fg-inv: #fff8f5;
+  --accent: #b8235c;
+  --accent-hover: #a01b4f;
+  --accent-soft: rgba(184, 35, 92, 0.12);
+  --accent-ring: rgba(184, 35, 92, 0.5);
+  --gold: #8a6218;
+  --gold-soft: rgba(138, 98, 24, 0.14);
+  --ok: #1f7a45;
+  --ok-soft: rgba(31, 122, 69, 0.14);
+  --warn: #8a5f10;
+  --warn-soft: rgba(138, 95, 16, 0.14);
+  --fail: #c0184f;
+  --fail-soft: rgba(192, 24, 79, 0.12);
+  --info: #63454f;
+  --shadow-2: 0 16px 40px rgba(27, 10, 15, 0.18);
+}

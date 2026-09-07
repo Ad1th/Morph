@@ -52,6 +52,53 @@ def test_resolve_token_precedence(monkeypatch):
     assert github.token_source() == "gh cli"
 
 
+def test_token_never_reaches_argv_or_git_config(monkeypatch, tmp_path):
+    """The PAT used to be embedded in the clone URL: visible to `ps` and written
+    to .git/config as remote.origin.url for the life of the checkout."""
+    import base64
+    import subprocess
+
+    token = "ghp_SECRETSECRETSECRETSECRETSECRET123456"
+    captured = {}
+
+    def fake_run(cmd, **kwargs):
+        if cmd[:2] == ["git", "clone"]:
+            captured["cmd"] = cmd
+            captured["env"] = kwargs.get("env") or {}
+            (tmp_path / "repo").mkdir(exist_ok=True)
+        return subprocess.CompletedProcess(cmd, 0, stdout="abc1234\n", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    _path, sha = github.clone("owner/repo", tmp_path, token=token)
+
+    assert token not in " ".join(captured["cmd"])
+    assert captured["cmd"][-2] == "https://github.com/owner/repo.git"
+    assert captured["env"]["GIT_CONFIG_KEY_0"] == "http.https://github.com/.extraheader"
+    b64 = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+    assert captured["env"]["GIT_CONFIG_VALUE_0"] == f"AUTHORIZATION: basic {b64}"
+    assert captured["env"]["GIT_TERMINAL_PROMPT"] == "0"
+    assert sha == "abc1234"
+
+
+def test_clone_errors_never_print_the_token(monkeypatch, tmp_path):
+    import subprocess
+
+    token = "ghp_SECRETSECRETSECRETSECRETSECRET123456"
+
+    def failing_run(cmd, **kwargs):
+        env = kwargs.get("env") or {}
+        return subprocess.CompletedProcess(
+            cmd, 128, stdout="", stderr=f"fatal: bad {token} and {env.get('GIT_CONFIG_VALUE_0')}"
+        )
+
+    monkeypatch.setattr(subprocess, "run", failing_run)
+    with pytest.raises(github.GitHubError) as exc:
+        github.clone("owner/repo", tmp_path, token=token)
+    assert token not in str(exc.value)
+    assert "basic ***" in str(exc.value)
+    assert github.clone_url("o", "r", token) == "https://github.com/o/r.git"
+
+
 # --------------------------------------------------------------------------- #
 # registry
 # --------------------------------------------------------------------------- #

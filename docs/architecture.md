@@ -1,8 +1,8 @@
 # Morph: Software Architecture Document
 
-> Build guide for developers. Read this, understand the system, build it.
+> Build guide for developers. Read this, understand the system, then read the module docstrings, which are the source of truth for the maths.
 
-This document describes every module, interface, data flow, and file structure in Morph. It is derived from the [Morph PRD](./Morph_PRD.md) and covers the full system: from environment capture through causal isolation to regression export.
+This document describes every module, interface, data flow and file of Morph as it exists in the repository. It is derived from the [Morph PRD](./Morph_PRD.md); where the PRD and the code disagree, this document follows the code and says so. The statistical pipeline is explained in [how-it-works.md](./how-it-works.md); the demo corpus in [faultyapps.md](./faultyapps.md); cloud execution in [cloud.md](./cloud.md); project registration in [projects.md](./projects.md).
 
 ---
 
@@ -10,63 +10,67 @@ This document describes every module, interface, data flow, and file structure i
 
 Morph is a local-first developer tool that:
 
-1. **Captures** environment conditions from a machine (OS, CPU, RAM, locale, network).
-2. **Reproduces** those conditions on a different machine using OS-native controls.
-3. **Runs** an application under those reproduced conditions and collects telemetry.
-4. **Experiments** by varying conditions systematically (baseline vs. treatment, threshold search).
-5. **Isolates** the exact environmental condition (or combination) responsible for the failure.
-6. **Exports** the discovered failure as a replayable regression artifact.
+1. **Captures** environment conditions from a machine (OS, CPU, RAM, locale, timezone, filesystem, process limits, network).
+2. **Reproduces** those conditions on another machine with OS-native controls, or a user-space proxy when it has no privileges.
+3. **Runs** an application under the reproduced conditions and collects telemetry and provenance.
+4. **Experiments**: paired sequential trials with anytime-valid evidence, or a fixed-N batch; a 2x2 interaction test; probabilistic bisection for thresholds; delta debugging for the minimal condition set.
+5. **Classifies** the failure: environment-caused, environment-exposed, application-internal, or no effect.
+6. **Exports** the discovered failure as a replayable regression bundle and a standalone CI test.
 
-### Core Loop
-
-```
-CAPTURE/DEFINE --> REPRODUCE --> RUN --> OBSERVE --> VARY --> ISOLATE --> FIX --> REPLAY --> PASS
-```
-
-### High-Level Architecture
+### Core loop
 
 ```
-                         Morph UI
-                    Dashboard / CLI
-                           |
-                    Local Controller
-                           |
-          +----------------+----------------+
-          |                |                |
-       Profiler          Runtime       Experiment
-          |                |              Engine
-          +----------------+----------------+
-                           |
-                      OS Adapter
-             +-------------+-------------+
-             |             |             |
-           macOS        Windows        Linux
-             |             |             |
-             +-------------+-------------+
-                           |
-                    Target Process
-                           |
-                       Telemetry
+CAPTURE/DEFINE --> REPRODUCE --> RUN --> ISOLATE (sequential) --> INTERACTION --> THRESHOLD --> MINIMIZE --> CLASSIFY --> FIX --> REPLAY --> EXPORT
+```
+
+### High-level architecture
+
+```
+        CLI (Typer)        TUI (Textual)        Dashboard (React/Vite)
+             |                   |                        |
+             +-------------------+------------------------+
+                                 |
+                       API service layer (morph/api/service.py)
+                                 |
+              +------------------+------------------+
+              |                  |                  |
+          Profiler        Runtime controller    Experiment engine
+              |                  |                  |
+              |            OS adapter              |
+              |      +-----------+-----------+      |
+              |    Linux       macOS      Windows   |
+              |      \           |           /      |
+              |       +-- ProxyAdapter (no root) ---+
+              |                  |
+              |           Target process  <--- telemetry collector (rlimits, kill tree, provenance)
+              |
+        EnvironmentProfile JSON  <---  cloud worker over SSH (same `morph run`)
 ```
 
 ---
 
 ## 2. Module Inventory
 
-| Module | Directory | Responsibility | Language |
-|---|---|---|---|
-| CLI | `morph/cli/` | Command-line entry point (Typer + Rich) | Python |
-| API Server | `morph/api/` | FastAPI server for frontend communication | Python |
-| Profiler | `morph/profiler/` | Captures machine environment into a profile | Python |
-| Runtime | `morph/runtime/` | Applies environment conditions, launches target process | Python |
-| OS Adapters | `morph/runtime/adapters/` | Platform-specific implementations (macOS, Windows, Linux) | Python |
-| Experiment Engine | `morph/engine/` | Baseline/treatment runner, statistical comparison, threshold search | Python |
-| Telemetry | `morph/telemetry/` | Collects stdout/stderr, exit codes, timing, resource usage | Python |
-| Regression | `morph/regression/` | Saves/loads/replays `.morph` regression artifacts | Python |
-| Schema | `morph/schema/` | Pydantic models for profiles, results, telemetry | Python |
-| Demo Apps | `demo_apps/` | Deliberately buggy sample applications for demonstration | Python |
-| Frontend | `frontend/` | React + TypeScript + Vite dashboard | TypeScript |
-| Tests | `tests/` | pytest test suite | Python |
+| Module | Directory | Responsibility |
+|---|---|---|
+| CLI | `morph/cli/main.py` | Typer app: `connect`, `reinstall`, `projects`, `capture`, `define`, `run`, `experiment`, `demo`, `threshold`, `minimize`, `cloud`, `save`, `replay`, `export`, `serve`, `tui`, `doctor` |
+| TUI | `morph/tui/` | Textual console: `app.py`, `orchestrator.py` (engine bridge), `screens/`, `widgets/`, `demo.py` (recorded replay), `profiles.py`, `perf.py` |
+| API server | `morph/api/app.py`, `routes/`, `service.py`, `defaults.py`, `validation.py` | FastAPI; every route mounted at `/api/v1` and at the root; shared defaults with the CLI |
+| Profiler | `morph/profiler/capture.py`, `collectors/{cpu,memory,os_info,locale_info,network,filesystem,process_limits}.py` | Captures the host into an `EnvironmentProfile` |
+| Runtime | `morph/runtime/controller.py`, `runner.py`, `state.py` | Applies a profile through an adapter, runs the command, guarantees cleanup; crash-safe record of native side effects |
+| OS adapters | `morph/runtime/adapters/{base,linux,macos,windows,proxy}.py` | Native shaping when privileged, `ProxyAdapter` otherwise; per-field fidelity |
+| Experiment engine | `morph/engine/` | `sequential.py`, `anytime.py`, `experiment.py`, `comparison.py`, `classifier.py`, `threshold.py`, `boundary.py`, `minimize.py`, `runners.py`, `progress.py`, `errors.py`, `validator.py`, `surface.py`, `blame.py`, `exporter.py` |
+| Telemetry | `morph/telemetry/collector.py`, `parser.py`, `provenance.py` | Subprocess launch, rlimits, output capture, error extraction, seed/version/host fingerprint |
+| Regression | `morph/regression/artifact.py`, `replay.py`, `exporter.py` | Save, load, replay `.morph` bundles; generate `test_morph_invariant.py` |
+| Cloud | `morph/cloud/capability.py`, `worker.py`, `dispatch.py` | Local capability check, SSH worker, explicit `--cloud` routing |
+| Projects | `morph/projects.py`, `project_setup.py`, `github.py`, `runenv.py` | Registry under `~/.morph`, clones, per-project venvs, GitHub auth |
+| Config | `morph/config.py`, `schema/config.py`, `morph.yaml` | `morph.yaml` discovery (stops at the git root or `$HOME`), `cloud:` block |
+| Environment helper | `morph/environment.py` | `morph.environment()` context manager used by exported invariant tests |
+| Schema | `morph/schema/` | Pydantic models: `profile`, `telemetry`, `trials`, `experiment`, `comparison`, `events`, `regression`, `parameters`, `project`, `surface`, `blame`, `config` |
+| Demo corpus | `apps/` | Six deliberately faulty apps, shared `conftest.py`, `netshape.py` hand-off |
+| Demo profiles | `profiles/` | One `EnvironmentProfile` per demo condition |
+| Frontend | `frontend/` | React + TypeScript + Vite dashboard |
+| Tests | `tests/` | pytest suite for `morph/`; `apps/*/test_app.py` for the corpus |
 
 ---
 
@@ -75,286 +79,196 @@ CAPTURE/DEFINE --> REPRODUCE --> RUN --> OBSERVE --> VARY --> ISOLATE --> FIX --
 ```
 morph/
   __init__.py
-  __main__.py                    # python -m morph entry point
+  config.py                      # morph.yaml discovery and loading
+  environment.py                 # morph.environment(latency_ms=..., packet_loss=...) for exported tests
+  github.py                      # token resolution, device flow, repo listing
+  projects.py                    # project registry (~/.morph/projects)
+  project_setup.py               # clone + per-project venv / npm install
+  runenv.py                      # interpreter / venv resolution for a project command
 
   cli/
-    __init__.py
-    main.py                      # Typer app: capture, run, experiment, replay
-    display.py                   # Rich tables, progress bars, result formatting
+    main.py                      # the Typer app (see section 7)
 
   api/
-    __init__.py
-    server.py                    # FastAPI app
+    app.py                       # FastAPI factory: CORS, /health, /version, routers at /api/v1 and /
+    service.py                   # shared orchestration used by CLI and routes (experiment, threshold, minimize, doctor)
+    defaults.py                  # TRIALS, SEQUENTIAL_MAX_ROUNDS, ALPHA, THRESHOLD_*, DEMO_*, SERVE_*
+    validation.py
     routes/
-      profiles.py                # GET/POST /profiles
-      runs.py                    # POST /run, GET /runs/{id}
-      experiments.py             # POST /experiment, GET /experiments/{id}
-      regressions.py             # GET/POST /regressions
+      profiles.py                # capture, save/list/get/delete, reconcile
+      parameters.py              # parameter metadata for the UI
+      runs.py                    # one run under a profile
+      experiments.py             # blocking, streaming, list/get/delete
+      threshold.py               # blocking and streaming
+      minimize.py                # ddmin over deviating conditions
+      surface.py                 # 2D failure surface, differential blame, invariant export
+      regressions.py             # list/save/get/replay/delete
+      projects.py                # upload/local/github connect, install, get/put/delete, GitHub auth
+      platform.py                # host OS and run targets
+      ws.py                      # /ws/experiment/{id}, /ws/threshold/{id}
 
   schema/
-    __init__.py
-    profile.py                   # EnvironmentProfile pydantic model
-    telemetry.py                 # RunResult, TelemetryData models
-    experiment.py                # ExperimentConfig, ExperimentResult models
-    regression.py                # RegressionArtifact model
-    comparison.py                # ComparisonResult, ThresholdResult models
+    profile.py                   # EnvironmentProfile, ProfileField, FieldStatus
+    telemetry.py                 # RunResult (invalid, provenance, fidelity), TelemetryData
+    trials.py                    # TrialBatch
+    experiment.py                # ExperimentConfig, ExperimentResult
+    comparison.py                # ComparisonResult, ThresholdResult, SearchPoint
+    events.py                    # TrialEvent (the live event stream)
+    regression.py                # RegressionArtifact, ReplayResult
+    parameters.py                # ParameterMetadata
+    project.py                   # ProjectInfo
+    surface.py, blame.py         # SurfaceRequest/Result, DifferentialBlameResult
+    config.py                    # MorphConfig, AdaptersConfig, CloudConfig
 
   profiler/
-    __init__.py
-    capture.py                   # Main capture orchestrator
+    capture.py                   # capture_environment()
     collectors/
-      __init__.py
-      cpu.py                     # CPU info: cores, arch, clock (psutil + py-cpuinfo)
-      memory.py                  # RAM total/available (psutil)
-      os_info.py                 # OS family, version, build (platform + distro)
-      locale_info.py             # Locale, timezone (stdlib locale + tzdata)
-      network.py                 # Measured latency, loss estimate, bandwidth
-      filesystem.py              # Case sensitivity, path separator, locking behavior
-      runtime_env.py             # Python version, env vars, dependency versions
+      cpu.py, memory.py, os_info.py, locale_info.py, network.py, filesystem.py, process_limits.py
 
   runtime/
-    __init__.py
-    controller.py                # Orchestrates: load profile -> apply conditions -> run -> collect
-    runner.py                    # Subprocess launcher with telemetry collection
+    controller.py                # RuntimeController: apply -> run -> cleanup; reconcile_profile_statuses
+    runner.py                    # execute_command(): os.environ + overrides -> collector
+    state.py                     # ~/.morph/state/shaping.json: tc/dnctl/cgroup entries with undo commands
     adapters/
-      __init__.py
-      base.py                    # Abstract BaseAdapter interface
-      macos.py                   # macOS: dnctl/pfctl for network, process priority for CPU
-      windows.py                 # Windows: Clumsy or proxy for network, Job Objects for CPU
-      linux.py                   # Linux: tc/netem for network, cgroups for CPU/memory
-      proxy.py                   # User-space TCP proxy for network simulation (cross-platform)
+      base.py                    # BaseAdapter, Fidelity, ProxyAdapter, locale/timezone helpers, plan_proxy_path
+      linux.py                   # tc netem on lo, cgroup cpu.max / memory.max (root or MORPH_CGROUP_PATH)
+      macos.py                   # dummynet pipe + pf anchor when root; proxy fallback; CPU/RAM hints only
+      windows.py                 # proxy fallback; CPU/RAM hints only
+      proxy.py                   # ProxyServer: RTT delay line, RTO-stall loss model, bandwidth bucket, seed
 
   engine/
-    __init__.py
-    experiment.py                # Main experiment loop: baseline, treatments, isolation
-    comparison.py                # Statistical comparison (Fisher exact, two-proportion z-test)
-    threshold.py                 # Binary search for failure boundary
-    grid.py                      # 2D parameter grid search (latency x loss, etc.)
-    classifier.py                # Classifies: environment-caused vs environment-exposed
+    sequential.py                # run_sequential_experiment: paired round-robin, early stopping
+    anytime.py                   # PairedEvidence: Beta-mixture e-process, anytime p, Bonferroni bar
+    experiment.py                # run_trials, isolate_variables, detect_interaction, run_experiment (batch)
+    comparison.py                # one-sided Fisher, Wilson, Newcombe CI, Holm
+    classifier.py                # four-way classification
+    threshold.py                 # search_threshold: deterministic bisection
+    boundary.py                  # locate_boundary: probabilistic bisection, credible interval
+    minimize.py                  # ddmin, batch_oracle
+    runners.py                   # profile -> run_fn / run_at builders shared by CLI and API
+    progress.py                  # OnEvent, emit, coerce_result, run_valid_trial (invalid-trial retry)
+    errors.py                    # InvalidTrialError
+    validator.py                 # profile validation against parameter metadata
+    surface.py                   # 2D grid (latency x loss) with safe/failing contour
+    blame.py                     # differential blame: diff pass vs fail traces
+    exporter.py                  # generate_invariant_test_code
 
   telemetry/
-    __init__.py
-    collector.py                 # Wraps subprocess, captures stdout/stderr/timing/resources
-    parser.py                    # Extracts exit code, error type, stack trace from output
+    collector.py                 # run_with_telemetry: shell=False, interpreter pinning, session kill, rlimits, invalid exit codes
+    parser.py                    # extract_error_type / message / stack_trace
+    provenance.py                # morph_version, host_fingerprint, seed_from_env
 
   regression/
-    __init__.py
-    artifact.py                  # Creates .morph/ regression directories
-    replay.py                    # Loads and replays a saved regression
-    exporter.py                  # Generates standalone test files (test_morph_invariant.py)
+    artifact.py                  # save / load .morph bundles
+    replay.py                    # replay_regression -> ReplayResult
+    exporter.py                  # export_ci_test
 
-demo_apps/
-  checkout_service/
-    demo_app.py                  # Failure B: lock lease timeout under latency + packet loss
-    README.md
-  timeout_client/
-    demo_app.py                  # Failure A: simple HTTP timeout under high latency
-    README.md
-  race_condition/
-    demo_app.py                  # Failure C: concurrency bug exposed by CPU constraint
-    README.md
-  locale_parser/
-    demo_app.py                  # Failure D: date parser with wrong locale assumption
-    README.md
+  cloud/
+    capability.py                # assess_locally -> HostCapability (shortfalls)
+    worker.py                    # RemoteWorker: ssh argv, probe, run
+    dispatch.py                  # run_anywhere, NotReproducibleAnywhere
 
-frontend/
-  package.json
-  vite.config.ts
-  src/
-    App.tsx
-    main.tsx
-    api/
-      client.ts                  # HTTP client to FastAPI backend
-    pages/
-      EnvironmentPage.tsx        # Profile capture/define, comparison view
-      ReproductionPage.tsx       # REPRODUCED/APPROXIMATED/UNAVAILABLE status per field
-      ExperimentPage.tsx         # Live trial results table, progress
-      CausePage.tsx              # Final isolation result, threshold, interaction evidence
-      RegressionPage.tsx         # Saved regressions, replay controls
-    components/
-      ProfileCard.tsx
-      ComparisonTable.tsx
-      TrialResultsTable.tsx
-      ThresholdGauge.tsx
-      FailureTimeline.tsx
-      StatusBadge.tsx            # REPRODUCED / APPROXIMATED / UNAVAILABLE badges
+  tui/
+    app.py, app.tcss, messages.py, orchestrator.py, demo.py, profiles.py, perf.py
+    screens/  home, environment, experiment, monitor, threshold, projects, regressions
+    widgets/  condition_lane, interaction_matrix, profile_diff, slider, threshold_gauge, verdict_card
 
-tests/
-  test_profiler.py
-  test_schema.py
-  test_engine.py
-  test_comparison.py
-  test_threshold.py
-  test_runner.py
-  test_regression.py
-  test_api.py
-  conftest.py
+apps/                            # see docs/faultyapps.md
+  conftest.py, netshape.py, requirements.txt, README.md
+  timeout/  pool_retry/  race/  locale_parse/  fd_limit/  tz_dst/
+    __init__.py  __main__.py  app.py  test_app.py  README.md
 
-.morph/                          # Generated at runtime
-  regressions/
-    timeout-001/
-      environment.json
-      command.json
-      expected.json
-      metadata.json
+profiles/                        # flagship.json, high_latency.json, locale_de.json, tz_dst.json, fd_limit.json, race_yield.json
+
+frontend/                        # React + TypeScript + Vite
+  src/  App.tsx  main.tsx  api/  components/  screens/  theme/
+
+scripts/
+  setup_gcp_worker.sh            # bootstrap an SSH worker: packages, venv, sudo tc, delegated cgroup, shaping self-check
+
+tests/                           # 28 modules; see section 15
+morph.yaml                       # project config (section 13)
+pyproject.toml                   # package config, pytest markers (slow, needs_linux, needs_root), ruff
 ```
+
+Runtime state lives under `~/.morph/`: `projects/`, `checkouts/`, `venvs/`, `state/shaping.json`; regression bundles under `.morph/regressions/` in the working directory.
 
 ---
 
 ## 4. Data Models (Schema)
 
-### 4.1 Environment Profile (`schema/profile.py`)
+### 4.1 Environment profile (`schema/profile.py`)
 
-The portable JSON format that describes a machine. Every field carries a `status` indicating how it was handled.
-
-```python
-from pydantic import BaseModel
-from typing import Optional, Literal, Any
-from enum import Enum
-
-class FieldStatus(str, Enum):
-    CAPTURED = "captured"         # Measured from a real machine
-    REQUESTED = "requested"       # Defined manually by the developer
-    REPRODUCED = "reproduced"     # Successfully applied on the test machine
-    APPROXIMATED = "approximated" # Best-effort (e.g., CPU throttled but not identical)
-    UNAVAILABLE = "unavailable"   # Cannot be reproduced locally
-
-class ProfileField(BaseModel):
-    value: Any
-    status: FieldStatus = FieldStatus.REQUESTED
-
-class OSInfo(BaseModel):
-    family: ProfileField          # "windows" | "darwin" | "linux"
-    version: ProfileField         # "11", "14.5", "22.04"
-
-class CPUInfo(BaseModel):
-    architecture: ProfileField    # "x86_64" | "arm64"
-    cores: ProfileField           # Physical core count
-    logical_processors: ProfileField
-    clock_mhz: ProfileField
-
-class MemoryInfo(BaseModel):
-    total_mb: ProfileField
-
-class LocaleInfo(BaseModel):
-    locale: ProfileField          # "en-IN", "en-US"
-    timezone: ProfileField        # "Asia/Kolkata"
-
-class FilesystemInfo(BaseModel):
-    case_sensitive: ProfileField
-
-class NetworkInfo(BaseModel):
-    latency_ms: ProfileField
-    packet_loss_percent: ProfileField
-    bandwidth_mbps: Optional[ProfileField] = None
-
-class EnvironmentProfile(BaseModel):
-    version: str = "1.0"
-    os: OSInfo
-    cpu: CPUInfo
-    memory: MemoryInfo
-    locale: LocaleInfo
-    filesystem: Optional[FilesystemInfo] = None
-    network: NetworkInfo
-```
-
-### Example Profile JSON
-
-```json
-{
-  "version": "1.0",
-  "os": {
-    "family": {"value": "windows", "status": "captured"},
-    "version": {"value": "11", "status": "captured"}
-  },
-  "cpu": {
-    "architecture": {"value": "x86_64", "status": "captured"},
-    "cores": {"value": 4, "status": "captured"},
-    "logical_processors": {"value": 4, "status": "captured"},
-    "clock_mhz": {"value": 2400, "status": "captured"}
-  },
-  "memory": {
-    "total_mb": {"value": 8192, "status": "captured"}
-  },
-  "locale": {
-    "locale": {"value": "en-IN", "status": "captured"},
-    "timezone": {"value": "Asia/Kolkata", "status": "captured"}
-  },
-  "filesystem": {
-    "case_sensitive": {"value": false, "status": "captured"}
-  },
-  "network": {
-    "latency_ms": {"value": 180, "status": "captured"},
-    "packet_loss_percent": {"value": 2.0, "status": "captured"},
-    "bandwidth_mbps": {"value": 10, "status": "captured"}
-  }
-}
-```
-
-### 4.2 Run Result (`schema/telemetry.py`)
+Every field is a `ProfileField {value, status}`. `FieldStatus` is `captured`, `requested`, `reproduced`, `approximated`, `unavailable`.
 
 ```python
-class RunResult(BaseModel):
-    run_id: str
-    exit_code: int
-    stdout: str
-    stderr: str
-    duration_ms: float
-    peak_memory_mb: Optional[float] = None
-    passed: bool                  # exit_code == 0
-    error_type: Optional[str] = None
-    error_message: Optional[str] = None
-    timestamp: str
+class OSInfo:         family, version, kernel_version?
+class CPUInfo:        architecture, cores, logical_processors, clock_mhz?, quota_percent?
+class MemoryInfo:     total_mb, swap_mb?, pressure_percent?
+class LocaleInfo:     locale, timezone, language_tag?
+class FilesystemInfo: case_sensitive, filesystem_type?, read_only?, disk_space_limit_mb?, disk_read_latency_ms?, disk_write_latency_ms?
+class NetworkInfo:    latency_ms (an RTT), packet_loss_percent, bandwidth_mbps?, jitter_ms?, available?, connection_type?
+class ProcessInfo:    timeout_s?, max_processes?, thread_limit?, fd_limit?
+
+class EnvironmentProfile:
+    version = "1.0"; os; cpu; memory; locale; filesystem?; network?; process?; env_vars: dict[str, str] = {}
 ```
 
-### 4.3 Experiment Result (`schema/experiment.py`)
+`network.latency_ms` is a **round-trip** time everywhere (profile, proxy, native adapters, threshold results). `env_vars` are exported verbatim to the child and override the adapter's own exports. `jitter_ms` is carried by the schema and supported by the proxy but not yet passed through the controller.
+
+### 4.2 Run result (`schema/telemetry.py`)
 
 ```python
-class TrialBatch(BaseModel):
-    condition_label: str          # "baseline", "latency_180ms", "loss_2pct", "latency+loss"
-    profile_overrides: dict       # Which profile fields were changed
-    total_runs: int
-    failures: int
-    failure_rate: float
-    run_results: list[RunResult]
-
-class ComparisonResult(BaseModel):
-    baseline: TrialBatch
-    treatment: TrialBatch
-    p_value: Optional[float] = None
-    is_significant: bool
-    effect_label: str             # "no_effect" | "significant_increase" | "significant_decrease"
-
-class ThresholdResult(BaseModel):
-    parameter: str                # "network.latency_ms"
-    safe_value: float             # Highest value that still passes
-    failure_value: float          # Lowest value that fails
-    boundary_estimate: float      # Midpoint or interpolated boundary
-    search_points: list[dict]     # [{"value": 150, "passed": true}, ...]
-
-class ExperimentResult(BaseModel):
-    experiment_id: str
-    target_profile: EnvironmentProfile
-    comparisons: list[ComparisonResult]
-    interactions: list[ComparisonResult]   # Multi-variable combinations
-    thresholds: list[ThresholdResult]
-    classification: str           # "environment_caused" | "environment_exposed" | "application_internal"
-    strongest_condition: str
-    summary: str
+class RunResult:
+    run_id, exit_code, stdout, stderr, duration_ms, peak_memory_mb?, passed  # passed == (exit_code == 0)
+    error_type?, error_message?, timestamp, telemetry: TelemetryData
+    # invalid-trial convention
+    invalid: bool = False           # exit 2, 126, 127, or the command could not launch
+    invalid_reason: str | None
+    # provenance
+    command, seed?, morph_version, host_fingerprint, profile_hash?, adapter?, fidelity: dict[str, Fidelity]
 ```
 
-### 4.4 Regression Artifact (`schema/regression.py`)
+`fidelity` maps a profile path (`network.latency_ms`, `cpu.quota_percent`, ...) to `{status, mechanism, detail}`: what the adapter actually did.
+
+### 4.3 Trials and comparisons (`schema/trials.py`, `schema/comparison.py`)
 
 ```python
-class RegressionArtifact(BaseModel):
-    regression_id: str
-    environment: EnvironmentProfile
-    command: str
-    expected_exit_code: int
-    expected_max_failure_rate: float
-    failure_signature: Optional[str] = None
-    created_at: str
-    metadata: dict
+class TrialBatch:        condition_label, total_runs, failures, failure_rate, run_results
+
+class ComparisonResult:  condition_label, baseline_failures/total, treatment_failures/total,
+                         p_value, is_significant, effect_label ("no_effect" | "significant_increase" | "significant_decrease"),
+                         method ("fisher" | "fisher_holm" | "paired_e_value"), alpha,
+                         p_value_decrease?, p_value_adjusted?, e_value?, pairs?, stopped_early?,
+                         risk_difference?, risk_difference_ci?
+
+class ThresholdResult:   parameter, safe_value?, failure_value?, boundary_estimate?, search_points,
+                         outcome ("boundary_found" | "never_fails" | "always_fails" | "inconclusive"),
+                         method ("bisection" | "probabilistic_bisection"), trials?,
+                         credible_mass?, credible_low?, credible_high?,
+                         probability_boundary_in_range?, probability_never_fails?, probability_always_fails?,
+                         floor_failure_rate?, ceiling_failure_rate?, posterior[], dose_response[]
+```
+
+### 4.4 Experiment (`schema/experiment.py`)
+
+```python
+class ExperimentConfig:  command, target_profile?, trials, timeout_sec, cwd?, mode ("sequential" | "batch"), max_rounds, alpha
+class ExperimentResult:  experiment_id?, target_profile?, baseline: TrialBatch, comparisons, classification, strongest_condition, summary
+```
+
+`classification` is one of `environment_caused`, `environment_exposed`, `application_internal`, `no_effect`.
+
+### 4.5 Events (`schema/events.py`)
+
+`TrialEvent.kind` is `phase_start`, `condition_start`, `trial`, `condition_done`, `comparison`, `evidence`, `search_probe`, `verdict`, `phase_done`. A `trial` event never carries a p-value; `evidence` carries the anytime-valid `e_value`, `evidence_threshold`, `pairs`, `decisive`; `search_probe` carries `param_value`, `safe_value`, `failure_value`, `boundary_estimate`. Invalid trials appear as `trial` events with `passed=None` and `extra={"invalid": True, "reason": ...}`.
+
+### 4.6 Regression artifact (`schema/regression.py`)
+
+```python
+class RegressionArtifact: regression_id, environment: EnvironmentProfile, command, expected_exit_code,
+                          expected_max_failure_rate, failure_signature?, created_at, metadata
+class ReplayResult:       regression_id, total_runs, failures, failure_rate, matches_expected
 ```
 
 ---
@@ -363,577 +277,308 @@ class RegressionArtifact(BaseModel):
 
 ### 5.1 Profiler (`morph/profiler/`)
 
-**Purpose:** Capture the current machine environment into an `EnvironmentProfile` JSON.
+`capture_environment()` runs every collector and returns a profile with every field `captured`. `network` is `None` in a capture (nothing measures the host's own path); `runners.with_unconstrained_network` fills it as 0 ms / 0 % when a search needs it. `process_limits.py` reads the soft `RLIMIT_NOFILE` / `RLIMIT_NPROC`, which is how a captured profile can carry a `fd_limit`.
 
-**Entry point:** `capture.py`
-
-```python
-# capture.py (simplified interface)
-def capture_environment() -> EnvironmentProfile:
-    """Collects all environment data and returns a structured profile."""
-    return EnvironmentProfile(
-        os=collect_os(),
-        cpu=collect_cpu(),
-        memory=collect_memory(),
-        locale=collect_locale(),
-        filesystem=collect_filesystem(),
-        network=collect_network(),
-    )
-```
-
-**Collectors** (each in `collectors/`):
-
-| Collector | Source Libraries | What It Reads |
-|---|---|---|
-| `cpu.py` | `psutil`, `py-cpuinfo` | `psutil.cpu_count()`, `cpuinfo.get_cpu_info()` |
-| `memory.py` | `psutil` | `psutil.virtual_memory().total` |
-| `os_info.py` | `platform`, `distro` | `platform.system()`, `platform.version()`, `distro.id()` |
-| `locale_info.py` | `locale`, `time`, `tzdata` | `locale.getdefaultlocale()`, `time.tzname` |
-| `network.py` | `subprocess` (ping), `socket` | Measures RTT to a known endpoint, estimates loss |
-| `filesystem.py` | `os`, `tempfile` | Creates temp files to test case sensitivity |
-| `runtime_env.py` | `sys`, `os` | `sys.version`, `os.environ`, installed packages |
-
-**Output:** Writes `profile.json` to disk. Every field status is set to `captured`.
-
----
-
-### 5.2 Runtime Controller (`morph/runtime/`)
-
-**Purpose:** Load a profile, apply conditions via the OS adapter, run the target process, collect telemetry, clean up.
-
-**Lifecycle:**
+### 5.2 Runtime controller and adapters (`morph/runtime/`)
 
 ```
-controller.run(profile, command)
+controller.run(profile, command, timeout, cwd)
     |
-    +--> adapter.apply_network(latency_ms, packet_loss_pct)
-    +--> adapter.apply_cpu(cores)
-    +--> adapter.apply_memory(limit_mb)  [if supported]
-    +--> adapter.apply_locale(locale, timezone)
-    |
-    +--> runner.execute(command)
-    |       |
-    |       +--> subprocess.Popen(command, env=modified_env)
-    |       +--> capture stdout, stderr, timing, exit code
-    |       +--> return RunResult
-    |
-    +--> adapter.cleanup()
-    |
-    +--> return RunResult
+    +--> adapter.apply_network(latency_ms, packet_loss_percent, bandwidth_mbps)   # profile.network; available=False => loss 100 %
+    +--> adapter.apply_cpu(max_cores, quota_percent)
+    +--> adapter.apply_memory(limit_mb)
+    +--> adapter.apply_locale(locale_str, timezone)                              # LC_ALL, LANG, TZ
+    +--> env = adapter.get_env_overrides() | profile.env_vars
+    +--> execute_command(command, env_overrides=env, timeout, cwd,
+                         max_processes=profile.process.max_processes, fd_limit=profile.process.fd_limit)
+    +--> finally: adapter.cleanup()
 ```
 
-**Key Design Decision: The Adapter Interface**
+`get_default_adapter()` picks `LinuxAdapter`, `MacOSAdapter` or `WindowsAdapter` by `platform.system()`; `force_proxy=True` picks `ProxyAdapter` directly. `reconcile_profile_statuses()` marks each field `reproduced` / `approximated` / `unavailable` from the adapter's `capabilities()` before a run; the adapter's `plan(profile)` and post-run `fidelity()` report the mechanism per field.
 
-```python
-# adapters/base.py
-from abc import ABC, abstractmethod
-
-class BaseAdapter(ABC):
-
-    @abstractmethod
-    def apply_network(self, latency_ms: float, packet_loss_pct: float,
-                      bandwidth_mbps: float | None = None) -> None: ...
-
-    @abstractmethod
-    def apply_cpu(self, max_cores: int) -> None: ...
-
-    @abstractmethod
-    def apply_memory(self, limit_mb: int) -> None: ...
-
-    @abstractmethod
-    def apply_locale(self, locale_str: str, timezone: str) -> None: ...
-
-    @abstractmethod
-    def cleanup(self) -> None: ...
-
-    @abstractmethod
-    def capabilities(self) -> dict[str, bool]: ...
-```
-
-Each OS adapter implements this interface using platform-native tools:
-
-| Condition | macOS | Windows | Linux |
+| Condition | Linux | macOS | Windows |
 |---|---|---|---|
-| Network shaping | `dnctl` + `pfctl` pipes, or user-space proxy | Clumsy, or user-space proxy | `tc qdisc netem` |
-| CPU restriction | `taskpolicy`, process affinity | Job Objects (`CreateJobObject`) | cgroups v2 |
-| Memory limit | Not natively supported (use ulimit) | Job Objects | cgroups v2 |
-| Locale/Timezone | `LC_ALL`, `TZ` env vars | `LC_ALL`, `TZ` env vars | `LC_ALL`, `TZ` env vars |
+| Network shaping | `tc qdisc netem` on `lo` (root or `sudo -n`); else proxy | dummynet pipe + `pf` anchor `morph` (root); else proxy | proxy |
+| CPU quota / cores | cgroup v2 `cpu.max` (root, or a delegated `MORPH_CGROUP_PATH`); else `MORPH_CPU_QUOTA_PERCENT` hint, `unavailable` | hint only, `unavailable` | hint only, `unavailable` |
+| Memory limit | cgroup v2 `memory.max` (same conditions); else hint | hint only, `unavailable` | hint only, `unavailable` |
+| Locale / timezone | `LC_ALL`, `LANG`, `TZ` | same | same (the CRT ignores `LC_ALL`; the corpus apps read it themselves) |
+| Process limits | `setrlimit` in the child | same | ignored |
 
-**Cross-Platform Fallback: User-Space TCP Proxy (`adapters/proxy.py`)**
+Native delays are per direction, so the adapters apply `latency_ms / 2`. Every native change is recorded in `~/.morph/state/shaping.json` **before** it is applied (`runtime/state.py`), with the undo command; `morph doctor` finds and undoes what a killed process left behind.
 
-For network simulation without administrator privileges or kernel modules:
-
-```
-Target App --> localhost:PROXY_PORT --> [inject delay, drop packets] --> upstream destination
-```
-
-This is implemented as a simple async TCP relay using Python stdlib `asyncio`. It intercepts outbound connections from the demo app and injects:
-- `asyncio.sleep(latency_ms / 1000)` before forwarding each packet.
-- `random.random() < packet_loss_pct / 100` to drop packets probabilistically.
-
-This proxy is the **recommended default** for hackathon demos because it requires zero OS permissions and never crashes on unfamiliar Wi-Fi.
-
----
-
-### 5.3 Experiment Engine (`morph/engine/`)
-
-**Purpose:** Run controlled experiments to isolate which environmental condition causes the failure.
-
-**Three modes of operation:**
-
-#### Mode 1: Single-Variable Isolation (`experiment.py`)
+**The proxy hand-off contract (`ProxyAdapter`, `adapters/proxy.py`).** Without privileges the adapter cannot intercept anything. It starts a `ProxyServer` and exports:
 
 ```
-For each candidate variable (latency, loss, CPU, locale, ...):
-    1. Run N trials under BASELINE conditions --> baseline_failures
-    2. Run N trials under TREATMENT (change one variable) --> treatment_failures
-    3. Compare failure rates statistically
-    4. If significantly different, mark as candidate cause
+MORPH_NET_LATENCY_MS         RTT to inject
+MORPH_NET_PACKET_LOSS_PCT    per-chunk loss probability
+MORPH_NET_BANDWIDTH_KBPS     optional token-bucket cap
+MORPH_SEED                   reproducible loss pattern
+MORPH_PROXY_HOST/PORT, MORPH_UPSTREAM_PORT   the adapter's own listener (for targets with an external upstream)
 ```
 
-#### Mode 2: Threshold Search (`threshold.py`)
+A target that hosts its own localhost server (every app under `apps/`) reads `MORPH_NET_*` and fronts its server with the same `ProxyServer` class in-process (`apps/netshape.py`). `ProxyServer` semantics: `latency_ms` is an RTT, half per direction, chunks pipelined; a lost chunk is delivered late after `max(200 ms, 3 x RTT)`, doubling on consecutive losses, in order, never corrupted; after `max_retransmits` (6) consecutive losses the connection is reset (`ECONNRESET`), which is how "offline" surfaces; `bandwidth_kbps` is a shared token bucket; `jitter_ms` is Gaussian extra delay. The proxy is the default path on a developer laptop and on CI.
+
+### 5.3 Experiment engine (`morph/engine/`)
+
+Engine functions take `run_fn` callbacks (returning `bool` or `RunResult`) and an optional `on_event`, so they are testable without a target. `runners.py` builds the callbacks from a profile and a command: `build_baseline_and_candidates` yields `latency_only`, `loss_only` and `full_treatment` (`full_target` in the CLI) for a profile that requests both network fields.
+
+| Mode | Function | What it does |
+|---|---|---|
+| Sequential isolation (default) | `sequential.run_sequential_experiment` | Paired round-robin trials; per-candidate `PairedEvidence` e-process (`anytime.py`); stop at `E >= K/alpha`; min 3 rounds, max 12 by default |
+| Batch isolation | `experiment.run_experiment` | N trials per condition; one-sided Fisher (`comparison.py`) with Holm across candidates; Newcombe CI |
+| Interaction | `experiment.detect_interaction` | The 2x2: `neither`, A, B, A+B; `interaction_confirmed` when only A+B is significant |
+| Threshold, Bayesian (default) | `boundary.locate_boundary` | Probabilistic bisection; logistic dose-response with floor/ceiling nuisance grid; credible interval; `never_fails` / `always_fails` guards |
+| Threshold, bisection | `threshold.search_threshold` | Deterministic halving, majority vote per probe |
+| Minimal set | `minimize.ddmin` | Delta debugging over deviating conditions; `batch_oracle` for flaky targets |
+| Classification | `classifier.classify_failure` | Four-way, Wilson lower bound for "internally flaky" |
+| Surface | `surface.py` | Latency x loss grid with safe / failing contour |
+| Blame | `blame.py` | Diff of passing vs failing traces (file, line, exception, duration) |
+| Invariant export | `exporter.py` | `test_morph_invariant.py` code generation |
+
+Invalid trials: `progress.run_valid_trial` retries a `RunResult.invalid` result up to `INVALID_TRIAL_ATTEMPTS` times and raises `InvalidTrialError` if every attempt is invalid, so a setup problem is reported as such, never as a verdict.
+
+The maths, with references, is in [how-it-works.md](./how-it-works.md).
+
+### 5.4 Telemetry collector (`morph/telemetry/`)
+
+`run_with_telemetry(command, env, timeout, cwd, max_processes, fd_limit)`:
+
+- **`shell=False`.** POSIX: `shlex.split`, a bare `python`/`python3`/`python3.x` first token is pinned to `sys.executable`; the child starts in its own session (`start_new_session=True`). Windows: the command line is passed through untouched (only the leading bare `python` rewritten), `CREATE_NEW_PROCESS_GROUP`.
+- **Resource limits.** A `preexec_fn` applies `RLIMIT_NPROC` / `RLIMIT_NOFILE` (clamped to the host's hard limits, with a note) and joins `MORPH_CGROUP_PATH` when set. Installed only when something was requested.
+- **Timeout.** `communicate(timeout)`; on expiry the whole process group is signalled (SIGTERM, grace, SIGKILL) plus a psutil sweep for anything that left the group; `taskkill /T` on Windows. `error_type = "TimeoutExpired"`, exit code -1.
+- **Output.** stdout/stderr bounded to 2 MiB each, tail kept; `error_type` / `error_message` / `stack_trace` extracted from stderr by `parser.py`.
+- **Invalid.** Exit 2, 126, 127 and launch failures (`FileNotFoundError` -> 127, `PermissionError` -> 126) set `invalid=True` with a reason.
+- **Provenance.** `seed`, `morph_version`, `host_fingerprint`, `profile_hash`, `adapter`, `fidelity` (from `provenance.py` and the controller).
+- **Monitoring.** Peak RSS and CPU sampled at 10 Hz (not faster: enumerating the process table at 50 Hz perturbed the timing-sensitive runs Morph measures).
+
+### 5.5 Regression artifacts (`morph/regression/`)
 
 ```
-Given a candidate variable (e.g., latency_ms):
-    low = safe_value (e.g., 50 ms, known to pass)
-    high = failure_value (e.g., 300 ms, known to fail)
-
-    While (high - low) > precision:
-        mid = (low + high) / 2
-        Run N trials at mid
-        If failure_rate > threshold:
-            high = mid
-        Else:
-            low = mid
-
-    Return boundary_estimate = (low + high) / 2
+.morph/regressions/<id>/
+  environment.json     # the EnvironmentProfile that triggers the failure
+  command.json         # {"command": ..., "timeout": ...}
+  expected.json        # {"exit_code": 0, "max_failure_rate": ...}
+  metadata.json        # created_at, failure_signature, provenance
 ```
 
-#### Mode 3: Interaction Detection (`experiment.py`)
-
-```
-For each pair of candidate variables (A, B):
-    Run trials with: neither, A only, B only, A+B
-
-    If A alone and B alone both pass, but A+B fails:
-        Report INTERACTION between A and B
-```
-
-**Statistical Comparison (`comparison.py`):**
-
-```python
-from scipy.stats import fisher_exact
-
-def compare_failure_rates(baseline_fails, baseline_total,
-                          treatment_fails, treatment_total) -> ComparisonResult:
-    """
-    Fisher's exact test for small sample sizes.
-    Two-proportion z-test for larger samples (N > 30).
-    """
-    table = [[baseline_fails, baseline_total - baseline_fails],
-             [treatment_fails, treatment_total - treatment_fails]]
-    odds_ratio, p_value = fisher_exact(table)
-
-    return ComparisonResult(
-        p_value=p_value,
-        is_significant=(p_value < 0.05),
-        effect_label="significant_increase" if p_value < 0.05 and
-                     treatment_fails/treatment_total > baseline_fails/baseline_total
-                     else "no_effect"
-    )
-```
-
-**Failure Classification (`classifier.py`):**
-
-| Classification | Condition |
-|---|---|
-| `application_internal` | Baseline failure rate is already high (> 10%) regardless of environment changes |
-| `environment_caused` | Baseline near 0% failures; treatment shows statistically significant increase |
-| `environment_exposed` | Baseline has low but nonzero failures; treatment dramatically amplifies rate |
-
----
-
-### 5.4 Telemetry Collector (`morph/telemetry/`)
-
-**Purpose:** Wrap subprocess execution and extract structured data from each run.
-
-```python
-# collector.py
-import subprocess, time
-from datetime import datetime
-
-def run_with_telemetry(command: str, env: dict, timeout: float = 30.0) -> RunResult:
-    start = time.time()
-    proc = subprocess.Popen(
-        command, shell=True, env=env,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-    try:
-        stdout, stderr = proc.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        stdout, stderr = proc.communicate()
-
-    duration = (time.time() - start) * 1000
-
-    return RunResult(
-        exit_code=proc.returncode,
-        stdout=stdout.decode(errors="replace"),
-        stderr=stderr.decode(errors="replace"),
-        duration_ms=duration,
-        passed=(proc.returncode == 0),
-        error_type=extract_error_type(stderr.decode(errors="replace")),
-        error_message=extract_error_message(stderr.decode(errors="replace")),
-        timestamp=datetime.utcnow().isoformat(),
-    )
-```
-
----
-
-### 5.5 Regression Artifacts (`morph/regression/`)
-
-**Purpose:** Save a discovered failure as a replayable, portable artifact.
-
-**Directory structure generated:**
-
-```
-.morph/
-  regressions/
-    checkout-latency-001/
-      environment.json      # The EnvironmentProfile that triggers the failure
-      command.json           # {"command": "python demo_app.py", "timeout": 30}
-      expected.json          # {"exit_code": 0, "max_failure_rate": 0.01}
-      metadata.json          # {"created": "...", "failure_signature": "LockLostException", ...}
-```
-
-**Replay:**
-
-```bash
-morph replay .morph/regressions/checkout-latency-001
-```
-
-This loads `environment.json`, applies it via the runtime controller, runs the command, and verifies the outcome matches `expected.json`.
-
-**CI Invariant Export (`exporter.py`):**
-
-Generates a standalone test file:
-
-```python
-# test_morph_invariant.py (generated)
-import subprocess
-
-def test_checkout_environment_tolerance():
-    """Generated by Morph: verifies service survives user baseline."""
-    # In a real setup, morph.environment() applies the proxy conditions
-    result = subprocess.run(["python", "demo_app.py"], capture_output=True)
-    assert result.returncode == 0
-```
+`morph save` writes one; `morph replay <path|id> -n N` runs it and reports `COMPLIANT` / `VIOLATION`; `morph export <path|id> -o test_morph_invariant.py` writes a standalone pytest file that uses `morph.environment()` to apply the proxy conditions and asserts the safe envelope.
 
 ---
 
 ## 6. API Contract (`morph/api/`)
 
-### Endpoints
+Every route is mounted twice: under `/api/v1` and at the root (for existing clients). CLI and routes share `morph/api/defaults.py` and `morph/api/service.py`, so the same request means the same experiment however it arrives.
 
-| Method | Path | Request Body | Response | Purpose |
+| Method | Path | Body | Response | Purpose |
 |---|---|---|---|---|
-| `POST` | `/profiles/capture` | None | `EnvironmentProfile` | Capture current machine |
-| `POST` | `/profiles` | `EnvironmentProfile` | `{"id": "..."}` | Save a manually defined profile |
-| `GET` | `/profiles` | None | `list[EnvironmentProfile]` | List all saved profiles |
-| `GET` | `/profiles/{id}` | None | `EnvironmentProfile` | Get one profile |
-| `POST` | `/run` | `{"profile_id": "...", "command": "..."}` | `RunResult` | Single run under a profile |
-| `POST` | `/experiment` | `ExperimentConfig` | `ExperimentResult` | Full experiment (baseline + treatments) |
-| `GET` | `/experiments/{id}` | None | `ExperimentResult` | Get experiment results |
-| `POST` | `/regressions` | `{"experiment_id": "..."}` | `RegressionArtifact` | Save experiment as regression |
-| `POST` | `/regressions/{id}/replay` | None | `RunResult` | Replay a saved regression |
+| `GET` | `/health`, `/version` | none | status / versions | Liveness, Morph and runtime versions |
+| `POST` | `/profiles/capture` | none | `EnvironmentProfile` | Capture this machine |
+| `POST` / `GET` | `/profiles` | profile / none | `{"id"}` / list | Save, list saved profiles |
+| `GET` / `DELETE` | `/profiles/{id}` | none | profile / `{}` | Get, delete |
+| `POST` | `/profiles/reconcile` | profile | profile with statuses | What this host can reproduce |
+| `GET` | `/parameters` | none | `dict[str, ParameterMetadata]` | Control metadata for the UI |
+| `GET` | `/platform` | none | `PlatformInfo` | Host OS and run targets |
+| `POST` | `/run` | `{command, profile?, timeout?, cwd?}` | `RunResult` | One run under a profile (inline, not by id) |
+| `POST` | `/experiments` | `ExperimentConfig` | `ExperimentResult` | Blocking experiment (sequential or batch) |
+| `POST` | `/experiments/stream` | `ExperimentConfig` | `{experiment_id, status}` | Start in the background; events over WebSocket |
+| `GET` / `DELETE` | `/experiments`, `/experiments/{id}` | none | list / result | Cached results (50 max) |
+| `POST` | `/threshold`, `/threshold/stream` | `ThresholdRequest` (`method`, `max_trials`, `precision`, ...) | `ThresholdResult` / id | Threshold search |
+| `POST` | `/minimize` | `{command, profile, conditions?, runs, fail_rate}` | `MinimizeResult` | ddmin minimal condition set |
+| `POST` | `/surface`, `/blame`, `/export/invariant` | `SurfaceRequest` / ... | `SurfaceResult` / `DifferentialBlameResult` / file | 2D failure surface, differential blame, CI test |
+| `GET` / `POST` | `/regressions` | none / `{profile, command, ...}` | list / `{id}` | List, save |
+| `GET` / `DELETE` | `/regressions/{id}` | none | artifact / `{}` | Get, delete |
+| `POST` | `/regressions/{id}/replay` | `{trials?}` | `ReplayResult` | Replay |
+| `POST` | `/projects/upload`, `/projects/local`, `/projects/github` | ... | `ProjectInfo` | Connect a project |
+| `GET` / `PUT` / `DELETE` | `/projects`, `/projects/{id}` | ... | list / `ProjectInfo` | Registry |
+| `POST` | `/projects/{id}/install` | none | `ProjectInfo` | Build the per-project venv |
+| `GET` / `POST` | `/projects/github/auth-status`, `/github/device-code`, `/github/poll-token`, `/github/repos` | ... | ... | GitHub auth and repo listing |
 
-### WebSocket (optional, for live updates)
+### WebSocket
 
-| Path | Direction | Payload | Purpose |
-|---|---|---|---|
-| `/ws/experiment/{id}` | Server to Client | `{"trial": 3, "condition": "latency_180ms", "passed": false}` | Stream live trial results to dashboard |
+| Path | Payload | Purpose |
+|---|---|---|
+| `/ws/experiment/{id}` | `{"type": "event", ...TrialEvent}` then `{"type": "done", "result"}` or `{"type": "error"}` | Live experiment |
+| `/ws/threshold/{id}` | same shape with `search_probe` events | Live threshold search |
 
 ---
 
-## 7. CLI Interface (`morph/cli/`)
+## 7. CLI Interface (`morph/cli/main.py`)
 
 ```bash
-# Capture the current machine environment
-morph capture --output profile.json
+# projects
+morph connect owner/repo [--branch b] [--install] [--name n]     # or a URL or a local path
+morph projects [--rm id]
+morph reinstall <id|name>
 
-# Define a profile manually (or edit an existing one)
-morph define --template default --output target.json
+# environments
+morph capture [-o profile.json] [--json]
+morph define [-t default|high-latency|constrained] [--latency ms] [--loss pct] -o target.json
 
-# Run an application under a specific profile
-morph run --profile target.json --command "python demo_app.py"
+# run and experiment
+morph run -c "<cmd>" [-p profile.json] [--cwd d] [--timeout s] [--force-proxy] [--cloud] [--json]
+morph experiment -c "<cmd>" [-p profile.json] [--mode sequential|batch] [-n trials] [--max-rounds r] [--alpha a] [--latency ms] [--loss pct] [--json]
+morph demo [--max-rounds r] [--latency 120] [--loss 18]          # apps/pool_retry, sequential 2x2
+morph threshold -c "<cmd>" --parameter network.latency_ms --low 0 --high 500 [--method bayes|bisect] [-n trials] [--max-trials t] [--precision p]
+morph minimize -c "<cmd>" -p profile.json [--condition f ...] [-n runs] [--fail-rate r]
+morph cloud [-p profile.json]                                     # capability check + worker probe
 
-# Run a full experiment (baseline + all candidate treatments)
-morph experiment --profile target.json --command "python demo_app.py" --trials 5
+# regressions
+morph save --id <id> -p profile.json -c "<cmd>" [--expected-exit 0] [--max-failure-rate r]
+morph replay <path|id> [-n trials]
+morph export <path|id> [-o test_morph_invariant.py]
 
-# Search for the failure threshold of a specific parameter
-morph threshold --profile target.json --command "python demo_app.py" \
-    --parameter network.latency_ms --low 50 --high 300 --trials 5
-
-# Replay a saved regression
-morph replay .morph/regressions/checkout-latency-001
-
-# Export a CI test from an experiment result
-morph export --experiment-id abc123 --output test_morph_invariant.py
-
-# Start the API server (for frontend)
-morph serve --port 8000
+# interfaces and health
+morph serve [--host h] [--port 8000] [--reload] [--origin o]
+morph tui [--demo]
+morph doctor [--no-network] [--json]
 ```
+
+`--project <id>` on `run`, `experiment`, `threshold` and `minimize` fills the command and working directory from the registry. Diagnostics go to stderr; `--json` keeps stdout machine-readable. Exit codes: 0 ok, 1 failure/violation, 2 not reproducible / usage.
 
 ---
 
-## 8. Frontend Architecture (`frontend/`)
+## 8. Frontend and TUI
 
-### Tech Stack
+**Dashboard** (`frontend/`, React + TypeScript + Vite): talks to the API at `/api/v1`, subscribes to `/ws/experiment/{id}` for live trials; screens for environment configuration, preparing, experiment, verdict, threshold and surface. The UI contract is in [ui-spec.md](./ui-spec.md).
 
-- React 18 + TypeScript
-- Vite for build/dev
-- Lightweight component library (or plain CSS modules)
-- HTTP client: `fetch` or a thin wrapper
-
-### Page Flow
-
-```
-Environment Page --> Reproduction Page --> Experiment Page --> Cause Page --> Regression Page
-      |                    |                    |                  |               |
-  [Capture or        [Shows field-        [Live trial        [Isolation      [Save as
-   define a           level status:        progress and       result and      regression,
-   profile]           REPRODUCED /         comparison         threshold       replay
-                      APPROXIMATED /       tables]            display]        after fix]
-                      UNAVAILABLE]
-```
-
-### Key UI Components
-
-| Component | Data Source | What It Shows |
-|---|---|---|
-| `ProfileCard` | `EnvironmentProfile` | OS, CPU, RAM, locale, network at a glance |
-| `ComparisonTable` | `list[ComparisonResult]` | Condition / Trials / Failures / Result per row |
-| `StatusBadge` | `FieldStatus` | Green REPRODUCED, Yellow APPROXIMATED, Red UNAVAILABLE |
-| `ThresholdGauge` | `ThresholdResult` | Visual slider showing the safe/fail boundary |
-| `FailureTimeline` | `RunResult` | Visual timeline of lock acquire, payment, timeout |
+**TUI** (`morph tui`, Textual): `orchestrator.py` builds `RunResult`-returning runners and drives the engine with an `on_event` callback inside a thread worker; `EXPERIMENT_MODES = ("sequential", "batch")`, `THRESHOLD_METHODS = ("bayesian", "bisection")`. Screens: home, environment, experiment, monitor, threshold, projects, regressions. Widgets: condition lanes (one per candidate, with the live e-value), interaction matrix, profile diff, sliders, threshold gauge, verdict card. `morph tui --demo` replays a recorded experiment with no target app or network.
 
 ---
 
 ## 9. Data Flow: End-to-End Walkthrough
 
-### Scenario: Diagnosing a checkout timeout
+The flagship, as measured (see `apps/pool_retry/README.md`):
 
 ```
-Step 1: Developer defines target profile
-        {latency: 180ms, loss: 2%, cores: 4, locale: en-IN}
-                            |
-                            v
-Step 2: CLI or UI sends to Runtime Controller
-        controller.run(profile, "python demo_app.py")
-                            |
-                            v
-Step 3: OS Adapter applies conditions
-        proxy.apply_network(latency=180, loss=2)
-        adapter.apply_cpu(cores=4)
-        adapter.apply_locale("en-IN", "Asia/Kolkata")
-                            |
-                            v
-Step 4: Runner launches subprocess
-        Popen("python demo_app.py", env=modified_env)
-        Captures stdout, stderr, exit code, duration
-                            |
-                            v
-Step 5: Adapter cleans up conditions
-        proxy.cleanup()
-                            |
-                            v
-Step 6: RunResult returned
-        {exit_code: 1, error: "LockLostException", duration: 245ms}
-                            |
-                            v
-Step 7: Experiment Engine runs controlled variations
-        Baseline (normal)     --> 0/5 failures
-        Latency only (180ms)  --> 0/5 failures
-        Loss only (2%)        --> 0/5 failures
-        Latency + Loss        --> 5/5 failures
-                            |
-                            v
-Step 8: Statistical comparison
-        Fisher exact test on each treatment vs baseline
-        Latency+Loss p-value < 0.001 --> SIGNIFICANT
-                            |
-                            v
-Step 9: Threshold search (if time permits)
-        Binary search on latency with loss=2% held constant
-        150ms PASS --> 200ms FAIL --> 175ms PASS --> 185ms FAIL
-        Boundary: ~180ms
-                            |
-                            v
-Step 10: Classification
-         Baseline: 0% failure, Treatment: 100% failure
-         Classification: ENVIRONMENT_CAUSED
-         Strongest condition: latency + packet_loss interaction
-                            |
-                            v
-Step 11: Display result in CLI/Dashboard
-         ComparisonTable + ThresholdGauge + FailureTimeline
-                            |
-                            v
-Step 12: Developer fixes demo_app.py (increases lock TTL)
-                            |
-                            v
-Step 13: Replay same profile
-         controller.run(same_profile, "python demo_app.py")
-         --> 0/5 failures --> PASS
-                            |
-                            v
-Step 14: Save as regression artifact
-         .morph/regressions/checkout-latency-001/
+1. profile      profiles/flagship.json: network.latency_ms 120 (RTT), packet_loss_percent 18, both `requested`
+2. reproduce    MacOSAdapter (no root) -> ProxyAdapter -> exports MORPH_NET_LATENCY_MS=120, MORPH_NET_PACKET_LOSS_PCT=18, MORPH_SEED
+3. run          collector launches `python -m apps.pool_retry test` (pinned interpreter, own session)
+                app fronts its server with ProxyServer; 16 requests through a 2-slot pool; deadline 2.8 s
+                -> exit 1, stdout {"result":"fail","signal":"DeadlineExceeded",...}, RunResult.fidelity network.*=reproduced (proxy)
+4. isolate      morph experiment (sequential, 12 rounds max)
+                round k: baseline, then latency_only / loss_only / full_target in rotating order; e-value per candidate
+                baseline 0/12, latency_only 0/12, loss_only 0/12, full_target 9/9: E = 102 after 9 pairs, stopped early, anytime p = 0.0098
+5. classify     baseline never failed, full_target significantly worse -> environment_caused; strongest: full_target
+6. interaction  detect_interaction: A alone no_effect, B alone no_effect, A+B significant -> interaction_confirmed
+7. threshold    locate_boundary on network.latency_ms with loss held at 18 %: credible interval around the flip
+8. minimize     ddmin over {latency_ms, packet_loss_percent, ...} -> {latency_ms, packet_loss_percent}
+9. fix          --fixed (pool sized to the batch); the same experiment: every leg 0/12, no_effect
+10. regression  morph save; morph replay -> COMPLIANT; morph export -> test_morph_invariant.py
 ```
 
 ---
 
 ## 10. Environment Comparison Logic
 
-When a target profile is loaded on a different machine, Morph compares each field:
+`reconcile_profile_statuses(profile, adapter)`: OS family equal -> `reproduced` (version `approximated`), else `unavailable`; CPU cores `approximated` when the adapter claims `cpu`, architecture `reproduced` only when it matches `platform.machine()`; memory `approximated` or `unavailable`; locale and timezone `reproduced` when the adapter claims `locale`; network `reproduced` (bandwidth `approximated`) when it claims `network`. After the run, `RunResult.fidelity` records what actually happened per field, which is what the UI should show.
 
-```python
-def compare_profiles(target: EnvironmentProfile,
-                     current: EnvironmentProfile) -> dict[str, FieldStatus]:
-    result = {}
-
-    # OS family
-    if target.os.family.value == current.os.family.value:
-        result["os.family"] = FieldStatus.REPRODUCED
-    else:
-        result["os.family"] = FieldStatus.UNAVAILABLE
-
-    # CPU cores (can throttle down, not up)
-    if current.cpu.cores.value >= target.cpu.cores.value:
-        result["cpu.cores"] = FieldStatus.REPRODUCED
-    else:
-        result["cpu.cores"] = FieldStatus.APPROXIMATED
-
-    # Memory (can limit down, not up)
-    if current.memory.total_mb.value >= target.memory.total_mb.value:
-        result["memory"] = FieldStatus.REPRODUCED
-    else:
-        result["memory"] = FieldStatus.UNAVAILABLE
-
-    # Network (always reproducible via proxy)
-    result["network.latency"] = FieldStatus.REPRODUCED
-    result["network.loss"] = FieldStatus.REPRODUCED
-
-    # Locale/Timezone (always reproducible via env vars)
-    result["locale"] = FieldStatus.REPRODUCED
-    result["timezone"] = FieldStatus.REPRODUCED
-
-    return result
-```
-
-If any field is `UNAVAILABLE`, Morph either:
-1. Warns the developer and proceeds without that condition.
-2. Routes the run to a cloud worker with the required resources.
+`cloud.capability.assess_locally(profile)` decides whether **another machine** is needed: more RAM (2 % tolerance), more cores, a different architecture, or a different OS family. Locale, timezone, limits and shaping are never shortfalls.
 
 ---
 
 ## 11. Demo Failure Corpus
 
-### Failure A: Simple Timeout (Priority: Review 1)
+Six apps under `apps/`, each with a one-line fix behind `--fixed`, a two-tier self-test and a profile under `profiles/`. Numbers are failures / trials on macOS through Morph's own paths.
 
-An HTTP client calls a server with a 200ms timeout. Under 250ms+ latency, it fails.
+| App | Knob | Baseline | Under condition | Classification |
+|---|---|---|---|---|
+| A `timeout` | `network.latency_ms` (RTT) | 0/20 | 20/20 at 120 ms; flips at ~42 ms | environment-caused |
+| B `pool_retry` (flagship) | latency **and** loss | 0/20 | 19/20 at 120 ms / 18 %; each alone 0/20 | environment-caused, interaction |
+| C `race` | `cpu.quota_percent` (Linux root) or `env_vars.MORPH_C_YIELD_EVERY` | 0/10 | 10/10 | environment-exposed |
+| D `locale_parse` | `locale.locale` = de_DE (comma decimal) | 0/5 | 5/5 | environment-caused |
+| E `fd_limit` | `process.fd_limit` = 64 | 0/10 | 10/10; flips between 96 and 112 | environment-caused |
+| F `tz_dst` | `locale.timezone` = America/Sao_Paulo | 0/5 | 5/5 | environment-caused |
 
-### Failure B: Interaction Effect (Priority: Review 1, Flagship)
-
-The checkout service with a 200ms inventory lock lease. Payment calls through the network. Under latency + packet loss, the payment succeeds but the lock expires before the response returns. Customer is charged, order is lost.
-
-This is the primary demo because it proves Morph can detect multi-variable interactions.
-
-### Failure C: Race Condition (Priority: Review 2)
-
-A multi-threaded counter with an unsynchronized increment. Under full CPU, the race window is too small to hit. Under 2-core CPU constraint, context switching exposes the race.
-
-### Failure D: Locale (Priority: Review 2)
-
-A date parser assumes `MM/DD/YYYY` format. Under `en-IN` locale, the system returns `DD/MM/YYYY`, causing silent data corruption.
+Signals: `TimeoutException`, `DeadlineExceeded`, `RaceDetected`, `LocaleParseMismatch`, `EMFILE`, `ScheduleDrift`. Details, mechanisms and the verification protocol: [faultyapps.md](./faultyapps.md).
 
 ---
 
 ## 12. Cloud Fallback Architecture
 
 ```
-Profile loaded
+morph run --cloud -p profile.json -c "<cmd>"
       |
-      v
-Local capability check
+  assess_locally(profile)
       |
-  Can reproduce locally?
-      |           |
-     YES          NO
-      |           |
-  Local run    Send profile to cloud worker (Tin Computer API)
-      |           |
-      |        Worker applies conditions
-      |        Worker runs application
-      |        Worker returns telemetry
-      |           |
-      v           v
-   RunResult   RunResult
+  reproducible here?  --yes-->  local RuntimeController.run
+      |
+      no
+      |
+  worker configured (morph.yaml cloud: / MORPH_CLOUD_*)?  --no-->  NotReproducibleAnywhere (exit 2)
+      |
+      yes
+      |
+  ssh worker 'morph run --profile <stdin> --command ... --json'  -->  RunResult (with the worker's provenance)
 ```
 
-Cloud workers receive the same `EnvironmentProfile` JSON. They run the same OS adapter logic on a machine with the required physical resources.
+Transport is SSH to any Linux box (GCP instance, Raspberry Pi); there is no second execution engine and no provider API. Dispatch is **explicit**: without `--cloud`, a configured worker never changes a local run. Details and worker setup: [cloud.md](./cloud.md).
 
 ---
 
 ## 13. Configuration
 
-### `morph.yaml` (project-level)
+`morph.yaml` is found by walking up from the working directory, stopping at a git root or `$HOME`; a malformed file warns and falls back to defaults.
 
 ```yaml
 version: "1.0"
 default_trials: 5
 significance_level: 0.05
-default_command: "python demo_apps/checkout_service/demo_app.py"
-proxy_port: 9876
+proxy_port: 9876              # ProxyAdapter's own listener; targets that host their own server use MORPH_NET_* instead
+
 adapters:
-  network: proxy          # "proxy" | "native"
+  network: proxy              # "proxy" | "native"
   cpu: native
+  memory: native
+  locale: native
+
 cloud:
-  enabled: false
-  provider: tin
-  endpoint: "https://api.tin.computer/v1"
+  provider: ssh               # provenance only: ssh | gcp | pi
+  host: ""                    # keep blank in git; MORPH_CLOUD_HOST wins
+  user: ""                    # MORPH_CLOUD_USER
+  python: ~/morph/.venv/bin/python
+  workdir: ~/morph
 ```
+
+Environment: `MORPH_CLOUD_HOST` / `MORPH_CLOUD_USER` / `MORPH_CLOUD_SSH_KEY` (aliases `MORPH_WORKER_*`), `MORPH_NO_NETWORK=1` (no SSH ever), `MORPH_SEED` (reproducible loss), `MORPH_CGROUP_PATH` (delegated cgroup for quota/memory without root), `MORPH_GITHUB_TOKEN` / `GITHUB_TOKEN` / `GH_TOKEN`.
 
 ---
 
 ## 14. Error Handling Rules
 
-1. **Adapter failures are not silent:** If `apply_network()` fails, the run must not proceed as if conditions were applied. Raise, log, and report `UNAVAILABLE`.
-2. **Subprocess timeouts:** Default 30s. Configurable. Timeout counts as a failure (exit code -1).
-3. **Partial reproduction:** If 3 out of 5 conditions are applied, mark the missing ones as `UNAVAILABLE` in the result. Never claim full reproduction when conditions were skipped.
-4. **Network proxy crashes:** If the proxy dies mid-run, all trials in that batch are invalidated and re-queued.
+As implemented today; intent is noted where the code still falls short.
+
+1. **Adapter failures fall back, and say so.** A native shaping command that fails is undone and recorded; the adapter falls back to the proxy and reports the mechanism in `fidelity`. Conditions with no mechanism on this host (CPU/RAM on macOS) are `unavailable` with an env hint, never claimed as applied.
+2. **Subprocess timeouts.** Default 30 s, `profile.process.timeout_s` overrides. The whole process tree is killed. A timeout counts as a failure (`TimeoutExpired`, exit -1).
+3. **Invalid trials are not evidence.** Exit 2 / 126 / 127 / launch failure -> `invalid`; the engine retries a few times, then raises `InvalidTrialError` rather than reporting a verdict.
+4. **Partial reproduction is visible.** `reconcile_profile_statuses` before, `fidelity` after: a run never claims full reproduction when a condition was skipped.
+5. **Native side effects survive crashes.** `runtime/state.py` records every `tc` / dummynet / cgroup change with its undo command before applying it; `morph doctor` cleans up. Intent not yet implemented: a proxy that dies mid-batch does not automatically invalidate and re-queue that batch's trials.
+6. **Statistics stay honest under live viewing.** Only anytime-valid quantities (e-values, credible intervals, Wilson bounds) are streamed; Fisher p-values are computed once, at the end, and labelled.
 
 ---
 
 ## 15. Testing Strategy
 
-| Test Type | Scope | Tool | When |
+| Tier | Scope | Command | When |
 |---|---|---|---|
-| Unit tests | Schema validation, comparison math, threshold search, classification | pytest | Every commit |
-| Integration tests | Profiler captures real data, runner executes real subprocess | pytest | Every commit |
-| Demo app tests | Each demo app fails/passes under expected conditions | pytest + morph CLI | Pre-merge |
-| API tests | FastAPI endpoint contracts | pytest + httpx | Pre-merge |
-| Frontend smoke | Dashboard loads, displays mock data | Manual or Playwright | Pre-review |
-| End-to-end | Full loop: capture, reproduce, experiment, isolate, replay | Manual + scripted | Pre-demo |
+| Unit + integration (`tests/`, 28 modules) | schema, comparison maths, anytime e-process, boundary posterior, sequential engine, threshold, classifier, adapters, proxy, collector, runner, controller, regression, API routes, WebSocket stream, projects, cloud (SSH mocked, `MORPH_NO_NETWORK`), TUI, e2e | `pytest -q --timeout=120` | every push and PR, blocking |
+| Corpus contract tier (`apps/`) | baseline passes, condition fails, exit codes, JSON line, clean stderr; ~10 s | `pytest apps -m "not slow"` | every push and PR, blocking (`sudo locale-gen de_DE.UTF-8` first; Linux/root-only tests skip themselves) |
+| Corpus statistical tier | acceptance rates over 10 to 20 trials with binomial-aware bounds | `pytest apps -m slow` | every push and PR, advisory (`continue-on-error`) |
+| Lint | `ruff check morph/ tests/ apps/` | | blocking |
+| CLI smoke, proxy self-check | `morph --help`, `morph capture`, `morph run`, `python -m morph.runtime.adapters.proxy` | | blocking |
+| Frontend smoke | dashboard loads against a running `morph serve` | manual / Playwright | pre-review |
+| End to end on hardware | `tc netem` on the Pi vs the proxy; `apps/race` under a real cgroup quota | manual | pre-demo |
+
+Markers `slow`, `needs_linux`, `needs_root` are registered in `pyproject.toml` with `--strict-markers`; `apps/conftest.py` turns the platform markers into skips.
 
 ---
 
 ## 16. Security and Privacy
 
-- Profiler captures only application-relevant data. No browser history, no user documents, no credentials.
-- Environment profiles should not contain API keys or secrets from `os.environ`. Filter known sensitive keys (`AWS_SECRET`, `DATABASE_URL`, `API_KEY`, etc.).
-- Network proxy only intercepts traffic from the target subprocess, not system-wide.
-- Cloud workers receive only the profile and the application binary/command. No access to the developer's filesystem.
+- The profiler captures application-relevant conditions only: no browser history, documents or credentials. `env_vars` in a profile are the ones a developer typed, not a dump of `os.environ`.
+- Targets run with `shell=False`; a command string is tokenised, never handed to a shell.
+- The proxy relays only connections made to its own port (or the in-app proxy an app opts into); nothing system-wide is intercepted.
+- Cloud workers receive the profile and the command over SSH in batch mode with no password prompts; the worker uses its own checkout, never the developer's filesystem.
+- `morph.yaml` is committed without a worker host or key; credentials come from `MORPH_CLOUD_*`.
 
 ---
 
@@ -941,16 +586,20 @@ cloud:
 
 | Term | Definition |
 |---|---|
-| **Profile** | A portable JSON description of a machine's environment conditions |
-| **Capture** | Recording a real machine's conditions into a profile |
-| **Reproduction** | Applying a profile's conditions on a different machine |
-| **Baseline** | Running trials under normal (unmodified) conditions |
-| **Treatment** | Running trials with one or more conditions changed |
-| **Isolation** | Determining which specific condition caused the failure |
-| **Interaction** | A failure that only occurs when two or more conditions are combined |
-| **Threshold** | The exact boundary value where a condition transitions from safe to failing |
-| **Environment-caused** | A failure introduced purely by the environmental condition |
-| **Environment-exposed** | A pre-existing bug amplified by the environmental condition |
-| **Regression artifact** | A saved, replayable record of a discovered failure and its conditions |
-| **OS Adapter** | Platform-specific implementation of condition application |
-| **User-space proxy** | A TCP relay that injects latency and packet loss without kernel access |
+| **Profile** | A portable JSON description of a machine's environment conditions, one `{value, status}` per field |
+| **Capture / Define** | Recording a real machine's conditions / typing a target by hand |
+| **Reproduction** | Applying a profile's conditions on another machine; per-field fidelity says how |
+| **Baseline** | Trials under the unconstrained host |
+| **Treatment / candidate** | Trials with one condition (or the full target) applied |
+| **Pair** | One baseline trial and one treatment trial run back to back in the same round |
+| **E-value** | Anytime-valid evidence against "no difference"; reject at `K/alpha` |
+| **Isolation** | Determining which condition raises the failure rate |
+| **Interaction** | A failure that only occurs when two conditions are combined |
+| **Threshold / boundary** | The parameter value where failures begin; reported as a credible interval |
+| **Minimal set** | The 1-minimal subset of conditions that still reproduces the failure (ddmin) |
+| **Environment-caused / exposed / application-internal / no effect** | The four-way verdict |
+| **Invalid trial** | A run the app could not attempt (exit 2, 126, 127, launch failure); retried, never counted |
+| **Fidelity** | Per-field record of the mechanism actually used and its status |
+| **Regression bundle** | A saved, replayable record of a discovered failure and its conditions |
+| **Adapter** | Platform-specific application of conditions; `ProxyAdapter` is the unprivileged fallback |
+| **User-space proxy** | A TCP relay with an RTT delay line and an RTO-based loss model, no kernel access needed |

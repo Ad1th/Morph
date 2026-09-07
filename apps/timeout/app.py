@@ -1,21 +1,36 @@
 """Failure A: timeout under network latency.
 
-Mechanism: a client with a tight timeout calls a local server that always takes
-~200ms to respond. Under normal (near-zero) loopback latency the response beats
-the deadline. Add latency on `lo` (see docs/faultyapps.md section 6) and the
-response arrives after the client's timeout fires.
+Mechanism: a client with a tight deadline calls a local server that always takes
+~200 ms to respond. Under normal (near-zero) loopback latency the response beats
+the deadline. Add round-trip latency and the response arrives after the
+client's timeout fires.
 
-    Env knob Morph turns : network latency on the loopback interface
-    Baseline (0ms added) : ~200ms < 250ms deadline -> PASS,  ~100/100
-    Fails when           : added latency pushes round-trip past ~250ms
-    Fix (one line)       : raise CLIENT_TIMEOUT (--fixed sets 1.0s)
+    Env knob Morph turns : network latency (profile ``network.latency_ms``, an RTT)
+    Baseline (0 ms added) : ~205 ms < 250 ms deadline -> PASS
+    Fails when           : RTT pushes the response past 250 ms, i.e. ~45 ms RTT
+    Fix (one line)       : raise CLIENT_TIMEOUT (--fixed sets 1.0 s)
     Classification       : environment-caused
 
-Tuning knobs are env vars so they can be re-tuned during the hackathon without
-touching code:
+The ONLY way this app fails is its deadline (``httpx.TimeoutException``).
+Morph's proxy never corrupts the byte stream: packet loss is delivered as a
+retransmission stall (``max(200 ms, 3 x RTT)``), so under loss the request
+simply arrives late and trips the same deadline. Anything that is not a
+timeout (connection refused, protocol error) is a setup error and exits 2:
+an *invalid* trial the engine discards rather than counts.
+
+How the condition reaches the app: when Morph cannot shape the loopback
+interface natively (no root), its runtime exports ``MORPH_NET_LATENCY_MS`` /
+``MORPH_NET_PACKET_LOSS_PCT`` and this app fronts its own server with Morph's
+TCP proxy (``apps/netshape.py``). With native shaping (root + tc/dnctl) those
+variables are absent and the app runs unshaped by itself. The server never
+sleeps for a latency value of its own: the delay comes from the network path,
+once, exactly as it would in production.
+
+Tuning knobs (env vars):
 
     MORPH_A_RESP_DELAY_S  server response delay in seconds (default 0.20)
     MORPH_A_TIMEOUT       client timeout in seconds (default 0.25)
+    MORPH_A_FIXED_TIMEOUT client timeout for --fixed (default 1.0)
 """
 
 from __future__ import annotations
@@ -37,10 +52,15 @@ FIXED_TIMEOUT_S = float(os.getenv("MORPH_A_FIXED_TIMEOUT", "1.0"))
 
 
 class _Handler(http.server.BaseHTTPRequestHandler):
+    # Buffer the response so headers and body leave in ONE write. Two writes
+    # would be two proxy chunks, each an independent loss event, which makes
+    # the fixture's loss sensitivity depend on socket timing.
+    wbufsize = -1
+
     def do_GET(self) -> None:
-        latency_s = float(os.getenv("MORPH_LATENCY_MS", "0.0")) / 1000.0
-        time.sleep(RESP_DELAY_S + latency_s)
+        time.sleep(RESP_DELAY_S)
         self.send_response(200)
+        self.send_header("Content-Length", "2")
         self.end_headers()
         self.wfile.write(b"ok")
 
@@ -54,10 +74,11 @@ class _QuietServer(http.server.ThreadingHTTPServer):
     When the client's timeout fires it drops the connection while the handler is
     still sleeping; the subsequent write raises ConnectionAborted/Reset/BrokenPipe
     and socketserver would dump a full traceback to stderr. That is the *expected*
-    path for this fixture, and Morph parses stderr to identify the failure signal
-    (see architecture.md 5.4) -- leaving the noise in would mislabel every failure.
-    Unexpected errors still propagate to the default handler.
+    path for this fixture, and Morph parses stderr to identify the failure signal,
+    so leaving the noise in would mislabel every failure.
     """
+
+    daemon_threads = True
 
     def handle_error(self, request, client_address) -> None:
         exc = sys.exc_info()[1]
@@ -74,40 +95,37 @@ def _run_once(client_timeout: float) -> dict:
     srv = _QuietServer(("127.0.0.1", 0), _Handler)
     thread = threading.Thread(target=srv.serve_forever, daemon=True)
     thread.start()
-
-    # When Morph shapes the loopback natively (tc netem / dnctl) this is a
-    # no-op; when it can't (no root), it passes the latency through
-    # MORPH_NET_LATENCY_MS and we front our own server with Morph's TCP proxy.
-    port, proxy_shutdown = start_proxy(srv.server_address[1])
-
-    # httpx.get() would build a fresh httpx.Client() per call -- on some
-    # machines that alone costs ~300ms+ (proxy/env/netrc probing), *outside*
-    # httpx's own timeout enforcement, which corrupts duration_ms without ever
-    # tripping the timeout. Build the client once, before the timer starts,
-    # and disable env probing (the app has no network egress requirement).
-    client = httpx.Client(trust_env=False)
-
-    # Measure only the client request itself. srv.shutdown() below waits on
-    # ThreadingHTTPServer's serve_forever poll_interval (default 0.5s), which
-    # would otherwise inflate duration_ms far past the actual request latency.
-    t0 = time.monotonic()
+    proxy_shutdown = None
+    client = None
     try:
-        client.get(f"http://127.0.0.1:{port}/", timeout=client_timeout)
-        result, signal, detail = "pass", None, ""
-    except httpx.TimeoutException:
-        result, signal = "fail", "TimeoutException"
-        detail = f"deadline {client_timeout * 1000:.0f}ms exceeded"
-    except httpx.HTTPError as exc:
-        # anything else (connection refused, etc.) is a setup error, not the
-        # engineered failure -- caller maps this to exit code 2.
-        result, signal, detail = "error", type(exc).__name__, str(exc)
-    duration_ms = (time.monotonic() - t0) * 1000
-    client.close()
+        port, proxy_shutdown = start_proxy(srv.server_address[1])
 
-    if proxy_shutdown is not None:
-        proxy_shutdown()
-    srv.shutdown()
-    thread.join(timeout=2)
+        # httpx.get() would build a fresh Client per call, which on some machines
+        # costs ~300 ms of proxy/env/netrc probing *outside* httpx's own timeout,
+        # corrupting duration_ms without ever tripping the deadline. Build it
+        # once, before the timer starts, with env probing off.
+        client = httpx.Client(trust_env=False)
+
+        t0 = time.monotonic()
+        try:
+            client.get(f"http://127.0.0.1:{port}/", timeout=client_timeout)
+            result, signal, detail = "pass", None, ""
+        except httpx.TimeoutException:
+            result, signal = "fail", "TimeoutException"
+            detail = f"deadline {client_timeout * 1000:.0f}ms exceeded"
+        except httpx.HTTPError as exc:
+            # Not the engineered failure: connection refused, protocol error.
+            # The caller maps this to exit 2 (invalid trial).
+            result, signal, detail = "error", type(exc).__name__, str(exc)
+        duration_ms = (time.monotonic() - t0) * 1000
+    finally:
+        if client is not None:
+            client.close()
+        if proxy_shutdown is not None:
+            proxy_shutdown()
+        srv.shutdown()
+        srv.server_close()
+        thread.join(timeout=2)
     return {
         "result": result,
         "signal": signal,

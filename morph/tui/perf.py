@@ -2,15 +2,23 @@
 
 One :class:`Sample` per app run: the slider values it ran under, plus the run's
 duration / CPU / memory and whether it passed. Feeds the sparklines and the
-live threshold warnings.
+live boundary warnings.
+
+Boundaries are direction-aware. For latency and loss *more* is worse, so the
+learned boundary is the lowest failing value; for CPU cores and RAM *less* is
+worse, so it is the highest failing value. ``direction="up"`` means "failures
+appear as the value goes up".
 """
 
 from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
+from typing import Literal
 
 from morph.schema.telemetry import RunResult
+
+Direction = Literal["up", "down"]
 
 
 @dataclass(frozen=True)
@@ -37,12 +45,6 @@ class PerfHistory:
             passed=bool(run.passed),
             run=run,
         )
-        self._samples.append(sample)
-        return sample
-
-    def add_synthetic(self, params: dict[str, float], *, duration_ms: float,
-                      cpu_percent: float, peak_mem_mb: float, passed: bool) -> Sample:
-        sample = Sample(dict(params), duration_ms, cpu_percent, peak_mem_mb, passed, None)
         self._samples.append(sample)
         return sample
 
@@ -76,35 +78,57 @@ class PerfHistory:
                 return s.run
         return None
 
-    def first_failure_value(self, param: str) -> float | None:
-        """Lowest value of ``param`` at which a run failed so far (a learned boundary)."""
-        vals = [s.params.get(param) for s in self._samples if not s.passed and param in s.params]
-        vals = [v for v in vals if v is not None]
-        return min(vals) if vals else None
-
-    def last_pass_value(self, param: str) -> float | None:
-        """Highest value of ``param`` at which a run still passed."""
-        vals = [s.params.get(param) for s in self._samples if s.passed and param in s.params]
-        vals = [v for v in vals if v is not None]
-        return max(vals) if vals else None
-
-    def implicates(self, param: str) -> float | None:
-        """A boundary for ``param`` only if the runs actually blame it: some run
-        passed strictly below it, and nothing at or above it passed. Rejects
-        params that just happened to be set during a failure caused by another.
-        """
-        boundary = self.first_failure_value(param)
-        if boundary is None:
-            return None
-        passes = [
+    def _values(self, param: str, *, passed: bool) -> list[float]:
+        return [
             s.params[param]
             for s in self._samples
-            if s.passed and param in s.params and s.params[param] is not None
+            if s.passed is passed and s.params.get(param) is not None
         ]
-        if not passes or min(passes) is None:
+
+    def first_failure_value(self, param: str, direction: Direction = "up") -> float | None:
+        """The failing value of ``param`` nearest the safe side: the lowest
+        failing value when more is worse, the highest when less is worse."""
+        fails = self._values(param, passed=False)
+        if not fails:
             return None
-        if not any(v < boundary for v in passes):   # nothing passed below it
+        return min(fails) if direction == "up" else max(fails)
+
+    def last_pass_value(self, param: str, direction: Direction = "up") -> float | None:
+        """The passing value of ``param`` nearest the failing side."""
+        passes = self._values(param, passed=True)
+        if not passes:
             return None
-        if any(v >= boundary for v in passes):      # something passed at/above it
+        return max(passes) if direction == "up" else min(passes)
+
+    def implicates(self, param: str, direction: Direction = "up") -> float | None:
+        """A boundary for ``param`` only if the runs actually blame it: some run
+        passed strictly on the safe side of it, and nothing on the failing side
+        (or at it) passed. Rejects params that just happened to be set during a
+        failure caused by another.
+        """
+        boundary = self.first_failure_value(param, direction)
+        if boundary is None:
+            return None
+        passes = self._values(param, passed=True)
+        if not passes:
+            return None
+        if direction == "up":
+            safe_side = any(v < boundary for v in passes)
+            leak = any(v >= boundary for v in passes)
+        else:
+            safe_side = any(v > boundary for v in passes)
+            leak = any(v <= boundary for v in passes)
+        if not safe_side or leak:
             return None
         return boundary
+
+    @staticmethod
+    def near_boundary(value: float, boundary: float, direction: Direction = "up") -> str | None:
+        """``"past"`` / ``"approaching"`` / ``None`` for ``value`` against ``boundary``."""
+        if direction == "up":
+            if value >= boundary:
+                return "past"
+            return "approaching" if value >= boundary * 0.9 else None
+        if value <= boundary:
+            return "past"
+        return "approaching" if value <= boundary * 1.1 else None

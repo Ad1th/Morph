@@ -2,29 +2,37 @@
 
 Populated straight from the isolation run's four batches (baseline = neither,
 latency_only = A, loss_only = B, full_target = both). Three cells stay green,
-one goes red: the "aha".
+one goes rose: the "aha".
 """
 
 from __future__ import annotations
 
-from rich.align import Align
-from rich.panel import Panel
+from rich.console import Group
 from rich.table import Table
 from rich.text import Text
 from textual.widgets import Static
 
-
-def _cell(rate: float, *, strong: bool = False) -> Text:
-    if rate >= 0.6:
-        style = "bold white on red3" if strong else "white on red3"
-    elif rate >= 0.25:
-        style = "black on yellow"
-    else:
-        style = "white on green"
-    return Text(f"  {rate:>4.0%} fail  ", style=style)
+from morph.tui.theme import palette
 
 
 class InteractionMatrix(Static):
+    def __init__(self, *, id: str | None = None, classes: str | None = None) -> None:
+        super().__init__(id=id, classes=classes)
+        self.confirmed: bool | None = None
+
+    def on_mount(self) -> None:
+        self.border_title = "INTERACTION 2x2"
+
+    def _cell(self, rate: float, *, strong: bool = False) -> Text:
+        p = palette(self)
+        if rate >= 0.6:
+            style = f"bold {p.ink_on_fail} on {p.fail}" if strong else f"{p.ink_on_fail} on {p.fail}"
+        elif rate >= 0.25:
+            style = f"{p.ink_on_evidence} on {p.warn}"
+        else:
+            style = f"{p.ink_on_pass} on {p.pass_}"
+        return Text(f" {rate:>4.0%} fail ", style=style)
+
     def show(
         self,
         label_a: str,
@@ -33,27 +41,25 @@ class InteractionMatrix(Static):
         a_only: float,
         b_only: float,
         both: float,
+        *,
+        interaction_probability: float | None = None,
     ) -> None:
-        grid = Table(show_header=True, header_style="bold", box=None, padding=(0, 1))
-        grid.add_column("", justify="right", style="dim")
-        grid.add_column(f"{label_b}: off", justify="center")
-        grid.add_column(f"{label_b}: on", justify="center")
-        grid.add_row(f"{label_a}: off", _cell(neither), _cell(b_only))
-        grid.add_row(f"{label_a}: on", _cell(a_only), _cell(both, strong=True))
+        p = palette(self)
+        grid = Table(show_header=True, header_style=f"bold {p.muted}", box=None, padding=(0, 1))
+        grid.add_column("", justify="right", style=p.muted)
+        grid.add_column(f"{label_b} off", justify="center")
+        grid.add_column(f"{label_b} on", justify="center")
+        grid.add_row(f"{label_a} off", self._cell(neither), self._cell(b_only))
+        grid.add_row(f"{label_a} on", self._cell(a_only), self._cell(both, strong=True))
 
         confirmed = a_only < 0.25 and b_only < 0.25 and both >= 0.6
-        caption = (
-            Text("→ failure requires the combination; neither condition does it alone",
-                 style="bold red3")
-            if confirmed
-            else Text("→ no combination-only effect", style="dim")
-        )
-        self.update(
-            Panel(
-                Align.center(grid),
-                title="interaction  2x2",
-                subtitle=str(caption),
-                border_style="red3" if confirmed else "grey50",
-                padding=(1, 2),
-            )
-        )
+        self.confirmed = confirmed
+        if confirmed:
+            caption = Text("→ failure requires the combination; neither alone does it",
+                           style=f"bold {p.fail}")
+        else:
+            caption = Text("→ no combination-only effect", style=p.muted)
+        if interaction_probability is not None:
+            caption.append(f"   P(interaction) = {interaction_probability:.2f}", style=p.evidence)
+        self.styles.border = ("round", p.fail if confirmed else p.muted)
+        self.update(Group(grid, caption))

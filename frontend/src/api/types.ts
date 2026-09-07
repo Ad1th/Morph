@@ -1,5 +1,5 @@
-// Mirrors morph/schema/profile.py. Kept in sync by hand -- small enough that a
-// codegen step would be more ceremony than the thing it replaces.
+// Mirrors morph/schema/*.py. Kept in sync by hand; every optional backend
+// field is optional here so a newer or older server never crashes the UI.
 
 export type FieldStatus = 'captured' | 'requested' | 'reproduced' | 'approximated' | 'unavailable'
 
@@ -31,6 +31,7 @@ export interface MemoryInfo {
 export interface LocaleInfo {
   locale: ProfileField<string>
   timezone: ProfileField<string>
+  language_tag?: ProfileField<string> | null
 }
 
 export interface FilesystemInfo {
@@ -70,6 +71,22 @@ export interface EnvironmentProfile {
   env_vars: Record<string, string>
 }
 
+// --- runs (morph/schema/telemetry.py) ---
+
+export interface TelemetryData {
+  cpu_percent?: number | null
+  memory_rss_mb?: number | null
+  network_rx_bytes?: number | null
+  network_tx_bytes?: number | null
+  extra?: Record<string, unknown>
+}
+
+export interface FidelityEntry {
+  status: string
+  mechanism?: string
+  detail?: string
+}
+
 export interface RunResult {
   run_id: string
   exit_code: number
@@ -81,20 +98,33 @@ export interface RunResult {
   error_type?: string | null
   error_message?: string | null
   timestamp: string
+  telemetry?: TelemetryData | null
+  invalid?: boolean
+  invalid_reason?: string | null
+  command?: string | null
+  seed?: number | null
+  morph_version?: string | null
+  host_fingerprint?: string | null
+  profile_hash?: string | null
+  adapter?: string | null
+  fidelity?: Record<string, FidelityEntry>
 }
 
-// Mirrors morph/schema/events.py's TrialEvent. Only the fields the dashboard
-// reads are typed narrowly; the rest ride along as optional.
+// --- events (morph/schema/events.py) ---
+
+export type EventKind =
+  | 'phase_start'
+  | 'condition_start'
+  | 'trial'
+  | 'condition_done'
+  | 'comparison'
+  | 'evidence'
+  | 'search_probe'
+  | 'verdict'
+  | 'phase_done'
+
 export interface TrialEvent {
-  kind:
-    | 'phase_start'
-    | 'condition_start'
-    | 'trial'
-    | 'condition_done'
-    | 'comparison'
-    | 'search_probe'
-    | 'verdict'
-    | 'phase_done'
+  kind: EventKind
   condition: string
   phase: string
   trial_index?: number | null
@@ -103,6 +133,8 @@ export interface TrialEvent {
   duration_ms?: number | null
   failures_so_far?: number | null
   error_type?: string | null
+  stdout_tail?: string | null
+  stderr_tail?: string | null
   failures?: number | null
   failure_rate?: number | null
   p_value?: number | null
@@ -110,6 +142,28 @@ export interface TrialEvent {
   effect_label?: string | null
   classification?: string | null
   strongest_condition?: string | null
+  e_value?: number | null
+  evidence_threshold?: number | null
+  pairs?: number | null
+  decisive?: boolean | null
+  param_value?: number | null
+  safe_value?: number | null
+  failure_value?: number | null
+  boundary_estimate?: number | null
+  extra?: Record<string, unknown>
+}
+
+// --- comparisons (morph/schema/comparison.py) ---
+
+export type ComparisonMethod = 'fisher' | 'fisher_holm' | 'paired_e_value'
+
+export interface TrialBatch {
+  condition_label: string
+  profile_overrides?: Record<string, unknown>
+  total_runs: number
+  failures: number
+  failure_rate?: number
+  run_results?: RunResult[]
 }
 
 export interface ComparisonResult {
@@ -118,27 +172,94 @@ export interface ComparisonResult {
   baseline_total: number
   treatment_failures: number
   treatment_total: number
-  p_value: number
+  p_value?: number | null
   is_significant: boolean
   effect_label: string
+  baseline?: TrialBatch | null
+  treatment?: TrialBatch | null
+  method?: ComparisonMethod
+  alpha?: number
+  p_value_decrease?: number | null
+  p_value_adjusted?: number | null
+  e_value?: number | null
+  pairs?: number | null
+  stopped_early?: boolean | null
+  risk_difference?: number | null
+  risk_difference_ci?: [number, number] | null
 }
+
+export type ThresholdOutcome = 'boundary_found' | 'never_fails' | 'always_fails' | 'inconclusive'
+
+export interface ThresholdPoint {
+  value?: number
+  failure_rate?: number | null
+  passed?: boolean | null
+}
+
+export interface ThresholdResult {
+  parameter: string
+  safe_value?: number | null
+  failure_value?: number | null
+  boundary_estimate?: number | null
+  search_points: ThresholdPoint[]
+  outcome?: ThresholdOutcome
+  method?: 'bisection' | 'probabilistic_bisection'
+  trials?: number | null
+  credible_mass?: number | null
+  credible_low?: number | null
+  credible_high?: number | null
+  probability_boundary_in_range?: number | null
+  probability_never_fails?: number | null
+  probability_always_fails?: number | null
+  floor_failure_rate?: number | null
+  ceiling_failure_rate?: number | null
+  posterior?: { value: number; density: number }[]
+  dose_response?: { value: number; failure_probability: number }[]
+}
+
+// --- experiments (morph/schema/experiment.py) ---
+
+export type Classification =
+  | 'environment_caused'
+  | 'environment_exposed'
+  | 'application_internal'
+  | 'no_effect'
+  | 'unknown'
 
 export interface ExperimentResult {
   experiment_id?: string | null
-  classification: string
+  target_profile?: EnvironmentProfile | null
+  baseline?: TrialBatch | null
+  comparisons: ComparisonResult[]
+  interactions?: ComparisonResult[]
+  thresholds?: ThresholdResult[]
+  classification: Classification | string
   strongest_condition: string
   summary: string
-  comparisons: ComparisonResult[]
-  target_profile?: EnvironmentProfile | null
+  warnings?: string[]
 }
 
-// WebSocket frames from /ws/experiment/{id}.
-export type ExperimentFrame =
-  | { type: 'connected'; experiment_id: string; status: string }
+export type ExperimentMode = 'sequential' | 'batch'
+
+export interface ExperimentStreamRequest {
+  command: string
+  target_profile: EnvironmentProfile
+  cwd?: string | null
+  trials?: number
+  timeout_sec?: number
+  mode?: ExperimentMode
+  max_rounds?: number
+  alpha?: number
+}
+
+// WebSocket frames from /ws/experiment/{id} and /ws/threshold/{id}.
+export type JobFrame =
+  | { type: 'connected'; experiment_id?: string; threshold_id?: string; status: string }
   | ({ type: 'event' } & TrialEvent)
-  | { type: 'done'; result: ExperimentResult }
-  | { type: 'error'; message: string }
-// --- Project selection (POST /projects/upload, POST /projects/local) ---
+  | { type: 'done'; result: ExperimentResult | ThresholdResult }
+  | { type: 'error'; message: string; setup_error?: boolean; cancelled?: boolean }
+
+// --- projects (morph/schema/project.py) ---
 
 export interface ProjectInfo {
   project_id: string
@@ -146,21 +267,33 @@ export interface ProjectInfo {
   path: string
   file_count: number
   entrypoints: string[]
-  /** Null when auto-detection found no entrypoint it recognises. */
   suggested_command?: string | null
   suggested_cwd?: string | null
-  /** Install steps that failed (empty = clean, or nothing to install). */
   deps_failed: string[]
+  source?: string
+  repo?: string | null
+  branch?: string | null
+  commit?: string | null
+  venv?: string | null
+  created_at?: string | null
 }
 
-// --- Run targets (GET /platform) ---
+export interface GithubRepo {
+  full_name: string
+  name: string
+  private: boolean
+  default_branch: string
+  description: string
+  html_url: string
+}
+
+// --- platform ---
 
 export interface RunTarget {
   id: string
   family: string
   label: string
   available: boolean
-  /** Why the target is unavailable, e.g. "No remote host configured". */
   reason?: string | null
   capabilities: Record<string, boolean>
 }
@@ -170,39 +303,8 @@ export interface PlatformInfo {
   targets: RunTarget[]
 }
 
-// --- Threshold search (POST /threshold) ---
+// --- parameters (morph/schema/parameters.py) ---
 
-export interface ThresholdRequest {
-  command: string
-  /** Dotted profile path, same shape as ParameterMetadata.field_path. */
-  parameter: string
-  low: number
-  high: number
-  trials?: number
-  precision?: number
-  profile?: EnvironmentProfile | null
-  cwd?: string | null
-  timeout?: number
-  target?: string
-}
-
-/** search_points is list[dict] server-side, so every field is treated as optional. */
-export interface ThresholdPoint {
-  value?: number
-  failure_rate?: number
-  passed?: boolean
-}
-
-// Mirrors morph/schema/comparison.py's ThresholdResult.
-export interface ThresholdResult {
-  parameter: string
-  safe_value: number
-  failure_value: number
-  boundary_estimate: number
-  search_points: ThresholdPoint[]
-}
-
-// Mirrors morph/schema/parameters.py's ParameterMetadata.
 export interface ParameterMetadata {
   name: string
   field_path: string
@@ -217,88 +319,60 @@ export interface ParameterMetadata {
   platform_support: Record<string, string>
 }
 
-// --- 2D Failure Surface, Differential Blame & Invariant Exporter ---
+// --- threshold requests ---
 
-export interface SurfaceGridPoint {
-  x: number
-  y: number
+export type ThresholdMethod = 'bayes' | 'bisect'
+
+export interface ThresholdRequest {
+  command: string
+  parameter: string
+  low: number
+  high: number
+  method?: ThresholdMethod
+  trials?: number
+  max_trials?: number
+  precision?: number | null
+  credible_mass?: number
+  profile?: EnvironmentProfile | null
+  cwd?: string | null
+  timeout?: number
+  target?: string
+}
+
+// --- regressions (morph/schema/regression.py) ---
+
+export interface RegressionArtifact {
+  regression_id: string
+  environment: EnvironmentProfile
+  command: string
+  expected_exit_code: number
+  expected_max_failure_rate: number
+  failure_signature?: string | null
+  created_at?: string
+  metadata: Record<string, unknown>
+}
+
+export interface ReplayResult {
+  regression_id: string
   passed: boolean
+  matches_expected: boolean
   failure_rate: number
-  runs: number
-  exit_code?: number | null
-  duration_ms?: number | null
-  stdout?: string | null
-  stderr?: string | null
-}
-
-export interface SafeBoundaryPoint {
-  x: number
-  y: number
-  status: string
-}
-
-export interface BlameTrace {
-  run_type: 'PASS' | 'FAIL'
-  parameter_val: string
-  file?: string | null
-  line?: number | null
-  function?: string | null
-  operation?: string | null
-  status_or_exception?: string | null
-  duration_ms?: number | null
-  summary_line: string
-}
-
-export interface DifferentialBlameResult {
-  culpable_file?: string | null
-  culpable_line?: number | null
-  culpable_code?: string | null
-  pass_trace?: BlameTrace | null
-  fail_trace?: BlameTrace | null
-  divergence_summary: string
-  explanation: string
-  suggested_fix?: string | null
-}
-
-export interface SurfaceResult {
-  param_x: string
-  param_y: string
-  param_x_label: string
-  param_y_label: string
-  param_x_unit: string
-  param_y_unit: string
-  x_values: number[]
-  y_values: number[]
-  grid: SurfaceGridPoint[][]
-  points: SurfaceGridPoint[]
-  safe_boundary: SafeBoundaryPoint[]
-  passing_count: number
-  failing_count: number
-  total_points: number
-  highest_passing_point?: SurfaceGridPoint | null
-  lowest_failing_point?: SurfaceGridPoint | null
-  blame?: DifferentialBlameResult | null
+  total_runs: number
+  failures: number
+  runs?: RunResult[]
+  regression: RegressionArtifact
   summary: string
 }
 
-export interface SurfaceRequest {
-  project_path: string
-  command?: string | null
-  cwd?: string | null
-  param_x?: string
-  param_y?: string
-  x_values?: number[] | null
-  y_values?: number[] | null
-  x_min?: number | null
-  x_max?: number | null
-  x_steps?: number | null
-  y_min?: number | null
-  y_max?: number | null
-  y_steps?: number | null
-  runs_per_point?: number
-  adapter_name?: string
-  supplied_profile?: EnvironmentProfile | null
+// --- profiles ---
+
+export interface SavedProfileRef {
+  id: string
+  filename: string
+  path: string
 }
+
+// --- export ---
 
 export interface ExportInvariantRequest {
   project_name: string
@@ -314,5 +388,16 @@ export interface ExportInvariantRequest {
 export interface ExportInvariantResponse {
   filename: string
   code: string
+  summary: string
+}
+
+// --- minimal failing set (POST /minimize) ---
+
+export interface MinimizeResult {
+  conditions: string[]
+  minimal: string[]
+  reproduced: boolean
+  oracle_calls?: number
+  history?: Record<string, unknown>[]
   summary: string
 }

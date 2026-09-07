@@ -8,12 +8,22 @@ worker's checkout is updated.
 Nothing here is provider-specific. A GCP instance, the Pi on the desk and a
 laptop across the room are all "a box you can SSH into"; `provider` in the
 config is provenance, not a code path.
+
+Safety rails:
+
+* `MORPH_NO_NETWORK=1` (set by tests/conftest.py) makes every SSH attempt
+  raise `WorkerUnavailable` before a socket is opened, so a unit test can
+  never reach a real machine whatever the config says.
+* SSH runs with `BatchMode=yes` (never prompts) and
+  `StrictHostKeyChecking=accept-new` (trust on first use, refuse a changed key).
+* Anything that looks like a token is redacted from error text.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import subprocess
 from dataclasses import dataclass
@@ -29,6 +39,21 @@ _PROBE_PY = (
     "print(json.dumps({'py':sys.version.split()[0],"
     "'morph':u.find_spec('morph') is not None}))"
 )
+
+# GitHub PATs, generic long hex/base64 secrets, and `user:secret@host` URLs.
+_SECRET_RE = re.compile(
+    r"(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}"
+    r"|(?<=://)[^/\s:]+:[^@\s]+(?=@)|AUTHORIZATION:\s*\S+\s+\S+)"
+)
+
+
+def redact(text: str) -> str:
+    """Scrub anything token-shaped from text destined for a log or an exception."""
+    return _SECRET_RE.sub("***", text or "")
+
+
+def network_disabled() -> bool:
+    return (os.environ.get("MORPH_NO_NETWORK") or "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _remote_path(path: str) -> str:
@@ -65,13 +90,26 @@ class WorkerInfo:
         return self.reachable and self.morph_importable
 
 
+def _env(*names: str) -> str | None:
+    for name in names:
+        value = (os.environ.get(name) or "").strip()
+        if value:
+            return value
+    return None
+
+
 def resolve_config(config: CloudConfig | None) -> CloudConfig:
-    """Fill a config from the environment, so credentials need not be committed."""
+    """Fill a config from the environment, so credentials need not be committed.
+
+    `MORPH_CLOUD_*` is canonical; `MORPH_WORKER_*` are accepted as aliases.
+    """
     cfg = (config or CloudConfig()).model_copy(deep=True)
-    cfg.host = cfg.host or os.environ.get("MORPH_CLOUD_HOST")
-    cfg.user = cfg.user or os.environ.get("MORPH_CLOUD_USER")
-    cfg.ssh_key = cfg.ssh_key or os.environ.get("MORPH_CLOUD_SSH_KEY")
-    if os.environ.get("MORPH_CLOUD_HOST"):
+    # The environment wins over the committed file, per field: a laptop can point
+    # a checked-in GCP config at the Pi on the desk without editing morph.yaml.
+    cfg.host = _env("MORPH_CLOUD_HOST", "MORPH_WORKER_HOST") or cfg.host
+    cfg.user = _env("MORPH_CLOUD_USER", "MORPH_WORKER_USER") or cfg.user
+    cfg.ssh_key = _env("MORPH_CLOUD_SSH_KEY", "MORPH_WORKER_SSH_KEY") or cfg.ssh_key
+    if _env("MORPH_CLOUD_HOST", "MORPH_WORKER_HOST"):
         cfg.enabled = True
     return cfg
 
@@ -109,6 +147,7 @@ class RemoteWorker:
             "BatchMode=yes",
             "-o",
             f"ConnectTimeout={int(self.config.connect_timeout)}",
+            # Trust on first use; refuse a host whose key has changed.
             "-o",
             "StrictHostKeyChecking=accept-new",
         ]
@@ -120,6 +159,11 @@ class RemoteWorker:
     def _ssh(
         self, remote_command: str, stdin: str | None = None, timeout: float = 60.0
     ) -> subprocess.CompletedProcess:
+        if network_disabled():
+            raise WorkerUnavailable(
+                "MORPH_NO_NETWORK is set: refusing to open an SSH connection "
+                f"to {self.target}"
+            )
         try:
             return subprocess.run(
                 self.ssh_argv(remote_command),
@@ -138,7 +182,7 @@ class RemoteWorker:
     def probe_command(self) -> str:
         """Shell run by `check`. Separate so a test can read it."""
         return (
-            f"{shlex.quote(self.config.python)} -c {shlex.quote(_PROBE_PY)} 2>/dev/null; "
+            f"{_remote_path(self.config.python)} -c {shlex.quote(_PROBE_PY)} 2>/dev/null; "
             # tc lives in /sbin, which is frequently absent from a non-login PATH.
             "(sudo -n /sbin/tc qdisc show dev lo >/dev/null 2>&1 && echo TC_OK || echo TC_NO)"
         )
@@ -154,11 +198,14 @@ class RemoteWorker:
         if not self.configured:
             return WorkerInfo(reachable=False, detail="no host configured")
 
-        proc = self._ssh(self.probe_command(), timeout=self.config.connect_timeout + 15)
+        try:
+            proc = self._ssh(self.probe_command(), timeout=self.config.connect_timeout + 15)
+        except WorkerUnavailable as exc:
+            return WorkerInfo(reachable=False, detail=redact(str(exc))[:200])
         if proc.returncode != 0 and not proc.stdout.strip():
             last = (proc.stderr or "").strip().splitlines()
             return WorkerInfo(
-                reachable=False, detail=(last[-1][:200] if last else "ssh failed")
+                reachable=False, detail=(redact(last[-1])[:200] if last else "ssh failed")
             )
 
         info = WorkerInfo(reachable=True, can_shape_network="TC_OK" in proc.stdout)
@@ -180,7 +227,8 @@ class RemoteWorker:
 
         A temp file rather than a pipe because `morph run` takes a profile
         PATH; the trap removes it even when the run fails, so repeated trials
-        cannot litter the worker.
+        cannot litter the worker. The worker's run is local-only by contract
+        (no `--cloud`), so a worker can never recurse into another worker.
         """
         return (
             "set -eu; "
@@ -188,7 +236,7 @@ class RemoteWorker:
             "trap 'rm -f \"$f\"' EXIT; "
             'cat > "$f"; '
             f"cd {_remote_path(self.config.workdir)} 2>/dev/null || true; "
-            f"{shlex.quote(self.config.python)} -m morph.cli.main run "
+            f"{_remote_path(self.config.python)} -m morph.cli.main run "
             f'--profile "$f" --command {shlex.quote(command)} '
             f"--timeout {float(timeout):g} --json"
         )
@@ -199,7 +247,13 @@ class RemoteWorker:
         command: str,
         timeout: float = 30.0,
     ) -> RunResult:
-        """Execute `command` under `profile` on the worker; return its RunResult."""
+        """Execute `command` under `profile` on the worker; return its RunResult.
+
+        Raises WorkerUnavailable -- never returns a fabricated trial -- when
+        the worker produced no result, refused the profile, or could not even
+        find the command (only commands relative to the worker's `workdir`,
+        such as the `apps/*` demos, are routable: project files are not synced).
+        """
         proc = self._ssh(
             self.build_run_command(command, timeout),
             stdin=profile.model_dump_json(),
@@ -212,9 +266,21 @@ class RemoteWorker:
         if payload is None:
             raise WorkerUnavailable(
                 "worker returned no run result. "
-                f"exit={proc.returncode} stderr={(proc.stderr or '').strip()[:300]}"
+                f"exit={proc.returncode} stderr={redact((proc.stderr or '').strip())[:300]}"
             )
-        return RunResult.model_validate(payload)
+        if "error" in payload and "exit_code" not in payload:
+            # `morph run --json` prints {"error": "not_reproducible", "detail": ...}
+            # on exit 2; that is a refusal, not a RunResult.
+            raise WorkerUnavailable(
+                f"worker refused the run: {redact(str(payload.get('detail') or payload['error']))}"
+            )
+        result = RunResult.model_validate(payload)
+        if result.exit_code == 127 or result.error_type == "FileNotFoundError":
+            raise WorkerUnavailable(
+                f"worker could not find the command {command!r}: only commands relative to "
+                f"{self.config.workdir} on the worker are routable (project files are not synced)"
+            )
+        return result
 
 
 def _last_json_object(text: str) -> dict | None:

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 
 class BlameTrace(BaseModel):
-    run_type: str  # "PASS" | "FAIL"
+    run_type: Literal["PASS", "FAIL"]
     parameter_val: str
     file: str | None = None
     line: int | None = None

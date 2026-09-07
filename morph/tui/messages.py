@@ -16,9 +16,26 @@ class EngineEvent(Message):
 
 
 class RunFinished(Message):
-    """A worker finished. ``result`` is the engine's return value or an Exception."""
+    """A worker finished. ``result`` is the engine's return value, ``error`` an
+    exception if it failed, ``cancelled`` True if the user stopped it."""
 
-    def __init__(self, result: object, error: BaseException | None = None) -> None:
+    def __init__(
+        self,
+        result: object,
+        error: BaseException | None = None,
+        *,
+        cancelled: bool = False,
+    ) -> None:
         self.result = result
+        self.error = error
+        self.cancelled = cancelled
+        super().__init__()
+
+
+class StatusUpdate(Message):
+    """A worker wants a status line shown (already escaped / a rich Text)."""
+
+    def __init__(self, text: object, *, error: bool = False) -> None:
+        self.text = text
         self.error = error
         super().__init__()

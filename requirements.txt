@@ -30,6 +30,7 @@ httpx>=0.27.0
 
 # ---- Config / serialization ----
 pyyaml>=6.0.1
+python-dotenv>=1.0.0           # loads the nearest .env at startup (see .env.example)
 
 # ---- Testing ----
 pytest>=8.1.0

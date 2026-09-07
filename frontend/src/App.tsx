@@ -1,86 +1,94 @@
-import { useState } from 'react'
-import { DesktopCorners } from './components/DesktopCorners'
-import { OsSwitcher } from './components/OsSwitcher'
-import type { EnvironmentProfile, ProjectInfo, RunResult } from './api/types'
-import { Desktop } from './screens/Desktop'
+import { useEffect, useState } from 'react'
+import { api } from './api/client'
+import { Rail } from './components/Rail'
+import { TargetSelect } from './components/TargetSelect'
+import { Icon } from './components/ui/Icon'
+import { SCREENS, useRoute } from './routes'
+import { Environment } from './screens/Environment'
 import { Experiment } from './screens/Experiment'
-import { ParameterConfiguration } from './screens/ParameterConfiguration'
-import { Preparing } from './screens/Preparing'
-import { Verdict } from './screens/Verdict'
-import { useOsTheme } from './theme/useOsTheme'
-
-type ScreenState =
-  | { name: 'desktop' }
-  | { name: 'config' }
-  /* The run is fully described by the time we leave the config screen, so the
-     command, cwd and target travel with the screen rather than living as
-     separate state that could drift out of sync with the profile. */
-  | { name: 'preparing'; profile: EnvironmentProfile; command: string; cwd?: string; target: string }
-  | { name: 'verdict'; result: RunResult }
-  | { name: 'experiment' }
+import { Projects } from './screens/Projects'
+import { Regressions } from './screens/Regressions'
+import { Run } from './screens/Run'
+import { Threshold } from './screens/Threshold'
+import { setState, useStore } from './state/store'
+import './components/shell.css'
 
 export default function App() {
-  const { os, setOs } = useOsTheme()
-  const [screen, setScreen] = useState<ScreenState>({ name: 'desktop' })
-  const [projectOpen, setProjectOpen] = useState(true)
-  const [project, setProject] = useState<ProjectInfo | null>(null)
+  const { screen, navigate } = useRoute()
+  const theme = useStore((s) => s.theme)
+  const project = useStore((s) => s.draft.project)
+  const [server, setServer] = useState<'checking' | 'ok' | 'down'>('checking')
 
-  /* The folder icon is always on screen, so it has to do the whole job:
-     come back to the desktop AND reopen the project dialog. Setting the
-     screen alone did nothing when the desktop was already showing. */
-  function openProject() {
-    setScreen({ name: 'desktop' })
-    setProjectOpen(true)
-  }
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
+
+  useEffect(() => {
+    let alive = true
+    const check = () =>
+      api
+        .health()
+        .then(() => alive && setServer('ok'))
+        .catch(() => alive && setServer('down'))
+    void check()
+    const t = window.setInterval(check, 15000)
+    return () => {
+      alive = false
+      window.clearInterval(t)
+    }
+  }, [])
+
+  const meta = SCREENS.find((s) => s.id === screen)!
 
   return (
-    <>
-      <OsSwitcher os={os} onChange={setOs} />
+    <div className="shell">
+      <Rail active={screen} onNavigate={navigate} />
+      <div className="shell__main">
+        <header className="topbar">
+          <div className="topbar__crumb">
+            <span className="muted">{meta.label}</span>
+            {project && (
+              <>
+                <span className="faint" aria-hidden>
+                  /
+                </span>
+                <button className="topbar__project" onClick={() => navigate('projects')} title={project.path}>
+                  <Icon name="folder" size={13} />
+                  {project.name}
+                </button>
+              </>
+            )}
+          </div>
+          <div className="topbar__tools">
+            <span
+              className="topbar__server"
+              data-state={server}
+              role="status"
+              title={server === 'ok' ? 'Morph server reachable' : server === 'down' ? 'Morph server not reachable' : 'Checking server'}
+            >
+              <Icon name="dot" size={10} />
+              {server === 'ok' ? 'server' : server === 'down' ? 'server down' : 'checking'}
+            </span>
+            <TargetSelect />
+            <button
+              className="btn btn--ghost btn--icon"
+              onClick={() => setState({ theme: theme === 'dark' ? 'light' : 'dark' })}
+              aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            >
+              <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+            </button>
+          </div>
+        </header>
 
-      {/* Desktop furniture: present on every screen, so it is rendered once
-          here rather than per screen. Clicking the folder always returns to
-          the desktop, where the upload dialog lives. */}
-      <DesktopCorners os={os} onFolderClick={openProject} />
-
-      {screen.name === 'desktop' && (
-        <Desktop
-          os={os}
-          open={projectOpen}
-          onOpenChange={setProjectOpen}
-          onProject={setProject}
-          onStart={() => setScreen({ name: 'config' })}
-          onExperiment={() => setScreen({ name: 'experiment' })}
-        />
-      )}
-
-      {screen.name === 'experiment' && (
-        <Experiment os={os} onBack={() => setScreen({ name: 'desktop' })} />
-      )}
-
-      {screen.name === 'config' && (
-        <ParameterConfiguration
-          os={os}
-          project={project}
-          onEnterEnvironment={(profile, command, cwd, target) =>
-            setScreen({ name: 'preparing', profile, command, cwd, target })
-          }
-        />
-      )}
-
-      {screen.name === 'preparing' && (
-        <Preparing
-          os={os}
-          profile={screen.profile}
-          command={screen.command}
-          cwd={screen.cwd}
-          target={screen.target}
-          onDone={(result) => setScreen({ name: 'verdict', result })}
-        />
-      )}
-
-      {screen.name === 'verdict' && (
-        <Verdict os={os} result={screen.result} onBack={() => setScreen({ name: 'config' })} />
-      )}
-    </>
+        <main className="content" id="main" key={screen}>
+          {screen === 'projects' && <Projects onNavigate={navigate} />}
+          {screen === 'run' && <Run onNavigate={navigate} />}
+          {screen === 'experiment' && <Experiment onNavigate={navigate} />}
+          {screen === 'threshold' && <Threshold onNavigate={navigate} />}
+          {screen === 'regressions' && <Regressions onNavigate={navigate} />}
+          {screen === 'environment' && <Environment onNavigate={navigate} />}
+        </main>
+      </div>
+    </div>
   )
 }

@@ -1,16 +1,24 @@
-"""Runtime Controller: orchestrates environment condition reproduction and execution."""
+"""Runtime Controller: orchestrates environment condition reproduction and execution.
+
+The controller only ever runs on THIS machine. Routing a run to a remote
+worker is an explicit, visible decision made by `morph.cloud.dispatch.run_anywhere`
+(`morph run --cloud`); it never happens as a side effect of constructing a
+controller, and a worker that is down never degrades into a silent local run.
+"""
 
 from __future__ import annotations
 
 import platform
+import random
 
-from morph.runtime.adapters.base import BaseAdapter, ProxyAdapter
+from morph.runtime.adapters.base import BaseAdapter, Fidelity, ProxyAdapter
 from morph.runtime.adapters.linux import LinuxAdapter
 from morph.runtime.adapters.macos import MacOSAdapter
 from morph.runtime.adapters.windows import WindowsAdapter
 from morph.runtime.runner import execute_command
-from morph.schema.profile import EnvironmentProfile, FieldStatus
-from morph.schema.telemetry import RunResult
+from morph.schema.profile import EnvironmentProfile, FieldStatus, ProfileField
+from morph.schema.telemetry import FidelityEntry, RunResult
+from morph.telemetry.provenance import profile_hash, seed_from_env
 
 
 def get_default_adapter(force_proxy: bool = False) -> BaseAdapter:
@@ -29,19 +37,42 @@ def get_default_adapter(force_proxy: bool = False) -> BaseAdapter:
         return ProxyAdapter()
 
 
+def _field(profile: EnvironmentProfile, path: str) -> ProfileField | None:
+    section, _, name = path.partition(".")
+    obj = getattr(profile, section, None)
+    if obj is None:
+        return None
+    return getattr(obj, name, None)
+
+
+def fidelity_report(
+    profile: EnvironmentProfile, adapter: BaseAdapter | None = None
+) -> dict[str, Fidelity]:
+    """What the adapter did (after a run) or would do (before one) for each field.
+
+    After `apply_conditions` the adapter's own record is authoritative; before
+    it, `adapter.plan(profile)` predicts without side effects.
+    """
+    adapter = adapter or get_default_adapter()
+    applied = adapter.fidelity()
+    return applied if applied else adapter.plan(profile)
+
+
 def reconcile_profile_statuses(
     profile: EnvironmentProfile, adapter: BaseAdapter | None = None
 ) -> EnvironmentProfile:
-    """Evaluate an EnvironmentProfile against adapter capabilities and update FieldStatuses.
+    """Evaluate an EnvironmentProfile against what the adapter can really do and update statuses.
 
-    Marks fields as REPRODUCED, APPROXIMATED, or UNAVAILABLE.
-    Returns a copy of the profile with updated statuses.
+    Marks fields as REPRODUCED, APPROXIMATED, or UNAVAILABLE using the
+    adapter's per-field fidelity, not its class-level capability booleans: a
+    proxy-shaped network is APPROXIMATED, an env-var CPU knob nothing consumes
+    is UNAVAILABLE. Returns a copy of the profile with updated statuses.
     """
     adapter = adapter or get_default_adapter()
-    caps = adapter.capabilities()
+    report = fidelity_report(profile, adapter)
     updated = profile.model_copy(deep=True)
 
-    # OS reconciliation
+    # OS: nothing applies it; it either matches the host or it does not.
     current_os = platform.system().lower()
     target_os = str(updated.os.family.value).lower()
     if target_os == current_os:
@@ -51,42 +82,25 @@ def reconcile_profile_statuses(
         updated.os.family.status = FieldStatus.UNAVAILABLE
         updated.os.version.status = FieldStatus.UNAVAILABLE
 
-    # CPU reconciliation
-    if caps.get("cpu", False):
-        updated.cpu.cores.status = FieldStatus.APPROXIMATED
-        updated.cpu.architecture.status = (
-            FieldStatus.REPRODUCED
-            if str(updated.cpu.architecture.value) == platform.machine()
-            else FieldStatus.UNAVAILABLE
-        )
-    else:
-        updated.cpu.cores.status = FieldStatus.UNAVAILABLE
-        updated.cpu.architecture.status = FieldStatus.UNAVAILABLE
+    # Architecture: likewise a property of the host.
+    updated.cpu.architecture.status = (
+        FieldStatus.REPRODUCED
+        if str(updated.cpu.architecture.value) == platform.machine()
+        else FieldStatus.UNAVAILABLE
+    )
 
-    # Memory reconciliation
-    if caps.get("memory", False):
-        updated.memory.total_mb.status = FieldStatus.APPROXIMATED
-    else:
-        updated.memory.total_mb.status = FieldStatus.UNAVAILABLE
-
-    # Locale reconciliation
-    if caps.get("locale", False):
-        updated.locale.locale.status = FieldStatus.REPRODUCED
-        updated.locale.timezone.status = FieldStatus.REPRODUCED
-    else:
-        updated.locale.locale.status = FieldStatus.UNAVAILABLE
-        updated.locale.timezone.status = FieldStatus.UNAVAILABLE
-
-    # Network reconciliation
-    if updated.network:
-        if caps.get("network", False):
-            updated.network.latency_ms.status = FieldStatus.REPRODUCED
-            updated.network.packet_loss_percent.status = FieldStatus.REPRODUCED
-            if updated.network.bandwidth_mbps:
-                updated.network.bandwidth_mbps.status = FieldStatus.APPROXIMATED
-        else:
-            updated.network.latency_ms.status = FieldStatus.UNAVAILABLE
-            updated.network.packet_loss_percent.status = FieldStatus.UNAVAILABLE
+    # Everything an adapter applies: status from the report, else UNAVAILABLE.
+    for path in (
+        "cpu.cores", "cpu.quota_percent",
+        "memory.total_mb",
+        "locale.locale", "locale.timezone",
+        "network.latency_ms", "network.packet_loss_percent", "network.bandwidth_mbps",
+    ):
+        field = _field(updated, path)
+        if field is None:
+            continue
+        entry = report.get(path)
+        field.status = entry.status if entry is not None else FieldStatus.UNAVAILABLE
 
     return updated
 
@@ -95,9 +109,15 @@ class RuntimeController:
     """Master controller managing adapter lifecycles and application execution."""
 
     def __init__(
-        self, adapter: BaseAdapter | None = None, force_proxy: bool = False
+        self,
+        adapter: BaseAdapter | None = None,
+        force_proxy: bool = False,
+        seed: int | None = None,
     ) -> None:
         self.adapter = adapter or get_default_adapter(force_proxy=force_proxy)
+        # Explicit seed > MORPH_SEED > a fresh one per run (recorded on the
+        # result, so any trial can be replayed with the same loss pattern).
+        self.seed = seed if seed is not None else seed_from_env()
 
     def apply_conditions(self, profile: EnvironmentProfile) -> None:
         """Apply all relevant conditions from the environment profile via the active adapter."""
@@ -111,10 +131,11 @@ class RuntimeController:
                 else None
             )
             # "Offline" has no dedicated mechanism: it reuses the existing
-            # proxy path with loss forced to 100%, which genuinely drops
-            # every packet rather than approximating disconnection some
-            # other way (ui-spec.md section 5: "Network availability =
-            # Offline -> latency/bandwidth/loss/jitter greyed and ignored").
+            # proxy path with loss forced to 100%, which stalls every chunk
+            # until the path is declared dead and the connection reset --
+            # what a disconnected machine actually looks like to a client
+            # (ui-spec.md section 5: "Network availability = Offline ->
+            # latency/bandwidth/loss/jitter greyed and ignored").
             if profile.network.available and profile.network.available.value is False:
                 loss = 100.0
             self.adapter.apply_network(
@@ -161,32 +182,51 @@ class RuntimeController:
         `profile.process.timeout_s`, if requested, overrides the `timeout`
         argument; `max_processes`/`fd_limit` are POSIX-only rlimits applied
         to the child (see `morph.telemetry.collector.run_with_telemetry`).
+
+        The returned RunResult carries provenance (`seed`, `profile_hash`,
+        `adapter`, `fidelity`, plus what the collector stamps) so it can be
+        reproduced and attributed.
         """
+        effective_timeout = timeout
+        if profile.process:
+            if (
+                profile.process.timeout_s
+                and profile.process.timeout_s.value is not None
+                and float(profile.process.timeout_s.value) > 0
+            ):
+                effective_timeout = float(profile.process.timeout_s.value)
+
+        seed = self.seed if self.seed is not None else random.getrandbits(32)
+        if hasattr(self.adapter, "seed"):
+            self.adapter.seed = seed
+
         try:
             self.apply_conditions(profile)
             env_overrides = self.adapter.get_env_overrides()
+            env_overrides.setdefault("MORPH_SEED", str(seed))
             if profile.env_vars:
                 # Explicit user-requested variables take precedence over the
                 # adapter's own (locale/proxy) overrides.
                 env_overrides = {**env_overrides, **profile.env_vars}
 
-            effective_timeout = timeout
             max_processes = fd_limit = None
             if profile.process:
-                if (
-                    profile.process.timeout_s
-                    and profile.process.timeout_s.value is not None
-                    and float(profile.process.timeout_s.value) > 0
-                ):
-                    effective_timeout = float(profile.process.timeout_s.value)
                 if profile.process.max_processes and profile.process.max_processes.value is not None:
                     max_processes = int(profile.process.max_processes.value)
                 if profile.process.fd_limit and profile.process.fd_limit.value is not None:
                     fd_limit = int(profile.process.fd_limit.value)
 
-            return execute_command(
+            result = execute_command(
                 command, env_overrides=env_overrides, timeout=effective_timeout, cwd=cwd,
                 max_processes=max_processes, fd_limit=fd_limit,
+                cgroup_path=self.adapter.cgroup_path(),
             )
+            result.seed = seed
+            result.profile_hash = profile_hash(profile)
+            result.adapter = type(self.adapter).__name__
+            result.fidelity = {
+                path: FidelityEntry(**entry) for path, entry in self.adapter.report().items()
+            }
+            return result
         finally:
             self.adapter.cleanup()

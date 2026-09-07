@@ -1,30 +1,39 @@
 """Failure D: locale-dependent number parsing (silent data corruption).
 
-Mechanism: a config value written European-style ("1,5" = one and a half) is
-parsed with locale.atof(), which honours the *ambient* locale's numeric
-conventions. Under a comma-decimal locale it reads 1.5. Under a period-decimal
-locale the comma is treated as a THOUSANDS separator and it silently reads
-15.0 -- a 10x error, with no exception raised.
+Mechanism: a config value written the way the developer wrote it ("1.5", one
+and a half, period decimal) is parsed with locale.atof(), which honours the
+*ambient* locale's numeric conventions. On the developer's machine (C, POSIX,
+en_US, en_IN: period decimal) it reads 1.5. On a German or French user's
+machine the period is the THOUSANDS separator, so it is stripped and the value
+silently reads 15.0. A 10x error, no exception raised.
 
-    de_DE.UTF-8   decimal_point=','  atof("1,5") -> 1.5    correct
-    en_US.UTF-8   decimal_point='.'  atof("1,5") -> 15.0   silently wrong
+    C / en_US / en_IN   decimal_point='.'  atof("1.5") -> 1.5    correct
+    de_DE / fr_FR       decimal_point=','  atof("1.5") -> 15.0   silently wrong
 
-    Env knob Morph turns : LANG / LC_ALL / LC_NUMERIC  (or --locale on Windows)
-    Baseline (de_DE)     : 0% fail
-    Fails when           : a period-decimal locale (en_US) is set -> 100% fail
-    Fix (one line)       : parse locale-independently instead of via locale.atof
+    Env knob Morph turns : LC_ALL / LANG (profile ``locale.locale``), or --locale
+    Baseline (no locale env, C.UTF-8 shell) : 0 % fail
+    Fails when           : a comma-decimal locale (de_DE, fr_FR) is set -> 100 % fail
+    Fix (one line)       : parse the value's documented format: float(raw)
     Classification       : environment-caused
 
-Fully deterministic -- no timing, no randomness, no network.
+Fully deterministic: no timing, no randomness, no network.
+
+Exit codes follow the corpus contract. 0 pass, 1 the engineered failure, and
+2 ONLY for a genuinely invalid trial: a locale was explicitly requested
+(--locale, MORPH_D_LOCALE, or LC_ALL/LANG naming a locale this fixture knows)
+and it is not installed or did not take effect. An unknown ambient locale is
+not invalid: the app runs under whatever the machine has, which is exactly the
+"works on my machine" situation the fixture models.
 
 Windows note: setlocale(LC_ALL, "") reads OS settings, NOT the LANG/LC_ALL
-environment variables, and changing the OS locale needs a reboot. So the locale
-is also accepted as an explicit --locale / MORPH_D_LOCALE knob, which is how
-Morph should drive this app on Windows (see docs/faultyapps.md section 6).
+environment variables, and changing the OS locale needs a reboot. This app
+therefore reads LC_ALL/LANG itself and applies them explicitly, so Morph's env
+export is honoured on Windows too; --locale / MORPH_D_LOCALE remain as a
+backup knob.
 
 Tuning knobs:
     MORPH_D_LOCALE   locale to apply explicitly (default: ambient/env)
-    MORPH_D_RAW      the raw config value to parse (default "1,5")
+    MORPH_D_RAW      the raw config value to parse (default "1.5")
     MORPH_D_EXPECTED the correct parsed value (default 1.5)
 """
 
@@ -34,19 +43,19 @@ import json
 import locale
 import os
 
-RAW_VALUE = os.getenv("MORPH_D_RAW", "1,5")
+RAW_VALUE = os.getenv("MORPH_D_RAW", "1.5")
 EXPECTED = float(os.getenv("MORPH_D_EXPECTED", "1.5"))
 TOLERANCE = 1e-6
 
 # Known locales: the naming variants worth trying, plus the numeric convention
 # that locale MUST produce if it genuinely took effect.
 #
-# The `decimal_point` entry is not documentation -- it is a guard. Windows' CRT
-# accepts any name shaped like ll_CC (e.g. "zz_ZZ") and silently falls back to a
+# The `decimal_point` entry is a guard, not documentation. Windows' CRT accepts
+# any name shaped like ll_CC (e.g. "zz_ZZ") and silently falls back to a
 # period-decimal default, and a Pi Lite image without generated locales can
-# behave similarly. Without this check a locale that never applied would produce
-# a *false* FAIL, and Morph would report "locale caused the failure" on evidence
-# that was fabricated. Verify the convention, never trust setlocale's return.
+# behave similarly. Without this check a locale that never applied would
+# produce a *false* PASS or FAIL, and Morph would report on fabricated
+# evidence. Verify the convention, never trust setlocale's return.
 _LOCALES = {
     "de_DE": {"aliases": ["de_DE.UTF-8", "de_DE.utf8", "de_DE", "German_Germany.1252", "de-DE"],
               "decimal_point": ","},
@@ -58,9 +67,12 @@ _LOCALES = {
               "decimal_point": "."},
 }
 
+# Locale names that mean "no particular locale": the developer's default shell.
+_NEUTRAL = {"", "C", "POSIX", "C.UTF-8", "C.utf8"}
+
 
 def _base_name(requested: str) -> str:
-    return requested.split(".")[0].replace("-", "_")
+    return requested.split(".")[0].split("@")[0].replace("-", "_")
 
 
 def _candidates(requested: str) -> list[str]:
@@ -75,14 +87,14 @@ def _candidates(requested: str) -> list[str]:
 def _env_requested() -> str | None:
     """The locale the *environment* is asking for, Unix-style.
 
-    Morph sets LC_ALL/LC_NUMERIC/LANG on Linux and macOS. Reading it back lets
-    us verify the knob actually moved: on Windows the CRT ignores these
-    variables entirely, so a run driven that way would otherwise report a FAIL
-    produced by the machine's own locale rather than by the requested one.
+    Morph exports LC_ALL and LANG (adapters' ``_apply_locale_env``). Reading
+    them back lets the app verify the knob actually moved: on Windows the CRT
+    ignores these variables, so a run driven that way would otherwise report
+    an outcome produced by the machine's own locale, not the requested one.
     """
     for var in ("LC_ALL", "LC_NUMERIC", "LANG"):
         value = os.environ.get(var)
-        if value and value not in ("C", "POSIX", "C.UTF-8"):
+        if value and value not in _NEUTRAL:
             return value
     return None
 
@@ -91,22 +103,21 @@ def _apply_locale(requested: str | None) -> tuple[str, str | None]:
     """Sets the process locale and verifies it actually took effect.
 
     Returns (applied_name, error). A non-None error means this trial is INVALID
-    (exit 2, "not a failure") -- per the interface contract, Morph must discard
-    it rather than count it as evidence.
+    (exit 2, "not a failure"): the engine discards it rather than counting it.
     """
     if not requested:
-        # Pure ambient with nothing requested: apply and report, but there is
-        # no expectation to verify against.
+        # Nothing requested: the developer's ambient locale, whatever it is.
         try:
             locale.setlocale(locale.LC_ALL, "")
-            return locale.setlocale(locale.LC_NUMERIC), None
-        except locale.Error as exc:
-            return "", f"could not apply ambient locale: {exc}"
+            return locale.setlocale(locale.LC_NUMERIC) or "C", None
+        except locale.Error:
+            locale.setlocale(locale.LC_ALL, "C")
+            return "C", None
 
     entry = _LOCALES.get(_base_name(requested))
     if not entry:
         return "", (f"locale {requested!r} is not registered in this fixture, so its numeric "
-                    f"convention cannot be verified -- add it to _LOCALES in app.py. "
+                    f"convention cannot be verified; add it to _LOCALES in app.py. "
                     f"Known: {', '.join(sorted(_LOCALES))}")
 
     for candidate in _candidates(requested):
@@ -122,7 +133,7 @@ def _apply_locale(requested: str | None) -> tuple[str, str | None]:
 
     return "", (f"locale {requested!r} is not installed, or did not take effect "
                 f"(expected decimal_point {entry['decimal_point']!r}; "
-                f"tried: {', '.join(_candidates(requested))}) -- "
+                f"tried: {', '.join(_candidates(requested))}); "
                 f"generate it, see docs/faultyapps.md section 6")
 
 
@@ -132,15 +143,15 @@ def _parse_buggy(raw: str) -> float:
 
 
 def _parse_fixed(raw: str) -> float:
-    """The fix: parse the value's own documented format, locale-independently."""
-    return float(raw.replace(",", "."))
+    """The fix: the config format is documented as period-decimal; parse that."""
+    return float(raw)
 
 
 def main(machine_mode: bool, fixed: bool, requested_locale: str | None = None) -> int:
     # An explicit --locale / MORPH_D_LOCALE is a deliberate knob: verify it
-    # strictly. A locale inherited from LC_ALL/LANG is only verified when this
-    # fixture knows its numeric convention -- otherwise a developer's own
-    # LANG=en_GB shell would turn every plain `run` into a setup error.
+    # strictly. A locale inherited from LC_ALL/LANG is verified when this
+    # fixture knows its numeric convention; any other ambient locale (a
+    # developer's en_GB shell) is applied as-is and never a setup error.
     explicit = requested_locale or os.getenv("MORPH_D_LOCALE") or None
     requested = explicit
     if requested is None:
@@ -164,7 +175,7 @@ def main(machine_mode: bool, fixed: bool, requested_locale: str | None = None) -
                 outcome = {
                     "result": "fail", "signal": "LocaleParseMismatch", "duration_ms": 0,
                     "detail": (f"parsed {RAW_VALUE!r} as {parsed}, expected {EXPECTED} "
-                               f"under {applied} (decimal comma read as thousands separator)"),
+                               f"under {applied} (decimal point read as thousands separator)"),
                 }
         except ValueError as exc:
             # Some locales reject the string outright rather than misreading it.

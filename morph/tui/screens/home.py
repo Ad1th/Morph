@@ -1,14 +1,19 @@
-"""Home -- mission control. Four ways in, plus a live host summary."""
+"""Home -- mission control. Six ways in, plus a live host summary."""
 
 from __future__ import annotations
 
 import platform
 from typing import ClassVar
 
+from rich.text import Text
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Container, Grid
-from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Static
+from textual.widgets import Button, Footer, Static
+
+from morph.tui.screens.base import MorphScreen
+from morph.tui.theme import palette
+from morph.tui.widgets.status_bar import StatusBar
 
 _LOGO = r"""
  __  __  ___  ___ ___ _  _
@@ -18,64 +23,71 @@ _LOGO = r"""
 """.strip("\n")
 
 _CARDS = [
-    ("experiment", "Experiment", "baseline vs treatments -> causal verdict"),
-    ("monitor", "Monitor", "slide conditions, watch performance live"),
-    ("threshold", "Threshold", "binary-search a parameter's tipping point"),
-    ("environment", "Environment", "capture / build a target profile"),
-    ("projects", "Projects", "add a GitHub repo or dir, then run it"),
-    ("regressions", "Regressions", "browse & replay saved bundles"),
+    ("experiment", "e", "Experiment", "baseline vs conditions → causal verdict"),
+    ("monitor", "m", "Monitor", "slide conditions, watch performance live"),
+    ("threshold", "t", "Threshold", "locate a parameter's failure boundary"),
+    ("environment", "n", "Environment", "capture / shape a target profile"),
+    ("projects", "p", "Projects", "add a GitHub repo or dir, then run it"),
+    ("regressions", "r", "Regressions", "browse & replay saved bundles"),
 ]
 
 
-class HomeScreen(Screen):
+class HomeScreen(MorphScreen):
+    SECTION = "home"
+    SUBTITLE = "test software in environments you don't physically have"
+
+    # The cards carry their own key hints, so the footer stays short at 80 cols.
     BINDINGS: ClassVar[list] = [
-        ("e", "open('experiment')", "Experiment"),
-        ("m", "open('monitor')", "Monitor"),
-        ("t", "open('threshold')", "Threshold"),
-        ("n", "open('environment')", "Environment"),
-        ("p", "open('projects')", "Projects"),
-        ("r", "open('regressions')", "Regressions"),
+        Binding("e", "open('experiment')", "Experiment", show=False),
+        Binding("m", "open('monitor')", "Monitor", show=False),
+        Binding("t", "open('threshold')", "Threshold", show=False),
+        Binding("n", "open('environment')", "Environment", show=False),
+        Binding("p", "open('projects')", "Projects", show=False),
+        Binding("r", "open('regressions')", "Regressions", show=False),
     ]
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=True)
+        yield self.title_widget()
         with Container(id="home-wrap"):
             yield Static(_LOGO, id="logo")
+            yield Static("M O R P H", id="wordmark")
             yield Static("test software in environments you don't physically have", id="tagline")
             with Grid(id="menu"):
-                for card_id, title, desc in _CARDS:
-                    yield Button(f"{title}\n[dim]{desc}[/dim]", id=f"card-{card_id}", classes="card")
-        yield Static(self._host_line(), id="home-status")
+                for card_id, key, title, desc in _CARDS:
+                    yield Button(self._card_label(key, title, desc), id=f"card-{card_id}", classes="card")
+            yield Static(self._host_line(), id="home-status")
+        yield StatusBar()
         yield Footer()
+
+    def _card_label(self, key: str, title: str, desc: str) -> Text:
+        p = palette(self)
+        label = Text()
+        label.append(f"{key} ", style=f"bold {p.evidence}")
+        label.append(title, style="bold")
+        label.append("\n")
+        label.append(desc, style=p.muted)
+        return label
 
     def on_mount(self) -> None:
         self.query_one("#card-experiment", Button).focus()
+        mode = "DEMO · recorded run, nothing executes" if self.demo else "LIVE"
+        self.status(mode)
+
+    def redraw_theme(self) -> None:
+        super().redraw_theme()
+        for card_id, key, title, desc in _CARDS:
+            self.query_one(f"#card-{card_id}", Button).label = self._card_label(key, title, desc)
 
     def _host_line(self) -> str:
-        mode = "DEMO (recorded)" if getattr(self.app, "demo", False) else "live"
         return (
-            f" host: {platform.system().lower()} / {platform.machine()}   "
-            f"python {platform.python_version()}   mode: {mode} "
+            f"host {platform.system().lower()} / {platform.machine()}  ·  "
+            f"python {platform.python_version()}"
         )
 
     def action_open(self, which: str) -> None:
-        from morph.tui.screens.environment import EnvironmentScreen
-        from morph.tui.screens.experiment import ExperimentScreen
-        from morph.tui.screens.monitor import MonitorScreen
-        from morph.tui.screens.projects import ProjectsScreen
-        from morph.tui.screens.regressions import RegressionsScreen
-        from morph.tui.screens.threshold import ThresholdScreen
-
-        screens = {
-            "experiment": ExperimentScreen,
-            "monitor": MonitorScreen,
-            "threshold": ThresholdScreen,
-            "environment": EnvironmentScreen,
-            "projects": ProjectsScreen,
-            "regressions": RegressionsScreen,
-        }
-        self.app.push_screen(screens[which]())
+        self.app.action_goto(which)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         assert event.button.id is not None
         self.action_open(event.button.id.removeprefix("card-"))
+

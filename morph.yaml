@@ -1,9 +1,11 @@
 # Morph project configuration.
 #
 # Cloud is a fallback, not a default (PRD section 25). A run only leaves this
-# machine when the profile asks for more than this machine physically has --
-# more RAM, more cores, another architecture or another OS -- because the
-# alternative would be pretending to reproduce conditions we cannot.
+# machine when you ask for it (`morph run --cloud`) AND the profile asks for
+# more than this machine physically has -- more RAM, more cores, another
+# architecture or another OS -- because the alternative would be pretending to
+# reproduce conditions we cannot. A configured worker never changes a plain
+# `morph run`.
 #
 # Check the routing decision and the worker at any time with:
 #     morph cloud --profile target.json
@@ -19,23 +21,35 @@ adapters:
   memory: native
   locale: native
 
+github:
+  # Sign in from the dashboard with the OAuth device flow: a GitHub page opens,
+  # you type a short code, done. Needs the PUBLIC client id of a GitHub OAuth
+  # App with "Enable Device Flow" ticked (github.com/settings/developers, one
+  # minute, no callback URL needed). Not a secret; GITHUB_CLIENT_ID overrides.
+  client_id: ""
+  scope: repo,read:user
+
 cloud:
   # Flip to true once `morph cloud` reports the worker usable.
   enabled: true
 
   # Provenance only. The transport is SSH whoever supplies the box, so a GCP
-  # instance, a Pi and a laptop across the room all work the same way.
+  # instance, a Raspberry Pi and a laptop across the room all work the same way.
   provider: gcp
 
-  # The instance's EXTERNAL ip, from the GCP console.
-  # Leave blank and export MORPH_CLOUD_HOST instead if you would rather not
-  # commit it; the environment wins over this file either way.
+  # The instance's EXTERNAL ip, from the GCP console. The environment wins
+  # over this file either way, so a laptop can point at the Pi on the desk:
+  #
+  #     export MORPH_CLOUD_HOST=rbpi.local MORPH_CLOUD_USER=rbpi
+  #     export MORPH_CLOUD_SSH_KEY=~/.ssh/id_ed25519   # optional
+  #
+  # (MORPH_WORKER_* are aliases.) A run only goes to the worker on an explicit
+  # `morph run --cloud`; tests and CI set MORPH_NO_NETWORK=1 and never connect.
   host: "34.93.95.6"
   user: "morph-worker"
   ssh_key: ~/.ssh/morph_gcp
 
-  # Set by scripts/setup_gcp_worker.sh, which builds a venv on the worker.
-  # A bare "python3" also works: Morph rewrites it to the interpreter it is
-  # running under, which is how the worker gets Morph's own dependencies.
+  # Interpreter and checkout on the worker, built by scripts/setup_gcp_worker.sh.
+  # A bare "python3" also works.
   python: /home/morph-worker/morph/.venv/bin/python
   workdir: /home/morph-worker/morph

@@ -1,0 +1,109 @@
+{
+  "version": "1.0",
+  "os": {
+    "family": {
+      "value": "darwin",
+      "status": "captured"
+    },
+    "version": {
+      "value": "26.5.2",
+      "status": "captured"
+    },
+    "kernel_version": {
+      "value": "25.5.0",
+      "status": "captured"
+    }
+  },
+  "cpu": {
+    "architecture": {
+      "value": "arm64",
+      "status": "captured"
+    },
+    "cores": {
+      "value": 8,
+      "status": "captured"
+    },
+    "logical_processors": {
+      "value": 8,
+      "status": "captured"
+    },
+    "clock_mhz": {
+      "value": 4056,
+      "status": "captured"
+    },
+    "quota_percent": {
+      "value": 100.0,
+      "status": "captured"
+    }
+  },
+  "memory": {
+    "total_mb": {
+      "value": 16384,
+      "status": "captured"
+    },
+    "swap_mb": {
+      "value": 6144,
+      "status": "captured"
+    },
+    "pressure_percent": {
+      "value": 78.3,
+      "status": "captured"
+    }
+  },
+  "locale": {
+    "locale": {
+      "value": "C.UTF-8",
+      "status": "requested"
+    },
+    "timezone": {
+      "value": "UTC",
+      "status": "requested"
+    },
+    "language_tag": {
+      "value": "en-US",
+      "status": "requested"
+    }
+  },
+  "filesystem": {
+    "case_sensitive": {
+      "value": false,
+      "status": "captured"
+    },
+    "filesystem_type": {
+      "value": "apfs",
+      "status": "captured"
+    },
+    "read_only": {
+      "value": false,
+      "status": "captured"
+    },
+    "disk_space_limit_mb": {
+      "value": 11666,
+      "status": "captured"
+    },
+    "disk_read_latency_ms": {
+      "value": 0.0,
+      "status": "captured"
+    },
+    "disk_write_latency_ms": {
+      "value": 0.0,
+      "status": "captured"
+    }
+  },
+  "network": {
+    "latency_ms": {
+      "value": 120.0,
+      "status": "requested"
+    },
+    "packet_loss_percent": {
+      "value": 18.0,
+      "status": "requested"
+    },
+    "bandwidth_mbps": null,
+    "jitter_ms": null,
+    "available": null,
+    "connection_type": null
+  },
+  "process": null,
+  "env_vars": {}
+}

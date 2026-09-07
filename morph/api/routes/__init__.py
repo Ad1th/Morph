@@ -1,3 +1,27 @@
-from morph.api.routes import experiments, parameters, profiles, regressions, runs
+from morph.api.routes import (
+    experiments,
+    minimize,
+    parameters,
+    platform,
+    profiles,
+    projects,
+    regressions,
+    runs,
+    surface,
+    threshold,
+    ws,
+)
 
-__all__ = ["experiments", "parameters", "profiles", "regressions", "runs"]
+__all__ = [
+    "experiments",
+    "minimize",
+    "parameters",
+    "platform",
+    "profiles",
+    "projects",
+    "regressions",
+    "runs",
+    "surface",
+    "threshold",
+    "ws",
+]

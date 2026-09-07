@@ -88,6 +88,7 @@ def test_get_default_adapter():
 
 
 def test_reconcile_profile_statuses():
+    """A third-party adapter without a `plan()` falls back to its capabilities."""
     profile = make_test_profile()
     mock_adapter = MockAdapter()
     reconciled = reconcile_profile_statuses(profile, adapter=mock_adapter)
@@ -193,3 +194,76 @@ def test_runtime_controller_process_timeout_overrides_argument():
     assert res.passed is False
     assert res.error_type == "TimeoutExpired"
     assert res.duration_ms < 5000
+
+
+def test_controller_never_builds_or_dispatches_to_a_worker():
+    """Routing is `run_anywhere`'s job (explicit `--cloud`); a plain controller
+    has no worker at all, so a configured-but-dead worker can never turn a
+    local run into a silent remote one, or a remote failure into a local run."""
+    controller = RuntimeController(adapter=MockAdapter())
+    assert not hasattr(controller, "worker")
+    assert "worker" not in RuntimeController.__init__.__code__.co_varnames
+
+
+def test_reconcile_uses_the_adapters_fidelity_not_class_booleans():
+    """A proxy-shaped network is APPROXIMATED and env-hint CPU/RAM knobs are
+    UNAVAILABLE, whatever `capabilities()` claims."""
+    from morph.runtime.adapters.base import ProxyAdapter
+
+    profile = make_test_profile()
+    reconciled = reconcile_profile_statuses(profile, adapter=ProxyAdapter())
+
+    assert reconciled.network.latency_ms.status == FieldStatus.APPROXIMATED
+    assert reconciled.network.packet_loss_percent.status == FieldStatus.APPROXIMATED
+    assert reconciled.cpu.cores.status == FieldStatus.UNAVAILABLE
+    assert reconciled.memory.total_mb.status == FieldStatus.UNAVAILABLE
+    assert reconciled.locale.locale.status == FieldStatus.REPRODUCED
+    assert reconciled.locale.timezone.status == FieldStatus.REPRODUCED
+
+
+def test_reconcile_marks_a_non_iana_timezone_approximated():
+    from morph.runtime.adapters.base import ProxyAdapter
+
+    profile = make_test_profile()
+    profile.locale.timezone.value = "IST"
+    reconciled = reconcile_profile_statuses(profile, adapter=ProxyAdapter())
+    assert reconciled.locale.timezone.status == FieldStatus.APPROXIMATED
+
+
+def test_fidelity_report_names_the_proxy_limitation():
+    from morph.runtime.adapters.base import PROXY_DETAIL, ProxyAdapter
+    from morph.runtime.controller import fidelity_report
+
+    report = fidelity_report(make_test_profile(), ProxyAdapter())
+    assert report["network.latency_ms"].detail == PROXY_DETAIL
+    assert "MORPH_MAX_CORES" in report["cpu.cores"].detail
+
+
+def test_run_result_carries_provenance_and_fidelity():
+    from morph.runtime.adapters.base import ProxyAdapter
+
+    profile = make_test_profile()
+    controller = RuntimeController(adapter=ProxyAdapter(), seed=99)
+    res = controller.run(
+        profile, f'{sys.executable} -c "import os; print(os.environ[\'MORPH_SEED\'])"'
+    )
+
+    assert res.passed, res.stderr
+    assert res.stdout.strip() == "99", "the seed must reach the child (netshape reproduces the loss pattern)"
+    assert res.seed == 99
+    assert res.command.startswith(sys.executable)
+    assert res.adapter == "ProxyAdapter"
+    assert res.profile_hash and len(res.profile_hash) == 64
+    assert res.morph_version and res.host_fingerprint
+    assert res.fidelity["network.latency_ms"].status == "approximated"
+    assert res.fidelity["cpu.cores"].status == "unavailable"
+    # JSON round-trip keeps all of it.
+    assert RunResult.model_validate_json(res.model_dump_json()) == res
+
+
+def test_a_fresh_seed_is_recorded_when_none_is_given():
+    controller = RuntimeController(adapter=MockAdapter())
+    a = controller.run(make_test_profile(), f'{sys.executable} -c "pass"')
+    b = controller.run(make_test_profile(), f'{sys.executable} -c "pass"')
+    assert a.seed is not None and b.seed is not None
+    assert a.profile_hash == b.profile_hash

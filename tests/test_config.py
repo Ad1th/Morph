@@ -45,3 +45,16 @@ def test_find_config_path(tmp_path):
 
     loaded = load_config(nested_dir)
     assert loaded.default_trials == 7
+
+
+def test_github_section_defaults_and_roundtrip(tmp_path):
+    from morph.config import load_config, save_config
+    from morph.schema.config import MorphConfig
+
+    cfg = MorphConfig()
+    assert cfg.github.client_id is None
+    assert cfg.github.scope == "repo,read:user"
+    cfg.github.client_id = "Iv1.abc123"
+    path = tmp_path / "morph.yaml"
+    save_config(cfg, path)
+    assert load_config(path).github.client_id == "Iv1.abc123"

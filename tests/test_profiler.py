@@ -39,6 +39,57 @@ def test_collect_locale():
     loc = collect_locale()
     assert loc.locale.status == FieldStatus.CAPTURED
     assert loc.timezone.value
+    # The locale must be usable as LC_ALL on POSIX: en_US.UTF-8, not en-US.
+    assert "-" not in loc.locale.value.split(".")[0]
+    assert loc.language_tag is not None and "_" not in loc.language_tag.value
+
+
+def test_timezone_is_an_iana_name_a_child_can_interpret(monkeypatch):
+    """`TZ=IST` is UTC to libc; `TZ=Asia/Kolkata` is not."""
+    from zoneinfo import ZoneInfo
+
+    monkeypatch.delenv("TZ", raising=False)
+    loc = collect_locale()
+    if loc.timezone.status == FieldStatus.CAPTURED:
+        ZoneInfo(loc.timezone.value)  # must not raise
+    else:
+        # Honest fallback: an abbreviation is marked APPROXIMATED, never CAPTURED.
+        assert loc.timezone.status == FieldStatus.APPROXIMATED
+
+
+def test_tz_env_is_honoured_when_it_is_an_iana_name(monkeypatch):
+    monkeypatch.setenv("TZ", "Europe/Berlin")
+    loc = collect_locale()
+    assert loc.timezone.value == "Europe/Berlin"
+    assert loc.timezone.status == FieldStatus.CAPTURED
+
+
+def test_capture_then_apply_round_trip_child_sees_the_zone_and_a_working_locale(monkeypatch):
+    """The whole point: what capture records, apply can hand to a child."""
+    import shlex
+    import subprocess
+    import sys
+
+    from morph.runtime.adapters.base import ProxyAdapter
+
+    monkeypatch.setenv("TZ", "Asia/Kolkata")
+    loc = collect_locale()
+    adapter = ProxyAdapter()
+    adapter.apply_locale(loc.locale.value, loc.timezone.value)
+    env = {**os.environ, **adapter.get_env_overrides()}
+    code = (
+        "import time, locale; print(time.strftime('%z')); "
+        "locale.setlocale(locale.LC_ALL, ''); print('locale-ok')"
+    )
+    argv = [sys.executable, "-c", code]
+    cmd = argv if os.name == "nt" else shlex.split(shlex.join(argv))
+    proc = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=30)
+    lines = proc.stdout.split()
+    assert lines[0] == "+0530", proc.stdout + proc.stderr
+    if os.name != "nt" and proc.returncode != 0:
+        # The captured locale may not be installed on a minimal CI image; that is a
+        # host limitation, not a wrong name. It must at least be well-formed.
+        assert "_" in env["LC_ALL"] and "." in env["LC_ALL"]
 
 
 def test_collect_filesystem():

@@ -11,6 +11,7 @@ Only when all three miss does anything need the OAuth device flow.
 
 from __future__ import annotations
 
+import base64
 import os
 import re
 import shutil
@@ -103,9 +104,39 @@ def normalize_repo(repo: str) -> tuple[str, str]:
 
 
 def clone_url(owner: str, name: str, token: str | None = None) -> str:
-    if token and token.strip():
-        return f"https://x-access-token:{token.strip()}@github.com/{owner}/{name}.git"
+    """The clone URL. The token is deliberately NOT embedded: it would land in
+    argv (visible to `ps`) and in `.git/config` as remote.origin.url for the
+    life of the checkout. Credentials travel via :func:`git_auth_env` instead."""
     return f"https://github.com/{owner}/{name}.git"
+
+
+def git_auth_env(token: str | None) -> dict[str, str]:
+    """Environment that authenticates git to github.com for ONE process.
+
+    Uses git's env-only config mechanism (GIT_CONFIG_COUNT/KEY/VALUE), so the
+    header exists only in the child's environment: nothing is written to any
+    config file and nothing appears on a command line.
+    """
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    if token and token.strip():
+        b64 = base64.b64encode(f"x-access-token:{token.strip()}".encode()).decode()
+        env.update({
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "http.https://github.com/.extraheader",
+            "GIT_CONFIG_VALUE_0": f"AUTHORIZATION: basic {b64}",
+        })
+    return env
+
+
+def redact(text: str, token: str | None) -> str:
+    """Remove the token (raw and base64-encoded) from any text shown to a user."""
+    out = text or ""
+    if token and token.strip():
+        raw = token.strip()
+        out = out.replace(raw, "***")
+        b64 = base64.b64encode(f"x-access-token:{raw}".encode()).decode()
+        out = out.replace(b64, "***")
+    return re.sub(r"AUTHORIZATION:\s*basic\s+\S+", "AUTHORIZATION: basic ***", out)
 
 
 def _friendly_clone_error(stderr: str, branch: str | None) -> str:
@@ -143,20 +174,18 @@ def clone(
     cmd = ["git", "clone", "--depth", str(depth)]
     if branch and branch.strip():
         cmd += ["--branch", branch.strip()]
-    cmd += [clone_url(owner, name, token), str(target)]
-    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    cmd += [clone_url(owner, name), str(target)]
+    env = git_auth_env(token)
 
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
     except subprocess.TimeoutExpired:
         raise GitHubError(f"Cloning {owner}/{name} timed out after {timeout:.0f}s")
     except (OSError, subprocess.SubprocessError) as exc:
-        raise GitHubError(f"Could not run git clone: {exc}")
+        raise GitHubError(f"Could not run git clone: {redact(str(exc), token)}")
 
     if proc.returncode != 0:
-        err = proc.stderr or proc.stdout or "unknown error"
-        if token and token in err:
-            err = err.replace(token, "***")
+        err = redact(proc.stderr or proc.stdout or "unknown error", token)
         raise GitHubError(_friendly_clone_error(err, branch))
 
     head = subprocess.run(

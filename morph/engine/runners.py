@@ -12,14 +12,20 @@ the identical experiment.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
+from morph.engine.progress import RunAtFn, RunFn
 from morph.runtime.controller import RuntimeController
 from morph.runtime.runner import execute_command
 from morph.schema.profile import EnvironmentProfile, FieldStatus, NetworkInfo, ProfileField
 
-RunFn = Callable[[], bool]
-RunAtFn = Callable[[float], bool]
+__all__ = [
+    "RunAtFn",
+    "RunFn",
+    "build_baseline_and_candidates",
+    "make_run_fn",
+    "make_threshold_run_fn",
+    "set_profile_parameter",
+    "with_unconstrained_network",
+]
 
 
 def _field_is_positive(field: object) -> bool:
@@ -113,33 +119,60 @@ def with_unconstrained_network(profile: EnvironmentProfile) -> EnvironmentProfil
     return filled
 
 
-def set_profile_parameter(
-    profile: EnvironmentProfile, dotted_path: str, value: float
-) -> EnvironmentProfile:
+def set_profile_parameter(profile: EnvironmentProfile, dotted_path: str, value: float) -> EnvironmentProfile:
     """Return a deep copy of ``profile`` with one field's value replaced.
 
     ``dotted_path`` addresses a ProfileField by section and name, e.g.
-    ``network.latency_ms``, ``cpu.cores``, ``memory.total_mb``.
+    ``network.latency_ms``, ``cpu.cores``, ``memory.total_mb``. The field's
+    status becomes ``REQUESTED``: the value is now something we are asking the
+    runtime to reproduce, not something that was captured from a host, so the
+    platform-restriction checks (which key on ``REQUESTED``) still apply.
     """
     updated = profile.model_copy(deep=True)
     parts = dotted_path.split(".")
     if len(parts) < 2:
-        raise ValueError(
-            f"Parameter '{dotted_path}' must be '<section>.<field>', e.g. 'network.latency_ms'"
-        )
+        raise ValueError(f"Parameter '{dotted_path}' must be '<section>.<field>', e.g. 'network.latency_ms'")
 
     section = updated
     for part in parts[:-1]:
-        section = getattr(section, part, None)
-        if section is None:
-            raise ValueError(f"Profile has no '{part}' section for parameter '{dotted_path}'")
+        nxt = getattr(section, part, None)
+        if nxt is None:
+            # An optional section (network / process / filesystem) the capture
+            # left empty: create it so the parameter has somewhere to live.
+            nxt = _blank_section(section, part)
+            if nxt is None:
+                raise ValueError(f"Profile has no '{part}' section for parameter '{dotted_path}'")
+            setattr(section, part, nxt)
+        section = nxt
 
-    leaf = getattr(section, parts[-1], None)
-    if leaf is None or not hasattr(leaf, "value"):
+    name = parts[-1]
+    leaf = getattr(section, name, None)
+    if leaf is None:
+        fields = getattr(type(section), "model_fields", {})
+        if name not in fields:
+            raise ValueError(f"'{dotted_path}' is not a settable profile field")
+        leaf = ProfileField(value=value, status=FieldStatus.REQUESTED)
+        setattr(section, name, leaf)
+    elif not hasattr(leaf, "value"):
         raise ValueError(f"'{dotted_path}' is not a settable profile field")
 
     leaf.value = value
+    leaf.status = FieldStatus.REQUESTED
     return updated
+
+
+def _blank_section(parent: object, name: str) -> object | None:
+    """A freshly requested optional section, with its required fields blank."""
+    from morph.schema.profile import FilesystemInfo, NetworkInfo, ProcessInfo
+
+    req = lambda v: ProfileField(value=v, status=FieldStatus.REQUESTED)  # noqa: E731
+    if name == "network":
+        return NetworkInfo(latency_ms=req(0.0), packet_loss_percent=req(0.0))
+    if name == "process":
+        return ProcessInfo()
+    if name == "filesystem":
+        return FilesystemInfo(case_sensitive=req(True))
+    return None
 
 
 def make_threshold_run_fn(

@@ -208,12 +208,15 @@ def test_cli_threshold(tmp_path):
             "0",
             "--high",
             "100",
-            "--trials",
-            "1",
+            "--max-trials",
+            "4",
         ],
     )
-    assert res.exit_code == 0
+    # The command always passes: there is no boundary in range, and the CLI
+    # says so with exit code 3 rather than a green panel.
+    assert res.exit_code == 3, res.output
     assert "Threshold Search Result" in res.stdout
+    assert "no boundary in range" in res.stdout
 
 
 

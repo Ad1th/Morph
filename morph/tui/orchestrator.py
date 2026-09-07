@@ -5,6 +5,11 @@ Thin wrappers that build ``RunResult``-returning trial runners from an
 callback. The TUI runs these inside a Textual thread worker and marshals the
 events onto the UI thread; nothing here imports Textual, so it is unit-testable
 on its own.
+
+Cancellation is cooperative: the screen's ``on_event`` raises
+:class:`RunCancelled` once the user has pressed Stop. The engine calls
+``on_event`` *between* trials, after ``RuntimeController.run`` has already
+restored the host in its ``finally``, so shaping never outlives a cancelled run.
 """
 
 from __future__ import annotations
@@ -12,8 +17,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+from morph.engine.boundary import locate_boundary
 from morph.engine.experiment import RunFn, run_experiment, run_trials
 from morph.engine.progress import OnEvent
+from morph.engine.sequential import run_sequential_experiment
 from morph.engine.threshold import search_threshold
 from morph.regression import load_regression
 from morph.regression.replay import ReplayResult
@@ -28,6 +35,24 @@ from morph.schema.telemetry import RunResult
 
 # Parameters the threshold search knows how to vary on a profile.
 THRESHOLD_PARAMETERS = ("network.latency_ms", "network.packet_loss_percent")
+
+EXPERIMENT_MODES = ("sequential", "batch")
+THRESHOLD_METHODS = ("bayesian", "bisection")
+
+
+class RunCancelled(Exception):
+    """Raised from an ``on_event`` callback to stop the engine between trials."""
+
+
+def cancellable(on_event: OnEvent, is_cancelled: Callable[[], bool]) -> OnEvent:
+    """Wrap ``on_event`` so it raises :class:`RunCancelled` once ``is_cancelled()``."""
+
+    def _emit(event: TrialEvent) -> None:
+        if is_cancelled():
+            raise RunCancelled()
+        on_event(event)
+
+    return _emit
 
 
 def _positive(field: object) -> bool:
@@ -95,10 +120,23 @@ def run_experiment_live(
     cwd: str | None = None,
     on_event: OnEvent,
     controller: RuntimeController | None = None,
+    mode: str = "sequential",
+    alpha: float = 0.05,
 ) -> ExperimentResult:
+    """Causal isolation. ``mode="sequential"`` (default) runs paired round-robin
+    trials with anytime-valid e-values and stops early; ``"batch"`` runs the
+    classic fixed-N design with one Fisher test per condition at the end.
+    ``trials`` is the per-condition budget in both modes."""
+    if mode not in EXPERIMENT_MODES:
+        raise ValueError(f"mode must be one of {EXPERIMENT_MODES}, got {mode!r}")
     baseline, candidates = build_isolation_runners(target, command, timeout, controller, cwd)
     if not candidates:
         candidates = {"treatment": make_result_runner(command, target, timeout, controller, cwd)}
+    if mode == "sequential":
+        return run_sequential_experiment(
+            baseline, candidates, max_rounds=trials, alpha=alpha,
+            min_rounds=min(3, trials), on_event=on_event,
+        )
     return run_experiment(baseline, candidates, n=trials, on_event=on_event)
 
 
@@ -132,13 +170,24 @@ def run_threshold_live(
     cwd: str | None = None,
     on_event: OnEvent,
     controller: RuntimeController | None = None,
+    method: str = "bayesian",
 ) -> ThresholdResult:
+    """Locate the failure boundary of ``parameter``. ``method="bayesian"``
+    (default) is probabilistic bisection: ``trials`` is the total trial budget
+    and the result carries a credible interval. ``"bisection"`` is the classic
+    halving search with ``trials`` runs per probe."""
+    if method not in THRESHOLD_METHODS:
+        raise ValueError(f"method must be one of {THRESHOLD_METHODS}, got {method!r}")
     ctrl = controller or RuntimeController()
 
     def run_at(value: float) -> RunResult:
         candidate = set_profile_parameter(base, parameter, value)
         return ctrl.run(profile=candidate, command=command, timeout=timeout, cwd=cwd)
 
+    if method == "bayesian":
+        return locate_boundary(
+            parameter, run_at, low, high, max_trials=max(trials, 6), on_event=on_event
+        )
     return search_threshold(
         parameter=parameter, run_at=run_at, low=low, high=high, trials=trials, on_event=on_event
     )
@@ -150,17 +199,24 @@ def run_replay_live(
     timeout: float,
     on_event: OnEvent,
     controller: RuntimeController | None = None,
+    run_fn: Callable[[], RunResult] | None = None,
 ) -> ReplayResult:
     """Re-run a saved regression bundle under its own environment, emitting a
-    trial event per run, then check the failure rate against its tolerance."""
+    trial event per run, then check the failure rate against its tolerance.
+
+    Trials run from the directory the bundle was recorded in
+    (``metadata["cwd"]``), so a project-based experiment replays correctly.
+    ``run_fn`` overrides the runner (demo mode / tests)."""
     artifact = (
         regression
         if isinstance(regression, RegressionArtifact)
         else load_regression(regression)
     )
-    ctrl = controller or RuntimeController()
-    runner = make_result_runner(artifact.command, artifact.environment, timeout, ctrl)
-    batch = run_trials(runner, trials, f"replay:{artifact.regression_id}", on_event=on_event)
+    if run_fn is None:
+        ctrl = controller or RuntimeController()
+        cwd = artifact.metadata.get("cwd") if isinstance(artifact.metadata, dict) else None
+        run_fn = make_result_runner(artifact.command, artifact.environment, timeout, ctrl, cwd)
+    batch = run_trials(run_fn, trials, f"replay:{artifact.regression_id}", on_event=on_event)
 
     matches = batch.failure_rate <= artifact.expected_max_failure_rate
     summary = (

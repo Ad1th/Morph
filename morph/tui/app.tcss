@@ -1,416 +1,610 @@
-/* Morph TUI -- one restrained accent ($accent), dark-first, adapts to light. */
+/* Morph TUI -- abyss / rose ground, gold evidence accent (see theme.py).
+   One panel language: round Textual borders with CAPS border-titles.
+   Breakpoints (set on Screen by the app): -compact (< 120 cols) / -wide,
+   -short (< 36 rows) / -tall. */
 
 Screen {
     background: $background;
+    color: $bone;
 }
 
-/* ---------- Home ---------- */
-
-#home-wrap {
-    align: center middle;
-    height: 1fr;
-}
-
-#logo {
-    color: $accent;
-    text-style: bold;
-    content-align: center middle;
-    width: auto;
-    margin-bottom: 1;
-}
-
-#tagline {
-    color: $text-muted;
-    content-align: center middle;
-    width: 100%;
-    margin-bottom: 2;
-}
-
-#menu {
-    grid-size: 2 3;
-    grid-gutter: 1 2;
-    grid-rows: 5;
-    grid-columns: 32;
-    width: auto;
-    height: auto;
-}
-
-.card {
-    width: 32;
-    height: 5;
-    border: round $panel-lighten-2;
-    background: $panel;
-    color: $text;
-    content-align: center middle;
-    text-align: center;
-}
-
-.card:hover {
-    border: round $accent;
-    background: $boost;
-}
-
-.card:focus {
-    border: thick $accent;
-    background: $boost;
-}
-
-#home-status {
-    dock: bottom;
-    height: 1;
-    padding: 0 1;
-    background: $panel;
-    color: $text-muted;
-}
-
-/* ---------- shared screen chrome ---------- */
+/* ---------- shared chrome ---------- */
 
 .screen-title {
     dock: top;
     height: 1;
-    background: $accent;
-    color: $text;
-    text-style: bold;
+    background: $surface;
+    color: $rose-soft;
     padding: 0 1;
 }
 
-.placeholder {
-    align: center middle;
-    height: 1fr;
-    color: $text-muted;
+.screen-title.flash {
+    background: $fail;
+    color: $ink-on-fail;
+}
+
+.status-bar {
+    height: 1;
+    width: 100%;
+    background: $surface;
+    color: $bone-dim;
+}
+
+.status-left {
+    width: 1fr;
+    height: 1;
+}
+
+.status-right {
+    width: auto;
+    height: 1;
+    text-align: right;
+}
+
+#status-progress {
+    width: 14;
+    height: 1;
+    margin: 0 1 0 0;
+}
+
+#status-progress Bar {
+    width: 1fr;
+}
+
+#status-progress Bar > .bar--bar {
+    color: $evidence;
+    background: $track;
+}
+
+#status-progress Bar > .bar--complete {
+    color: $pass;
+}
+
+Footer {
+    background: $surface;
+}
+
+Footer > .footer-key--key, FooterKey .footer-key--key {
+    color: $evidence;
+    background: $surface;
+}
+
+FooterKey .footer-key--description {
+    color: $bone-dim;
 }
 
 .hidden {
     display: none;
 }
 
-/* ---------- Experiment ---------- */
-
-#setup {
+/* setup bars: compact widgets, one or two rows */
+.setup {
     height: auto;
-    padding: 1;
-    background: $panel;
-    align-vertical: middle;
+    padding: 0 1;
+    background: $surface;
 }
 
-#setup Label {
-    padding: 1 1 0 2;
-    color: $text-muted;
+.setup .row {
+    height: 1;
+    margin-bottom: 0;
 }
 
-#setup Input {
+.setup Label {
+    color: $bone-dim;
+    padding: 0 1 0 0;
+    width: auto;
+}
+
+.setup Input {
     width: 1fr;
+    background: $panel;
+    color: $bone;
+    margin-right: 1;
 }
 
-#setup #in-trials {
-    width: 8;
+.setup Input:focus {
+    background: $boost;
 }
 
-#setup #in-regid {
-    width: 16;
+.setup Input.narrow {
+    width: 7;
 }
 
-#setup #btn-run {
-    margin-left: 2;
+.setup Input.mid {
+    width: 14;
 }
 
-#setup #btn-save {
-    margin-left: 1;
+.setup Button {
+    margin-right: 1;
+    min-width: 8;
+    color: $bone;
 }
+
+.setup Button.-primary {
+    background: $fail;
+    color: $ink-on-fail;
+    text-style: bold;
+}
+
+.setup Button.-success {
+    background: $pass;
+    color: $ink-on-pass;
+    text-style: bold;
+}
+
+.setup Button:disabled {
+    background: $panel;
+    color: $bone-dim;
+}
+
+.setup Checkbox {
+    background: $surface;
+    color: $bone;
+    margin-right: 1;
+    width: auto;
+}
+
+.setup Checkbox > .toggle--button {
+    color: $evidence;
+    background: $panel;
+}
+
+.setup Select {
+    width: 26;
+    margin-right: 1;
+}
+
+.setup Select > SelectCurrent {
+    background: $panel;
+    border: none;
+    height: 1;
+    padding: 0 1;
+}
+
+/* every panel shares one border language */
+.panel {
+    border: round $evidence-dim;
+    border-title-color: $evidence;
+    border-title-style: bold;
+    border-subtitle-color: $bone-dim;
+    padding: 0 1;
+}
+
+RichLog.panel {
+    background: $surface;
+    color: $bone;
+    scrollbar-color: $evidence-dim;
+    scrollbar-background: $surface;
+}
+
+DataTable {
+    background: $background;
+    color: $bone;
+    border: round $evidence-dim;
+    border-title-color: $evidence;
+    border-title-style: bold;
+}
+
+DataTable > .datatable--header {
+    background: $surface;
+    color: $bone-dim;
+    text-style: bold;
+}
+
+DataTable > .datatable--cursor {
+    background: $panel;
+    color: $bone;
+}
+
+DataTable > .datatable--even-row {
+    background: $surface 40%;
+}
+
+/* ---------- Home ---------- */
+
+#home-wrap {
+    align: center top;
+    height: 1fr;
+    padding: 1 2 0 2;
+}
+
+#logo {
+    color: $fail;
+    text-style: bold;
+    content-align: center middle;
+    text-align: center;
+    width: 100%;
+    height: auto;
+    margin-bottom: 0;
+}
+
+#wordmark {
+    color: $fail;
+    text-style: bold;
+    content-align: center middle;
+    text-align: center;
+    width: 100%;
+    height: 1;
+}
+
+Screen.-tall #wordmark { display: none; }
+Screen.-short #logo { display: none; }
+
+#tagline {
+    color: $bone-dim;
+    content-align: center middle;
+    text-align: center;
+    width: 100%;
+    height: 1;
+    margin-bottom: 1;
+}
+
+#menu {
+    grid-size: 2 3;
+    grid-gutter: 0 2;
+    grid-rows: 4;
+    grid-columns: 1fr;
+    width: 100%;
+    height: auto;
+    max-width: 80;
+}
+
+Screen.-wide #menu {
+    grid-size: 3 2;
+    max-width: 120;
+}
+
+.card {
+    width: 100%;
+    min-width: 30;
+    height: 4;
+    border: round $evidence-dim;
+    background: $surface;
+    color: $bone;
+    content-align: center middle;
+    text-align: center;
+    text-style: none;
+}
+
+.card:hover {
+    border: round $evidence;
+    background: $panel;
+}
+
+.card:focus {
+    border: round $fail;
+    background: $panel;
+    text-style: bold;
+}
+
+#home-status {
+    height: 1;
+    padding: 0 1;
+    color: $bone-dim;
+    text-align: center;
+    width: 100%;
+    margin-top: 1;
+}
+
+/* ---------- Experiment ---------- */
 
 #exp-body {
     height: 1fr;
 }
 
-#lanes {
+#exp-left {
     width: 3fr;
-    padding: 1 2;
+    height: 1fr;
+    padding: 0 1;
+    scrollbar-color: $evidence-dim;
+    scrollbar-background: $background;
+}
+
+#exp-right {
+    width: 2fr;
+    height: 1fr;
+    min-width: 30;
+}
+
+Screen.-compact #exp-body {
+    layout: vertical;
+}
+
+Screen.-compact #exp-left {
+    width: 100%;
+    height: 1fr;
+    min-height: 8;
+}
+
+Screen.-compact #exp-right {
+    width: 100%;
+    height: 9;
+}
+
+#lanes {
+    height: auto;
 }
 
 .lane {
     height: auto;
-    padding: 1 0;
-    border-bottom: dashed $panel-lighten-2;
+    border-top: round $evidence-dim;
+    border-title-color: $rose-soft;
+    border-title-style: bold;
+    padding: 0 1;
 }
 
-#exp-log {
-    width: 2fr;
-    border-left: solid $panel-lighten-2;
-    padding: 0 1;
-    background: $surface;
+.lane.decisive {
+    border-top: round $evidence;
+    border-title-color: $evidence;
+}
+
+#lanes-empty {
+    color: $bone-dim;
+    padding: 1 1;
+    height: auto;
 }
 
 #verdict, #matrix {
     height: auto;
-    padding: 0 2 1 2;
+    margin-top: 1;
 }
 
-ExperimentScreen.significant {
-    border: thick $error;
+#matrix {
+    width: auto;
+}
+
+#evidence {
+    height: auto;
+    max-height: 45%;
+    background: $surface;
+}
+
+Screen.-compact #evidence {
+    max-height: 4;
+}
+
+#exp-log {
+    height: 1fr;
 }
 
 /* ---------- Environment ---------- */
 
-#env-bar {
-    height: auto;
-    padding: 1;
-    background: $panel;
-}
-
-#env-bar Select {
-    width: 24;
-}
-
-#env-bar Input {
-    width: 1fr;
-    margin-left: 1;
-}
-
-#env-bar Button {
-    margin-left: 1;
-}
-
 #env-diff {
     height: 1fr;
-    margin: 1 2;
+    margin: 0 1;
 }
 
 #env-edit {
-    height: auto;
-    padding: 0 2;
+    height: 1;
+    padding: 0 1;
+    background: $surface;
 }
 
 #env-edit-label {
-    width: 22;
-    color: $text-muted;
-    padding: 1 1 0 0;
+    width: auto;
+    color: $bone-dim;
+    padding: 0 1 0 0;
 }
 
 #env-edit-input {
     width: 1fr;
-}
-
-#env-status {
-    dock: bottom;
-    height: 1;
-    padding: 0 2;
     background: $panel;
-    color: $text-muted;
 }
 
 /* ---------- Threshold ---------- */
 
-#th-bar, #th-setup2 {
-    height: auto;
-    padding: 1 1 0 1;
-    background: $panel;
-}
-
-#th-setup2 {
-    padding: 0 1 1 1;
-}
-
-#th-bar Select {
-    width: 28;
-}
-
-#th-bar Input {
-    width: 12;
-    margin-left: 1;
-}
-
-#th-bar Button {
-    margin-left: 2;
-}
-
-#th-setup2 Input {
-    width: 1fr;
-    margin-right: 1;
+#th-body {
+    height: 1fr;
 }
 
 #th-gauge-wrap {
     height: auto;
-    padding: 1 2;
 }
 
 .gauge {
     height: auto;
-    padding: 1 0;
+    margin: 0 1;
+}
+
+#th-empty {
+    color: $bone-dim;
+    padding: 1 2;
+    height: auto;
 }
 
 #th-log {
     height: 1fr;
-    border-top: solid $panel-lighten-2;
-    padding: 0 2;
-    background: $surface;
+    margin: 0 1;
 }
 
 /* ---------- Regressions ---------- */
 
 #reg-table {
     height: 1fr;
-    margin: 0 2;
+    min-height: 5;
+    margin: 0 1;
 }
 
-#reg-bar {
+#reg-lane-wrap {
     height: auto;
-    padding: 1;
-    background: $panel;
+    margin: 0 1;
 }
 
-#reg-bar Input {
-    width: 10;
-}
-
-#reg-bar Button {
-    margin-left: 2;
+#reg-verdict {
+    height: auto;
+    margin: 0 1;
 }
 
 #reg-log {
-    height: 8;
-    border-top: solid $panel-lighten-2;
-    padding: 0 2;
-    background: $surface;
+    height: 6;
+    margin: 0 1;
 }
 
-#reg-status {
-    dock: bottom;
-    height: 1;
-    padding: 0 2;
-    background: $panel;
-    color: $text-muted;
-}
-
-RegressionsScreen .lane {
-    padding: 0 2;
+Screen.-compact #reg-log {
+    height: 4;
 }
 
 /* ---------- Monitor ---------- */
-
-#mon-bar {
-    height: auto;
-    padding: 1;
-    background: $panel;
-    align-vertical: middle;
-}
-
-#mon-bar #mon-command {
-    width: 1fr;
-}
-
-#mon-bar Label {
-    padding: 0 1 0 2;
-    color: $text-muted;
-}
-
-#mon-bar #mon-run {
-    margin-left: 2;
-}
 
 #mon-body {
     height: 1fr;
 }
 
 #mon-sliders {
-    width: 2fr;
-    padding: 1 2;
+    width: 1fr;
+    min-width: 46;
+    height: 1fr;
+    padding: 0 1;
+    border: round $evidence-dim;
+    border-title-color: $evidence;
+    border-title-style: bold;
+    margin: 0 1;
+}
+
+#mon-graph {
+    width: 1fr;
+    height: 1fr;
+    padding: 0 1;
+    scrollbar-size: 1 1;
+    scrollbar-color: $evidence-dim;
+    scrollbar-background: $background;
+    border: round $evidence-dim;
+    border-title-color: $evidence;
+    border-title-style: bold;
+    margin: 0 1 0 0;
+}
+
+Screen.-compact #mon-body {
+    layout: vertical;
+}
+
+Screen.-compact #mon-sliders {
+    width: 100%;
+    height: 9;
+    margin: 0 1;
+}
+
+Screen.-compact #mon-graph {
+    width: 100%;
+    height: 1fr;
+    margin: 0 1;
 }
 
 .slider {
     height: 1;
-    color: $text;
+    color: $bone;
 }
 
 .slider:focus {
-    background: $boost;
+    background: $panel;
 }
 
-#mon-graph {
-    width: 3fr;
-    padding: 1 2;
-    border-left: solid $panel-lighten-2;
-    background: $surface;
-}
-
-.mon-h {
-    color: $text-muted;
-    text-style: bold;
-    margin-bottom: 1;
+.slider.warn {
+    color: $fail;
 }
 
 .mon-metric {
-    color: $text-muted;
-    margin-top: 1;
+    color: $bone-dim;
+    height: 1;
 }
 
 #mon-graph Sparkline {
+    height: 2;
+    margin-bottom: 0;
+}
+
+Screen.-short #mon-graph Sparkline {
+    height: 1;
+}
+
+Screen.-tall #mon-graph Sparkline {
     height: 3;
+}
+
+#mon-graph Sparkline > .sparkline--max-color {
+    color: $fail;
+}
+
+#mon-graph Sparkline > .sparkline--min-color {
+    color: $evidence-dim;
 }
 
 .mon-val {
     text-style: bold;
+    color: $bone;
+    height: 1;
 }
 
 #mon-strip {
-    color: $text-muted;
+    color: $bone-dim;
+    height: auto;
 }
 
 #mon-warn {
-    dock: bottom;
     height: auto;
     min-height: 1;
-    padding: 0 2;
-    background: $panel;
-    color: $text;
+    max-height: 3;
+    padding: 0 1;
+    margin: 0 1;
+    background: $surface;
+    color: $bone;
 }
 
 /* ---------- Projects ---------- */
 
-#proj-bar {
-    height: auto;
-    padding: 1;
-    background: $panel;
-    align-vertical: middle;
-}
-
-#proj-bar #proj-src {
-    width: 1fr;
-}
-
-#proj-bar Checkbox {
+#proj-table {
+    height: 1fr;
+    min-height: 4;
     margin: 0 1;
 }
 
-#proj-bar #proj-connect {
-    margin-left: 1;
-}
-
-#proj-table {
-    height: 1fr;
-    margin: 0 2;
-}
-
-#proj-actions {
-    height: auto;
-    padding: 1;
-    background: $panel;
-}
-
-#proj-actions Button {
-    margin-right: 1;
-}
-
 #proj-log {
-    height: 8;
-    border-top: solid $panel-lighten-2;
-    padding: 0 2;
-    background: $surface;
+    height: 6;
+    margin: 0 1;
 }
 
-#proj-status {
-    dock: bottom;
-    height: 1;
+Screen.-compact #proj-log {
+    height: 4;
+}
+
+/* ---------- Help modal ---------- */
+
+HelpScreen {
+    align: center middle;
+}
+
+#help-box {
+    width: 64;
+    max-width: 90%;
+    height: auto;
+    max-height: 90%;
+    border: round $evidence;
+    border-title-color: $evidence;
+    border-title-style: bold;
+    border-subtitle-color: $bone-dim;
+    background: $surface;
     padding: 0 2;
+}
+
+#help-body {
+    height: auto;
+}
+
+/* ---------- command palette ---------- */
+
+CommandPalette > Vertical {
+    background: $surface;
+    border: round $evidence;
+}
+
+CommandPalette #--input {
     background: $panel;
-    color: $text-muted;
+}
+
+/* Monitor: parameter group headers between slider blocks */
+.mon-group {
+    color: $evidence;
+    text-style: bold;
+    margin: 1 0 0 1;
+    height: 1;
 }
