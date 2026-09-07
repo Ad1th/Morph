@@ -66,7 +66,8 @@ def connect(
     branch: str | None = typer.Option(None, "--branch", "-b", help="Branch to clone"),
     token: str | None = typer.Option(None, "--token", help="GitHub token (else gh CLI / env)"),
     install: bool = typer.Option(
-        False, "--install", help="Create an isolated venv and install the project's dependencies"
+        True, "--install/--no-install",
+        help="Build an isolated venv and install the project's dependencies (default: on)",
     ),
     name: str | None = typer.Option(None, "--name", help="Registry name (default: repo/dir name)"),
 ):

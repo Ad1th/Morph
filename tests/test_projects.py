@@ -86,7 +86,24 @@ def test_detect_command_single_script(tmp_path):
 def test_detect_command_pytest_layout(tmp_path):
     (tmp_path / "tests").mkdir()
     cmd, _ = project_setup.detect_command(tmp_path)
-    assert cmd == "python3 -m pytest -q"
+    # scoped: one tests dir, stop at first failure, ignore project addopts
+    assert cmd.startswith("python3 -m pytest")
+    assert "-x" in cmd and "-o addopts=" in cmd and cmd.endswith(" tests")
+
+
+def test_detect_command_prefers_entrypoint_over_pytest(tmp_path):
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "app.py").write_text("print('run me')\n")
+    cmd, _ = project_setup.detect_command(tmp_path)
+    assert cmd == "python3 app.py"
+
+
+def test_detect_command_uses_pyproject_console_script(tmp_path):
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "x"\n[project.scripts]\nmytool = "x:main"\n'
+    )
+    cmd, _ = project_setup.detect_command(tmp_path)
+    assert cmd == "mytool --help"
 
 
 def test_detect_command_none_when_unrecognised(tmp_path):
@@ -129,3 +146,18 @@ def test_connect_local_directory(tmp_path):
 def test_connect_rejects_missing_path(tmp_path):
     with pytest.raises(FileNotFoundError):
         project_setup.connect(str(tmp_path / "does-not-exist"), base=tmp_path)
+
+
+def test_command_in_env_rewrites_console_script(tmp_path):
+    venv = tmp_path / "venv"
+    bindir = venv / ("Scripts" if __import__("sys").platform == "win32" else "bin")
+    bindir.mkdir(parents=True)
+    (bindir / "python").write_text("")
+    (bindir / "mytool").write_text("")
+
+    out = runenv.command_in_env("mytool --help", venv)
+    assert out == f'"{bindir / "mytool"}" --help'
+    # pytest -> module form under the venv python
+    assert runenv.command_in_env("pytest -q tests", venv).startswith(f'"{bindir / "python"}" -m pytest')
+    # an unknown bare command is left alone
+    assert runenv.command_in_env("make run", venv) == "make run"
