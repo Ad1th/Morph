@@ -95,10 +95,27 @@
   grid-template-rows: auto 1fr auto;
 }
 
+/* A quiet scrim so mono copy holds contrast over the bright screen in the
+   hero without darkening the whole scene. */
+.journey-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 90% at 0% 0%,
+    color-mix(in oklab, var(--wine-abyss) 78%, transparent) 0%,
+    transparent 55%
+  );
+  opacity: calc(1 - var(--p) / 0.14);
+  transition: opacity 0.2s linear;
+}
+
 /* Hero type, top-left, huge. Instrument Serif is one weight — hierarchy comes
    from size and space, never a bolded word. */
 .hero {
-  max-width: 22ch;
+  position: relative;
+  max-width: min(90vw, 46rem);
   opacity: calc(1 - var(--p) / 0.09);
   transition: opacity 0.2s linear;
 }
@@ -113,11 +130,11 @@
 }
 
 .hero-line {
-  margin: 1.4rem 0 0;
-  max-width: 30ch;
+  margin: 1.6rem 0 0;
+  max-width: 40ch;
   font-size: clamp(0.9rem, 1.15vw, 1.05rem);
-  line-height: 1.7;
-  color: var(--bone-dim);
+  line-height: 1.75;
+  color: var(--bone);
 }
 
 /* Camera HUD, bottom-left — a render-viewport readout, not a decorative
@@ -175,6 +192,8 @@
 .annotation {
   position: absolute;
   width: min(32ch, 44vw);
+  padding: 0.9rem 1rem 1.1rem;
+  background: color-mix(in oklab, var(--wine-abyss) 68%, transparent);
   opacity: 0;
   transform: translateY(12px);
   transition: opacity 0.45s ease, transform 0.45s ease;
@@ -324,6 +343,12 @@
 .btn:hover {
   background: var(--bone);
   color: var(--wine-base);
+}
+
+.landing a:focus-visible,
+.landing button:focus-visible {
+  outline: 1px solid var(--rose-soft);
+  outline-offset: 3px;
 }
 
 .btn-primary {
