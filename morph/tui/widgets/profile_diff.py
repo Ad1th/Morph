@@ -11,6 +11,7 @@ from rich.text import Text
 from textual.widgets import DataTable
 
 from morph.schema.profile import EnvironmentProfile, FieldStatus
+from morph.tui.theme import palette, status_style
 
 # (row label, dotted path) in display order
 _ROWS: list[tuple[str, str]] = [
@@ -25,12 +26,12 @@ _ROWS: list[tuple[str, str]] = [
     ("net loss (%)", "network.packet_loss_percent"),
 ]
 
-_STATUS_STYLE = {
-    FieldStatus.REPRODUCED: ("REPRODUCED", "bold green"),
-    FieldStatus.APPROXIMATED: ("APPROXIMATED", "bold yellow"),
-    FieldStatus.UNAVAILABLE: ("UNAVAILABLE", "bold red3"),
-    FieldStatus.CAPTURED: ("captured", "dim"),
-    FieldStatus.REQUESTED: ("requested", "dim cyan"),
+_STATUS_TEXT = {
+    FieldStatus.REPRODUCED: "REPRODUCED",
+    FieldStatus.APPROXIMATED: "APPROXIMATED",
+    FieldStatus.UNAVAILABLE: "UNAVAILABLE",
+    FieldStatus.CAPTURED: "captured",
+    FieldStatus.REQUESTED: "requested",
 }
 
 # dotted paths safe to edit inline
@@ -61,20 +62,25 @@ class ProfileDiff(DataTable):
         self._col_status = keys[2]
         for label, path in _ROWS:
             self.add_row(label, "-", "-", key=path)
+        self.border_title = "TARGET PROFILE"
 
-    def show(self, profile: EnvironmentProfile) -> None:
+    def show(self, profile: EnvironmentProfile, notes: dict[str, str] | None = None) -> None:
+        p = palette(self)
         for _label, path in _ROWS:
             fld = _field(profile, path)
             if fld is None:
-                value_cell = Text("n/a", style="grey37")
-                status_cell = Text("-", style="grey37")
+                value_cell = Text("n/a", style=p.muted)
+                status_cell = Text("-", style=p.muted)
             else:
                 editable = path in EDITABLE
-                value_cell = Text(str(fld.value), style="white" if editable else "grey70")
-                text, style = _STATUS_STYLE.get(fld.status, (str(fld.status), "dim"))
-                status_cell = Text(text, style=style)
-            self.update_cell(path, self._col_value, value_cell)
-            self.update_cell(path, self._col_status, status_cell)
+                value_cell = Text(str(fld.value), style=f"bold {p.text}" if editable else p.muted)
+                text = _STATUS_TEXT.get(fld.status, str(fld.status))
+                status_cell = Text(text, style=status_style(p, str(getattr(fld.status, "value", fld.status))))
+                note = (notes or {}).get(path)
+                if note:
+                    status_cell.append(f"  {note}", style=p.muted)
+            self.update_cell(path, self._col_value, value_cell, update_width=True)
+            self.update_cell(path, self._col_status, status_cell, update_width=True)
 
     def path_at_cursor(self) -> str | None:
         try:
