@@ -694,11 +694,18 @@ async def test_experiment_screen_renders_live_evidence_bars():
 # --------------------------------------------------------------------------- #
 
 def _clipped(app) -> list[str]:
+    """Widgets drawn outside the screen. Children of a scrollable container are
+    exempt: being scrolled out of view is not clipping, the container itself
+    still has to fit."""
+    from textual.containers import VerticalScroll
+
     width, height = app.size
     bad = []
     for w in app.screen.walk_children(with_self=False):
         r = w.region
         if r.width == 0 or r.height == 0 or not w.display:
+            continue
+        if any(isinstance(a, VerticalScroll) for a in w.ancestors):
             continue
         if r.x < 0 or r.y < 0 or r.right > width or r.bottom > height:
             bad.append(f"{w!r} {r}")

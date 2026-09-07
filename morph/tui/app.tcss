@@ -600,3 +600,11 @@ CommandPalette > Vertical {
 CommandPalette #--input {
     background: $panel;
 }
+
+/* Monitor: parameter group headers between slider blocks */
+.mon-group {
+    color: $evidence;
+    text-style: bold;
+    margin: 1 0 0 1;
+    height: 1;
+}

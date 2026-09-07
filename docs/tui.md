@@ -78,26 +78,43 @@ resolves from the same four batches — three cells green, "both" rose — with
 `^s` freezes the run as a regression bundle under `.morph/regressions/`,
 recording the project's working directory so a replay runs from the same place.
 
-## Monitor — live tuning
+## Monitor: live tuning
 
-A task-manager view, not a statistical test. Four **sliders** (latency, loss,
-cpu cores, ram) — `←/→` nudge, `Shift+←/→` jump, `Home/End`, `Tab` between
-them. Moving one re-runs the command under the new conditions (debounced, one
-at a time; `space` toggles auto-run, `^r` runs once, enter in the command box
-runs it — typing there does not).
+A task-manager view, not a statistical test. The conditions pane lists every
+knob the dashboard has, in the same groups:
 
-The right pane is a rolling graph of the last ~60 runs: **duration**, **CPU**,
-**peak memory** sparklines with a current-value readout, plus a pass/fail strip.
+- **network**: on/off, connection type (ethernet, wifi, cellular, vpn,
+  satellite), latency, packet loss, bandwidth, jitter
+- **cpu and memory**: cores, cpu quota, ram, ram pressure, swap, architecture,
+  os family
+- **locale and time**: locale, timezone
+- **filesystem**: case sensitivity, read-only, disk space, disk read and write
+  latency
+- **process**: timeout, max processes, threads, open files
 
-When a slider crosses a boundary the runs have revealed, it gets a `⚠` and the
-panel names the condition, its value, and the reason from the last failing run.
-Boundaries are direction-aware (more latency/loss is worse; *less* RAM/cores is
-worse) and a slider is only blamed when the runs actually split on it.
+Numeric knobs are sliders (`←/→` nudge, `Shift+←/→` jump, `Home/End` to the
+ends); choices and toggles cycle with the same keys. `Tab` moves between them
+and the pane scrolls. Every knob shows its fidelity badge for this host:
+`REPRODUCED`, `APPROXIMATED` or `UNAVAILABLE` (a Mac cannot cgroup-limit CPU
+or RAM, so those read `UNAVAILABLE` rather than pretending), or `CAPTURED`
+when the value is simply recorded into the profile.
 
-Each slider carries its fidelity badge for this host (`REPRODUCED` /
-`APPROXIMATED` / `UNAVAILABLE`), from the adapter's fidelity report when the
-runtime exposes one and from the reconcile pass otherwise. `--demo` uses a
-synthetic pool_retry-shaped performance model so it runs with no target app.
+Changing a knob re-runs the command under the new conditions (debounced, one
+at a time; `Space` toggles auto-run, `Ctrl+R` runs once). The right pane is a
+rolling graph of the last ~60 runs: duration, CPU and peak memory sparklines
+with a current-value readout, plus a pass/fail strip.
+
+When a slider crosses a boundary the runs have revealed, it gets a red `⚠`
+and the panel names the condition, its value and the reason, taken from the
+last failing run. A boundary is only attributed to a knob when the runs
+actually split on it.
+
+If the connected project has no runnable command, or its command cannot
+launch here, the Monitor keeps working on a per-project performance model
+seeded from the repository and commit: the same repo always draws the same
+graphs and crosses the same boundaries, a different repo gets different
+ones. The graph title and status bar say `SIMULATED` and why. `--demo` uses
+the pool_retry-shaped model with no target app.
 
 ## Threshold — failure boundary
 

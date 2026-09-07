@@ -29,7 +29,14 @@ from morph.schema.telemetry import RunResult, TelemetryData
 from morph.tui.messages import RunFinished
 from morph.tui.orchestrator import set_profile_parameter
 from morph.tui.perf import PerfHistory
-from morph.tui.profiles import PARAMS, fidelity_badges, implicit_high_latency
+from morph.tui.profiles import (
+    ALL_PARAMS,
+    PARAM_GROUPS,
+    fidelity_badges,
+    implicit_high_latency,
+    param_text,
+    param_value,
+)
 from morph.tui.screens.base import MorphScreen
 from morph.tui.theme import palette
 from morph.tui.widgets.slider import Slider
@@ -80,39 +87,88 @@ class ProjectModel:
         self.base_mem = between(60.0, 240.0)
         self.error_type, self.error = rng.choice(self.ERRORS)
 
+        self.payload_mb = between(0.5, 12.0)  # bytes moved per run: bandwidth matters
+        self.fd_floor = round(between(24.0, 160.0))  # open files the app needs
+        self.writes = rng.random() < 0.7  # a read-only filesystem breaks it
+        self.needs_swap = rng.random() < 0.3  # dies when swap is gone under pressure
+
+    def why(self, params: dict[str, float]) -> tuple[str, str] | None:
+        """The first reason this run fails under ``params``, or None."""
+        v = {k: param_value(k, x) for k, x in params.items()}
+        lat = float(v.get("network.latency_ms", 0.0))
+        loss = float(v.get("network.packet_loss_percent", 0.0))
+        cores = float(v.get("cpu.cores", 4.0))
+        ram = float(v.get("memory.total_mb", 8192.0))
+        quota = float(v.get("cpu.quota_percent", 100.0))
+        if v.get("network.available", True) is False:
+            return ("NetworkUnavailable", "no route to host: the network is switched off")
+        if v.get("filesystem.read_only", False) and self.writes:
+            return ("ReadOnlyFilesystem", "EROFS writing the work directory on a read-only filesystem")
+        if float(v.get("process.fd_limit", 4096)) < self.fd_floor:
+            return ("EMFILE", f"too many open files: needs about {self.fd_floor}")
+        if float(v.get("memory.pressure_percent", 0.0)) >= 70 and (
+            self.needs_swap and float(v.get("memory.swap_mb", 2048)) < 256
+        ):
+            return ("MemoryError", "cannot allocate under memory pressure with no swap")
+        if ram < self.ram_floor:
+            return ("MemoryError", f"worker pool needs about {self.ram_floor} MB")
+        if cores < self.core_floor or quota < 100 * self.core_floor / max(cores, 1) * 0.5:
+            return ("CPUStarved", "scheduler quota spent before the batch completed")
+        if (lat >= self.lat_threshold and loss >= self.loss_threshold) or lat >= self.lat_threshold * 1.6:
+            return (self.error_type, self.error)
+        if self.duration(params) / 1000.0 > float(v.get("process.timeout_s", 60.0)):
+            return ("Timeout", "exceeded the process timeout")
+        return None
+
     def failed(self, params: dict[str, float]) -> bool:
-        lat = params.get("network.latency_ms", 0.0)
-        loss = params.get("network.packet_loss_percent", 0.0)
-        cores = params.get("cpu.cores", 4.0)
-        ram = params.get("memory.total_mb", 8192.0)
-        return (
-            (lat >= self.lat_threshold and loss >= self.loss_threshold)
-            or lat >= self.lat_threshold * 1.6
-            or ram < self.ram_floor
-            or cores < self.core_floor
+        return self.why(params) is not None
+
+    def duration(self, params: dict[str, float]) -> float:
+        v = {k: param_value(k, x) for k, x in params.items()}
+        lat = float(v.get("network.latency_ms", 0.0))
+        loss = float(v.get("network.packet_loss_percent", 0.0))
+        jitter = float(v.get("network.jitter_ms", 0.0))
+        bw = max(float(v.get("network.bandwidth_mbps", 1000.0)), 0.1)
+        quota = max(float(v.get("cpu.quota_percent", 100.0)), 1.0)
+        disk = float(v.get("filesystem.disk_read_latency_ms", 0.0)) + float(
+            v.get("filesystem.disk_write_latency_ms", 0.0)
         )
+        conn = {"ethernet": 1.0, "wifi": 1.08, "vpn": 1.15, "cellular": 1.35, "satellite": 1.9}.get(
+            str(v.get("network.connection_type", "ethernet")), 1.0
+        )
+        transfer = self.payload_mb * 8 / bw * 1000.0  # ms to move the payload
+        return (
+            self.base_ms * (100.0 / quota) + lat * self.lat_gain + loss * self.loss_gain + transfer + disk * 6
+        ) * conn + jitter * 0.6
 
     def run(self, params: dict[str, float]) -> RunResult:
-        lat = params.get("network.latency_ms", 0.0)
-        loss = params.get("network.packet_loss_percent", 0.0)
-        cores = max(params.get("cpu.cores", 4.0), 1.0)
-        ram = max(params.get("memory.total_mb", 8192.0), 128.0)
+        v = {k: param_value(k, x) for k, x in params.items()}
+        cores = max(float(v.get("cpu.cores", 4.0)), 1.0)
+        ram = max(float(v.get("memory.total_mb", 8192.0)), 128.0)
+        jitter = float(v.get("network.jitter_ms", 0.0))
+        pressure = float(v.get("memory.pressure_percent", 0.0))
         g = self.noise.gauss
-        failed = self.failed(params)
-        duration = self.base_ms + lat * self.lat_gain + loss * self.loss_gain + g(0, 12)
+        reason = self.why(params)
+        failed = reason is not None
+        duration = self.duration(params) + g(0, 12 + jitter * 0.4)
         if failed:
-            duration = max(duration, self.base_ms * 3.2 + lat * 2.0) + g(0, 40)
+            duration = max(duration, self.base_ms * 3.2) + g(0, 40)
         cpu = min(99.0, self.base_cpu + 110 / cores + g(0, 3))
-        mem = self.base_mem + (4096 / ram) * 55 + g(0, 4)
-        detail = f"{self.error} (latency {lat:.0f} ms, loss {loss:.1f} %, {cores:.0f} cores, {ram:.0f} MB)"
+        mem = self.base_mem + (4096 / ram) * 55 + pressure * 1.2 + g(0, 4)
+        knobs = ", ".join(
+            f"{ALL_PARAMS[k]['label']} {param_text(k, x)}"
+            for k, x in params.items()
+            if k in ("network.latency_ms", "network.packet_loss_percent", "cpu.cores", "memory.total_mb")
+        )
+        detail = f"{reason[1]} ({knobs})" if reason else knobs
         return RunResult(
             exit_code=1 if failed else 0,
             passed=not failed,
             duration_ms=max(1.0, duration),
             peak_memory_mb=round(mem, 1),
             telemetry=TelemetryData(cpu_percent=round(cpu, 1), memory_rss_mb=round(mem, 1)),
-            error_type=self.error_type if failed else None,
-            error_message=detail if failed else None,
+            error_type=reason[0] if reason else None,
+            error_message=detail if reason else None,
             stdout=f"[simulated] {'FAIL' if failed else 'PASS'}\n  {detail}",
         )
 
@@ -160,17 +216,12 @@ class MonitorScreen(MorphScreen):
                 yield Button("Run once", id="mon-run", compact=True)
         with Horizontal(id="mon-body"):
             with VerticalScroll(id="mon-sliders"):
-                for param, spec in PARAMS.items():
-                    hi = self._limits.get(param, spec["high"])
-                    if spec["direction"] == "down":
-                        val = hi
-                    else:
-                        val = 60.0 if param.endswith("latency_ms") else 0.0
-                    yield Slider(
-                        param, spec["label"], minimum=spec["low"], maximum=hi, value=val,
-                        step=spec["step"], big_step=spec["big_step"], unit=spec["unit"],
-                        fmt=spec["fmt"], direction=spec["direction"],
-                    )
+                for group in PARAM_GROUPS:
+                    yield Static(group, classes="mon-group")
+                    for param, spec in ALL_PARAMS.items():
+                        if spec["group"] != group:
+                            continue
+                        yield self._make_slider(param, spec)
                 yield Static("", id="mon-warn")
             with VerticalScroll(id="mon-graph"):
                 yield Static("duration", classes="mon-metric")
@@ -186,6 +237,49 @@ class MonitorScreen(MorphScreen):
                 yield Static("", id="mon-strip")
         yield StatusBar()
         yield Footer()
+
+    def _make_slider(self, param: str, spec: dict) -> Slider:
+        if spec["kind"] != "range":
+            return Slider(
+                param,
+                spec["label"],
+                minimum=0,
+                maximum=1,
+                value=float(spec.get("default", 0)),
+                step=1,
+                choices=spec["choices"],
+                direction=spec["direction"],
+            )
+        hi = self._limits.get(param, spec["high"])
+        val = self._default_value(param, spec, hi)
+        return Slider(
+            param,
+            spec["label"],
+            minimum=spec["low"],
+            maximum=hi,
+            value=val,
+            step=spec["step"],
+            big_step=spec["big_step"],
+            unit=spec["unit"],
+            fmt=spec["fmt"],
+            direction=spec["direction"],
+        )
+
+    @staticmethod
+    def _default_value(param: str, spec: dict, hi: float) -> float:
+        """Start every knob where a healthy host sits: limits wide open, no
+        latency beyond a little, nothing throttled."""
+        if param == "network.latency_ms":
+            return 60.0
+        if param == "network.bandwidth_mbps":
+            return 1000.0
+        if param == "cpu.quota_percent":
+            return 100.0
+        if param == "process.timeout_s":
+            return 30.0
+        if param == "memory.swap_mb":
+            return 2048.0
+        return hi if spec["direction"] == "down" else 0.0
 
     def on_mount(self) -> None:
         self.query_one("#mon-sliders", VerticalScroll).border_title = "CONDITIONS"
@@ -203,7 +297,7 @@ class MonitorScreen(MorphScreen):
     def _reconcile(self) -> None:
         try:
             base = implicit_high_latency()
-            badges = fidelity_badges(base)
+            badges = fidelity_badges(base, params=ALL_PARAMS)
             self.app.call_from_thread(self._apply_reconcile, base, badges)
         except Exception as exc:
             self.app.call_from_thread(self._apply_reconcile, None, {}, exc)
@@ -223,8 +317,9 @@ class MonitorScreen(MorphScreen):
             self.status(Text(f"reconcile failed: {error}"), error=True)
         else:
             self.status("ready · slide a condition and watch it re-run")
-        self._warn(Text("adjust a slider; the last failing run explains itself here",
-                        style=palette(self).muted))
+        self._warn(
+            Text("adjust a slider; the last failing run explains itself here", style=palette(self).muted)
+        )
         if self._auto():
             self._schedule_run()
 
@@ -319,7 +414,7 @@ class MonitorScreen(MorphScreen):
         profile = self._base or implicit_high_latency()
         for param, value in params.items():
             try:
-                profile = set_profile_parameter(profile, param, value)
+                profile = set_profile_parameter(profile, param, param_value(param, value))
             except ValueError:
                 pass
         if self._controller is None:
@@ -332,14 +427,32 @@ class MonitorScreen(MorphScreen):
         """pool_retry-shaped synthetic performance model for --demo: the batch
         misses its deadline once latency and loss stack, or when latency alone
         is extreme, or when RAM is too tight for the worker pool."""
-        lat = params.get("network.latency_ms", 0.0)
-        loss = params.get("network.packet_loss_percent", 0.0)
-        cores = max(params.get("cpu.cores", 4.0), 1.0)
-        ram = max(params.get("memory.total_mb", 8192.0), 128.0)
-        duration = 558 + lat * 1.15 + loss * 16 + random.gauss(0, 12)
+        v = {k: param_value(k, x) for k, x in params.items()}
+        lat = float(v.get("network.latency_ms", 0.0))
+        loss = float(v.get("network.packet_loss_percent", 0.0))
+        cores = max(float(v.get("cpu.cores", 4.0)), 1.0)
+        ram = max(float(v.get("memory.total_mb", 8192.0)), 128.0)
+        quota = max(float(v.get("cpu.quota_percent", 100.0)), 1.0)
+        bw = max(float(v.get("network.bandwidth_mbps", 1000.0)), 0.1)
+        jitter = float(v.get("network.jitter_ms", 0.0))
+        duration = (
+            558 * (100 / quota)
+            + lat * 1.15
+            + loss * 16
+            + 24000 / bw
+            + jitter * 0.6
+            + random.gauss(0, 12 + jitter * 0.4)
+        )
         cpu = min(99.0, 18 + 130 / cores + random.gauss(0, 3))
         mem = 96 + (4096 / ram) * 55 + random.gauss(0, 4)
-        failed = (lat >= 180 and loss >= 1.0) or lat >= 330 or ram < 700
+        failed = (
+            v.get("network.available", True) is False
+            or (lat >= 180 and loss >= 1.0)
+            or lat >= 330
+            or ram < 700
+            or float(v.get("process.fd_limit", 4096)) < 32
+            or duration / 1000.0 > float(v.get("process.timeout_s", 60.0))
+        )
         return RunResult(
             exit_code=1 if failed else 0,
             passed=not failed,
@@ -403,6 +516,9 @@ class MonitorScreen(MorphScreen):
         current = self._current_params()
         hot: list[str] = []
         for slider in self.query(Slider):
+            if slider.choices:
+                slider.set_warn(False)
+                continue
             boundary = self._hist.implicates(slider.param, slider.direction)
             near = None
             if boundary is not None:
@@ -415,8 +531,12 @@ class MonitorScreen(MorphScreen):
 
         if not hot:
             passing = bool(self._hist.latest and self._hist.latest.passed)
-            self._warn(Text("healthy at these settings" if passing else "watching…",
-                            style=p.pass_ if passing else p.muted))
+            self._warn(
+                Text(
+                    "healthy at these settings" if passing else "watching…",
+                    style=p.pass_ if passing else p.muted,
+                )
+            )
             return
 
         line = Text()
