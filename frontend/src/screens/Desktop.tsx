@@ -44,6 +44,7 @@ export function Desktop({
   const [authStatus, setAuthStatus] = useState('')
   const [localPath, setLocalPath] = useState('apps/timeout')
   const [note, setNote] = useState('')
+  const [installDeps, setInstallDeps] = useState(false)
   const [project, setProject] = useState<ProjectInfo | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const folderRef = useRef<HTMLInputElement>(null)
@@ -102,6 +103,23 @@ export function Desktop({
     }
   }
 
+  async function loadGhCliToken() {
+    setAuthStatus('Reading token from the gh CLI…')
+    try {
+      const { token: cliToken, source } = await api.githubCliToken()
+      if (cliToken) {
+        setToken(cliToken)
+        localStorage.setItem('morph_github_token', cliToken)
+        setAuthStatus(`Using token from ${source}.`)
+        void loadUserRepos(cliToken)
+      } else {
+        setAuthStatus('No token from gh CLI or environment — run `gh auth login`, or paste a PAT.')
+      }
+    } catch (err) {
+      setAuthStatus(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   async function loadUserRepos(authToken: string) {
     if (!authToken.trim()) return
     try {
@@ -138,7 +156,11 @@ export function Desktop({
     setNote(pending)
     setView('busy')
     try {
-      const info = await fn()
+      let info = await fn()
+      if (installDeps) {
+        setNote(`Installing dependencies for ${info.name}…`)
+        info = await api.installProject(info.project_id)
+      }
       setProject(info)
       onProject(info)
       setNote(`${info.name}: ${info.file_count} file${info.file_count === 1 ? '' : 's'} ready.`)
@@ -354,6 +376,15 @@ export function Desktop({
                         >
                           Fetch Repos
                         </button>
+                        <button
+                          type="button"
+                          className="desktop__btn bevel-raised"
+                          style={{ flex: 'none', padding: '0 10px' }}
+                          onClick={() => void loadGhCliToken()}
+                          title="Use the token from your local `gh auth login`"
+                        >
+                          Use gh CLI
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -413,6 +444,15 @@ export function Desktop({
                     placeholder="main / master (default)"
                   />
                 </div>
+
+                <label className="desktop__label" style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                  <input
+                    type="checkbox"
+                    checked={installDeps}
+                    onChange={(e) => setInstallDeps(e.target.checked)}
+                  />
+                  Install dependencies after cloning
+                </label>
 
                 <div className="desktop__dialog-actions">
                   <button className="desktop__btn bevel-raised" onClick={() => setView('choose')}>

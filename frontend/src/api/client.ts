@@ -72,6 +72,20 @@ export const api = {
   useGithubProject: (payload: { repo: string; token?: string; branch?: string }) =>
     request<ProjectInfo>('/projects/github', { method: 'POST', body: JSON.stringify(payload) }),
 
+  /** A token from the server's `gh` CLI / environment, so the browser can skip
+   *  the device flow when the machine is already authenticated. */
+  githubCliToken: () =>
+    request<{ token: string | null; source: string }>('/projects/github/cli-token', {
+      method: 'POST',
+    }),
+
+  listProjects: () => request<ProjectInfo[]>('/projects'),
+
+  /** Build the project an isolated venv and install its dependencies; the
+   *  returned project's `suggested_command` runs from that venv. */
+  installProject: (projectId: string) =>
+    request<ProjectInfo>(`/projects/${projectId}/install`, { method: 'POST' }),
+
   requestGithubDeviceCode: (payload?: { client_id?: string }) =>
     request<{
       device_code: string
