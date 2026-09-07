@@ -163,7 +163,7 @@ def test_platform_shape_matches_adapter_capabilities():
     assert data["host"]["arch"]
 
     targets = {t["id"]: t for t in data["targets"]}
-    assert set(targets) == {"local", "remote-ssh"}
+    assert set(targets) == {"local", "remote-ssh", "cloud"}
 
     local = targets["local"]
     assert local["available"] is True
@@ -177,8 +177,25 @@ def test_platform_shape_matches_adapter_capabilities():
     assert remote["reason"]
     assert remote["capabilities"] == {}
 
+    # The cloud row is asserted on shape, not on availability: whether a worker
+    # answers depends on morph.yaml and on a machine outside this test. What
+    # must hold either way is that the row never claims to be usable without
+    # saying so, and never reports itself unavailable without a reason the user
+    # can act on.
+    cloud = targets["cloud"]
+    assert isinstance(cloud["available"], bool)
+    if cloud["available"]:
+        assert cloud["reason"] is None
+    else:
+        assert cloud["reason"]
 
-def test_run_rejects_non_local_target():
+
+def test_run_rejects_unknown_target():
+    """An unrecognised target is refused rather than quietly run on this host.
+
+    "cloud" is deliberately not covered here: it is a real target now, and
+    exercising it would need a worker on the far end of an SSH connection.
+    """
     res = client.post("/run", json={"command": "echo hi", "target": "remote-ssh"})
     assert res.status_code == 400
     assert "remote-ssh" in res.json()["detail"]
