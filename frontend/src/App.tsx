@@ -20,7 +20,7 @@ type ScreenState =
   | { name: 'experiment' }
 
 export default function App() {
-  const { os, setOs } = useOsTheme()
+  const { os, cycle } = useOsTheme()
   const [screen, setScreen] = useState<ScreenState>({ name: 'desktop' })
   const [projectOpen, setProjectOpen] = useState(true)
   const [project, setProject] = useState<ProjectInfo | null>(null)
@@ -35,7 +35,7 @@ export default function App() {
 
   return (
     <>
-      <OsSwitcher os={os} onChange={setOs} />
+      <OsSwitcher os={os} onCycle={cycle} />
 
       {/* Desktop furniture: present on every screen, so it is rendered once
           here rather than per screen. Clicking the folder always returns to

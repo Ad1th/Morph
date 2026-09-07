@@ -1,18 +1,23 @@
 .os-switcher {
   position: fixed;
-  /* Nudged above the shared corner line: the badge artwork carries transparent
-     margin around its ring, so a box-aligned badge reads as sitting lower than
-     the folder opposite it. */
-  top: calc(var(--corner-top) - 20px);
-  right: var(--corner-side);
+  /* Offsets tuned to the artwork, not to its bounding box. theme-wheel.png is
+     136x136 with the dial drawn inset -- 20px of empty pixels above the top
+     knob, 24px to the right of the frame -- so a box aligned flush to the
+     corner line would sit visibly low and inboard of the folder opposite it.
+     These two nudges put the drawn dial where the old badge's art sat. */
+  top: calc(var(--corner-top) - 15px);
+  right: calc(var(--corner-side) + 10px);
   z-index: 1000;
 }
 
-/* The artwork is the button: the badge image already carries its own bevelled
-   metal ring, so the chrome that used to draw one here is gone. */
-.os-switcher__badge {
-  width: 116px;
-  height: 116px;
+/* The artwork is the button: it carries its own bevelled ring and knobs, so
+   there is no chrome to draw here. */
+.os-switcher__dial {
+  /* 136px is the PNG's native size. Displaying pixel art 1:1 keeps every
+     source pixel on exactly one device pixel; scaling it to a fractional
+     size drops rows unevenly and the bevel goes ragged. */
+  width: 136px;
+  height: 136px;
   padding: 0;
   border: none;
   background: none;
@@ -22,59 +27,54 @@
   filter: drop-shadow(1px 2px 4px rgba(0, 0, 0, 0.45));
 }
 
-.os-switcher__badge-img {
+.os-switcher__dial-img {
   width: 100%;
   height: 100%;
   display: block;
   object-fit: contain;
-  /* Keep the pixel art crisp instead of letting the browser smooth it. */
   image-rendering: pixelated;
+  /* The dial's circle is centred at (67.5, 70.5) of the 136px square -- lower
+     than the box centre, because the top knob lifts the artwork's bounding box
+     while the side handles widen its base. Spinning about the box centre would
+     swing the dial in a small orbit instead of turning it in place. */
+  transform-origin: 49.6% 51.8%;
+  /* Decelerating, like a detent wheel thrown and left to settle. */
+  transition: transform 620ms cubic-bezier(0.22, 0.61, 0.25, 1);
 }
 
-.os-switcher__badge:hover {
+.os-switcher__dial:hover {
   filter: drop-shadow(1px 2px 6px rgba(0, 0, 0, 0.6)) brightness(1.06);
 }
 
-.os-switcher__badge:focus-visible {
+.os-switcher__dial:active .os-switcher__dial-img {
+  /* Reads as the wheel taking the push, before the turn runs. */
+  scale: 0.94;
+  transition: transform 620ms cubic-bezier(0.22, 0.61, 0.25, 1), scale 90ms ease-out;
+}
+
+.os-switcher__dial:focus-visible {
   outline: 2px solid var(--accent, #1e4bb8);
   outline-offset: 3px;
 }
 
-.os-switcher__menu {
+/* Announced, never shown: the re-skin is the visible feedback. */
+.os-switcher__status {
   position: absolute;
-  top: 126px;
-  right: 0;
-  min-width: 160px;
-  background: var(--surface);
-  border: 1px solid var(--surface-border);
-  border-radius: 8px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
-.os-switcher__item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  font-family: var(--font-ui);
-  font-size: 15px;
-  text-align: left;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.os-switcher__item:hover {
-  background: var(--group-header-bg-active);
-}
-
-.os-switcher__item[data-active='true'] {
-  font-weight: 600;
-  color: var(--accent);
+@media (prefers-reduced-motion: reduce) {
+  /* Every rotation is a whole number of turns, so dropping the animation
+     lands on exactly the same frame -- the switch just happens at once. */
+  .os-switcher__dial-img,
+  .os-switcher__dial:active .os-switcher__dial-img {
+    transition: none;
+  }
 }
