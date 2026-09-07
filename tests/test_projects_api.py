@@ -406,3 +406,34 @@ def test_github_device_code_and_poll(monkeypatch):
 
 
 
+
+
+def test_projects_registry_endpoints(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from morph.api.app import app
+
+    client = TestClient(app)
+    proj_dir = tmp_path / "regproj"
+    proj_dir.mkdir()
+    (proj_dir / "main.py").write_text("print('x')\n")
+
+    created = client.post("/projects/local", json={"path": str(proj_dir)})
+    assert created.status_code == 200
+    pid = created.json()["project_id"]
+
+    listing = client.get("/projects")
+    assert listing.status_code == 200
+    assert any(p["project_id"] == pid for p in listing.json())
+
+    one = client.get(f"/projects/{pid}")
+    assert one.status_code == 200
+    assert one.json()["name"] == "regproj"
+    assert one.json()["suggested_command"] == "python3 main.py"
+
+    token = client.post("/projects/github/cli-token")
+    assert token.status_code == 200
+    assert set(token.json()) == {"token", "source"}
+
+    assert client.delete(f"/projects/{pid}").json() == {"deleted": True}
+    assert client.get(f"/projects/{pid}").status_code == 404
