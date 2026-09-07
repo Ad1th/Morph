@@ -85,6 +85,16 @@ def connect(
         console.print(f"[bold red]Error:[/bold red] {exc}")
         raise typer.Exit(code=1)
 
+    _print_project(proj)
+    if proj.deps_failed:
+        console.print(
+            f"[yellow]note:[/yellow] {len(proj.deps_failed)} dependency step(s) failed "
+            f"({', '.join(proj.deps_failed)}). Retry with:  morph reinstall {proj.id}"
+        )
+    console.print(f"\n[green]next:[/green]  morph experiment --project {proj.id}")
+
+
+def _print_project(proj) -> None:
     table = Table(title=f"Connected: {proj.name}", show_header=False)
     table.add_column(style="cyan")
     table.add_column(style="white")
@@ -94,9 +104,33 @@ def connect(
     table.add_row("command", proj.command or "[yellow]not detected — pass --command[/yellow]")
     if proj.venv:
         table.add_row("venv", proj.venv)
+    if proj.deps_failed:
+        table.add_row("deps", f"[yellow]{len(proj.deps_failed)} failed[/yellow]")
     table.add_row("files", str(proj.file_count))
     console.print(table)
-    console.print(f"\n[green]next:[/green]  morph experiment --project {proj.id}")
+
+
+@app.command()
+def reinstall(
+    project: str = typer.Argument(..., help="Connected project id or name"),
+):
+    """Rebuild a connected project's venv and re-install its dependencies (no re-clone)."""
+    from morph import project_setup
+    from morph import projects as _projects
+
+    try:
+        proj = _projects.load(project)
+    except KeyError as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    console.print(f"[cyan]Reinstalling[/cyan] {proj.name} …")
+    updated = project_setup.reinstall(proj, logger=lambda m: console.print(f"  [dim]{m}[/dim]"))
+    _print_project(updated)
+    if updated.deps_failed:
+        console.print(f"[yellow]still failing:[/yellow] {', '.join(updated.deps_failed)}")
+        raise typer.Exit(code=1)
+    console.print("[green]all dependencies installed.[/green]")
 
 
 @app.command()
