@@ -186,8 +186,9 @@ def test_a_fitting_profile_runs_locally(host):
         def __init__(self):
             self.ran = False
 
-        def run(self, profile, command, timeout=30.0):
+        def run(self, profile, command, timeout=30.0, cwd=None):
             self.ran = True
+            self.cwd = cwd
             return _ok_result()
 
     controller = FakeController()

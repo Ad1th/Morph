@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import typer
@@ -189,6 +190,12 @@ def run(
     force_proxy: bool = typer.Option(
         False, "--force-proxy", help="Force user-space TCP proxy instead of native OS tools"
     ),
+    cloud: bool = typer.Option(
+        False, "--cloud", help="Route to the remote worker if this host cannot satisfy the profile"
+    ),
+    as_json: bool = typer.Option(
+        False, "--json", help="Print the RunResult as JSON only (used by remote workers)"
+    ),
 ):
     """Run an application under a simulated environment profile."""
     command, cwd = _resolve_project(project, command, cwd)
@@ -201,12 +208,40 @@ def run(
             raise typer.Exit(code=1)
         env_profile = EnvironmentProfile.model_validate_json(profile.read_text(encoding="utf-8"))
 
-    console.print(f"[cyan]Executing:[/cyan] {command}" + (f"  [dim](cwd: {cwd})[/dim]" if cwd else ""))
-    if env_profile:
+    if not as_json:
+        console.print(
+            f"[cyan]Executing:[/cyan] {command}" + (f"  [dim](cwd: {cwd})[/dim]" if cwd else "")
+        )
+
+    placement = None
+    if env_profile and cloud:
+        from morph.cloud import NotReproducibleAnywhere, run_anywhere
+
+        try:
+            result, placement = run_anywhere(
+                profile=env_profile, command=command, timeout=timeout,
+                controller=controller, cwd=cwd,
+            )
+        except NotReproducibleAnywhere as exc:
+            if as_json:
+                print(json.dumps({"error": "not_reproducible", "detail": str(exc)}))
+            else:
+                console.print(f"[bold red]{exc}[/bold red]")
+            raise typer.Exit(code=2) from exc
+    elif env_profile:
         result = controller.run(profile=env_profile, command=command, timeout=timeout, cwd=cwd)
     else:
         from morph.runtime.runner import execute_command
         result = execute_command(command=command, timeout=timeout, cwd=cwd)
+
+    # Machine mode: a bare JSON document on stdout and nothing else. This is
+    # the contract morph.cloud.worker parses when Morph runs on another box.
+    if as_json:
+        print(result.model_dump_json())
+        raise typer.Exit(code=0 if result.passed else 1)
+
+    if placement is not None and placement.location == "cloud":
+        console.print(f"[yellow]Routed to the cloud worker[/yellow] -- {placement.summary}")
 
     status_style = "bold green" if result.passed else "bold red"
     peak_memory = f"{result.peak_memory_mb:.1f} MB" if result.peak_memory_mb is not None else "N/A"
@@ -477,6 +512,71 @@ def tui(
     from morph.tui import run
 
     run(demo=demo)
+
+
+@app.command()
+def cloud(
+    profile: Path | None = typer.Option(
+        None, "--profile", "-p", help="Profile to assess against this host"
+    ),
+):
+    """Check the remote worker, and whether a profile even needs one."""
+    from morph.cloud import assess_locally
+    from morph.cloud.worker import RemoteWorker
+
+    if profile:
+        if not profile.exists():
+            console.print(f"[bold red]Error:[/bold red] Profile file '{profile}' not found")
+            raise typer.Exit(code=1)
+        cap = assess_locally(
+            EnvironmentProfile.model_validate_json(profile.read_text(encoding="utf-8"))
+        )
+        if cap.reproducible_locally:
+            console.print("[bold green]Reproducible locally[/bold green] - no worker needed.")
+        else:
+            table = Table(title="This host falls short of the profile")
+            table.add_column("Resource")
+            table.add_column("Requested")
+            table.add_column("This host")
+            table.add_column("Why it needs another machine")
+            for short in cap.shortfalls:
+                table.add_row(
+                    short.field_path, str(short.requested), str(short.available), short.detail
+                )
+            console.print(table)
+            console.print("[yellow]NOT_REPRODUCIBLE_LOCALLY[/yellow] - this run needs a worker.")
+
+    worker = RemoteWorker()
+    console.print()
+    if not worker.configured:
+        console.print(
+            "[dim]No worker configured. Set cloud.host in morph.yaml, or the "
+            "MORPH_CLOUD_HOST / MORPH_CLOUD_USER / MORPH_CLOUD_SSH_KEY variables.[/dim]"
+        )
+        raise typer.Exit(code=0)
+
+    console.print(f"[cyan]Probing[/cyan] {worker.target} ...")
+    info = worker.check()
+
+    def mark(ok: bool) -> str:
+        return "[green]yes[/green]" if ok else "[red]no[/red]"
+
+    lines = [
+        f"Reachable:       {mark(info.reachable)}",
+        f"Python:          {info.python_version or '-'}",
+        f"Morph installed: {mark(info.morph_importable)}",
+        f"Can shape net:   {mark(info.can_shape_network)}",
+    ]
+    if info.detail:
+        lines += ["", info.detail]
+    console.print(
+        Panel(
+            "\n".join(lines),
+            title="Cloud worker",
+            border_style="green" if info.usable else "red",
+        )
+    )
+    raise typer.Exit(code=0 if info.usable else 1)
 
 
 if __name__ == "__main__":

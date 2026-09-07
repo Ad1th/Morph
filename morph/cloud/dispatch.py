@@ -63,19 +63,24 @@ def run_anywhere(
     controller: RuntimeController | None = None,
     worker: RemoteWorker | None = None,
     allow_cloud: bool = True,
+    cwd: str | None = None,
 ) -> tuple[RunResult, RunPlacement]:
     """Run `command` under `profile` on whichever machine can honour it.
 
     Returns the result and where it ran. Raises NotReproducibleAnywhere when
     the profile exceeds this host and no worker can take it.
+
+    `cwd` applies to a local run only: it is a path on THIS machine and would
+    not exist on the worker, which uses its own configured checkout instead.
     """
     capability = assess_locally(profile)
 
     if capability.reproducible_locally:
         controller = controller or RuntimeController()
-        return controller.run(profile=profile, command=command, timeout=timeout), RunPlacement(
-            location="local", capability=capability
+        result = controller.run(
+            profile=profile, command=command, timeout=timeout, cwd=cwd
         )
+        return result, RunPlacement(location="local", capability=capability)
 
     if not allow_cloud:
         raise NotReproducibleAnywhere(
