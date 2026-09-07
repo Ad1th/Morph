@@ -53,15 +53,24 @@ export function ParameterRow({
 
         {kind === 'slider' && (
           <div className="param-row__slider">
-            <input
-              type="range"
-              min={meta.min ?? 0}
-              max={meta.max ?? 100}
-              step={meta.step ?? 1}
-              value={typeof value === 'number' ? value : Number(meta.min ?? 0)}
-              disabled={disabled}
-              onChange={(e) => onChange(Number(e.target.value))}
-            />
+            {/* A range input needs a real ceiling, and only some parameters
+                have one. This used to fall back to max=100, which invented
+                hardware -- offering 100 cores on a 16-core host -- and, where
+                the minimum was already 100 (disk space, in MiB), produced a
+                slider pinned shut with min === max. Where the catalog knows no
+                maximum, there is simply no slider, and the number field below
+                takes the value on its own. */}
+            {meta.max != null && (
+              <input
+                type="range"
+                min={meta.min ?? 0}
+                max={meta.max}
+                step={meta.step ?? 1}
+                value={typeof value === 'number' ? value : Number(meta.min ?? 0)}
+                disabled={disabled}
+                onChange={(e) => onChange(Number(e.target.value))}
+              />
+            )}
             <input
               type="number"
               className="param-row__number"
