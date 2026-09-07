@@ -24,11 +24,30 @@ from morph.schema.telemetry import RunResult
 
 # One line, no embedded newlines: this has to survive being nested inside an
 # ssh command string.
-_PROBE_PY = (
-    "import json,sys,importlib.util as u;"
-    "print(json.dumps({'py':sys.version.split()[0],"
-    "'morph':u.find_spec('morph') is not None}))"
-)
+# Reports capacity as well as readiness: the parameter catalog needs the
+# worker's real cores and RAM to bound its sliders, and asking for them here
+# keeps that to the one round trip `check` already pays for.
+_PROBE_PY = """
+import json, os, sys, importlib.util as u
+try:
+    mb = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") // (1024 * 1024)
+except (ValueError, AttributeError, OSError):
+    mb = 0
+# Physical cores, to match what profile.cpu.cores means. On a cloud VM the two
+# differ: a GCP vCPU is a hyperthread, so an 8-vCPU box has 4 physical cores.
+try:
+    import psutil
+    cores = psutil.cpu_count(logical=False) or os.cpu_count() or 0
+except Exception:
+    cores = os.cpu_count() or 0
+print(json.dumps({
+    "py": sys.version.split()[0],
+    "morph": u.find_spec("morph") is not None,
+    "cores": cores,
+    "logical": os.cpu_count() or 0,
+    "memory_mb": mb,
+}))
+"""
 
 
 def _remote_path(path: str) -> str:
@@ -59,6 +78,11 @@ class WorkerInfo:
     morph_importable: bool = False
     can_shape_network: bool = False
     detail: str = ""
+    # What the box physically has. 0 means "not learned", never "none":
+    # an unreachable worker must not read as a machine with no CPUs.
+    cores: int = 0          # physical
+    logical: int = 0        # hyperthreads, for display only
+    memory_mb: int = 0
 
     @property
     def usable(self) -> bool:
@@ -166,6 +190,9 @@ class RemoteWorker:
         if payload:
             info.python_version = str(payload.get("py", ""))
             info.morph_importable = bool(payload.get("morph"))
+            info.cores = int(payload.get("cores") or 0)
+            info.logical = int(payload.get("logical") or 0)
+            info.memory_mb = int(payload.get("memory_mb") or 0)
 
         if not info.morph_importable:
             info.detail = f"morph is not importable under {self.config.python} on the worker"
