@@ -314,3 +314,40 @@
   font-size: 12px;
 }
 
+
+/* Windows only: the Connect/Upload window snaps open the way a Win95/98 dialog
+   did -- a hard, centre-origin zoom with no fade and no travel.
+
+   Linear, not eased. The era's window manager drew a handful of expanding
+   XOR rectangles and was finished inside a few frames; an ease-out would
+   soften the landing into something that reads as modern, and that softness is
+   exactly what would date it to now rather than to 1995.
+
+   Scoped to the Windows skin because the macOS and Linux desktops have their
+   own conventions, and only this one snapped like this.
+
+   It plays on open and only on open: Desktop.tsx mounts the dialog behind
+   `open &&`, so moving between views inside it (choose -> github -> busy ->
+   done) leaves the element in place and never retriggers the animation. */
+@keyframes desktop-dialog-snap-open {
+  from {
+    transform: scale(0.05);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+.desktop[data-os='windows'] .desktop__dialog {
+  /* Its own centre, so it grows outward in place rather than unfolding from a
+     corner -- the dialog is positioned with top/left and carries no other
+     transform, so this composes with nothing. */
+  transform-origin: center center;
+  animation: desktop-dialog-snap-open 170ms linear both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop[data-os='windows'] .desktop__dialog {
+    animation: none;
+  }
+}
