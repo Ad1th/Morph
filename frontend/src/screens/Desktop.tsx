@@ -2,7 +2,7 @@ import { useRef, useState, type ChangeEvent } from 'react'
 import type { OsName } from '../theme/useOsTheme'
 import './Desktop.css'
 
-const TAGLINE = 'The quieter you become, the more you are able to hear'
+const TAGLINE = 'Now it breaks on your machine too'
 
 type DialogView = 'choose' | 'github' | 'done'
 
