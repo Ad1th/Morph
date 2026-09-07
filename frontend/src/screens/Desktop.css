@@ -75,6 +75,10 @@
 
 .desktop__wordmark {
   font-family: var(--font-display);
+  /* Blue Screen ships a single 400 face. An h1 defaults to bold, so the browser
+     was synthesising one by smearing those outlines; asking for the weight the
+     font actually has gives the true, thinner letterforms. */
+  font-weight: 550;
   /* Scales with the viewport so it fills the desktop on a large screen and
      still fits on a laptop. The trailing indent balances the letter-spacing,
      which otherwise pads only the right side and shifts the word off centre. */
