@@ -36,6 +36,15 @@ include = ["morph*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Markers used by the demo-app corpus under apps/ (see apps/conftest.py).
+# --strict-markers makes a typo in a marker name a collection error instead of
+# a silently unselected test.
+addopts = "--strict-markers"
+markers = [
+    "slow: statistical corpus check over many trials (advisory in CI; run with -m slow)",
+    "needs_linux: requires a Linux host (cgroup CPU quota, tc netem); skipped elsewhere",
+    "needs_root: requires root privileges; skipped when unprivileged",
+]
 
 [tool.ruff]
 line-length = 110

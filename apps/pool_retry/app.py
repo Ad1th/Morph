@@ -3,40 +3,40 @@
 This is the fixture that proves Morph finds *combinations*, not just single
 toggles. Neither condition alone breaks it. Together they do.
 
-    latency alone    -> PASS
-    packet loss alone-> PASS
-    latency + loss   -> FAIL
+    latency alone     -> PASS
+    packet loss alone -> PASS
+    latency + loss    -> FAIL
 
 Mechanism. A client fires N_REQUESTS concurrent requests through a small
-connection pool (POOL_MAX slots), with bounded retries and one overall
-wall-clock DEADLINE_S budget. The server answers in ~80ms.
+connection pool (POOL_MAX slots), with a per-request read timeout, bounded
+retries, and one overall wall-clock DEADLINE_S budget. The server answers in
+~80 ms.
 
-  - Latency alone: every request costs 80ms + RTT. With POOL_MAX slots the
-    batch runs in ceil(N/POOL) waves. Slower, but inside the deadline.
-  - Loss alone: a dropped packet stalls one request until its per-request
-    timeout fires, then it retries. At low latency that retry is cheap, and
-    the other requests drain quickly through the free slot.
-  - Both: the stalled request holds its pool slot for the whole per-request
-    timeout while every remaining request is now ALSO slow (RTT on each), so
-    they queue behind the reduced pool. The queue cascades past the deadline.
+The interaction lives in how a lost packet costs time on a real TCP path: a
+loss is not a missing byte, it is a *retransmission stall* of roughly
+``max(200 ms, 3 x RTT)`` (Linux's minimum RTO, then the RTT-scaled estimate),
+which is exactly what Morph's proxy emulates.
 
-    Env knobs Morph turns : latency AND packet loss (on lo, or via proxy)
-    Baseline              : batch ~240ms -> PASS
+  - Latency alone (120 ms RTT): every request costs 80 ms + 120 ms = 200 ms;
+    the batch runs in ceil(N/POOL) waves. Slower, but well inside the deadline.
+  - Loss alone (18 %): a stall is 200 ms at near-zero RTT; 80 + 200 = 280 ms
+    still fits inside the 500 ms read timeout, so the request just arrives a
+    little late. No retry, no slot held.
+  - Both: the stall is now 3 x 120 = 360 ms, and 200 + 360 = 560 ms is PAST the
+    read timeout. Every single loss now burns a full read timeout, the retry
+    goes through the pool queue again, and with N requests sharing POOL_MAX
+    slots the queue cascades past the deadline.
+
+    Env knobs Morph turns : latency AND packet loss (profile ``network.*``)
+    Baseline              : batch ~0.7 s -> PASS
     Fix (one line)        : POOL_MAX = N_REQUESTS (no queueing) via --fixed
     Classification        : environment-caused, INTERACTION
 
-Simulated conditions (for verification where tc/Clumsy are unavailable):
-
-    MORPH_B_SIM_LATENCY_MS   extra ms the server adds to every response
-    MORPH_B_SIM_STALL_PCT    % of requests the server stalls past the client's
-                             per-request timeout
-
-Real packet loss does not lose whole requests -- it costs a TCP retransmit
-timeout. So loss is emulated as a per-request probability of a stall, which is
-the same thing the client experiences. NOTE: the mapping from netem's "loss 2%"
-to a per-request stall percentage is NOT 1:1 (one HTTP request is many packets,
-and TCP retransmits), so MORPH_B_SIM_STALL_PCT must be recalibrated against real
-netem on the Pi before any number here is quoted as a real-world figure.
+Conditions are real, not simulated: Morph's runtime exports MORPH_NET_* and
+this app fronts its own server with Morph's TCP proxy (apps/netshape.py), the
+same delay-line and retransmission model Morph uses everywhere it cannot shape
+a real interface. The proxy never corrupts bytes, so the only failure path is
+the deadline (``DeadlineExceeded``); a setup error exits 2.
 """
 
 from __future__ import annotations
@@ -53,26 +53,19 @@ import httpx
 
 from apps.netshape import start_proxy
 
-# Tuned so that each condition ALONE stays inside the deadline and only the
-# combination cascades past it. The deadline is placed in the measured gap
-# between the slowest passing leg (latency alone, max 2298ms) and the fastest
-# failing one (both, min 2466ms). See the README for the full distributions.
-DEADLINE_S = float(os.getenv("MORPH_B_DEADLINE", "2.4"))
+# Operating point, measured (see README "How the deadline was chosen"). The
+# deadline sits in the gap between the slowest leg that must pass (latency
+# alone, or --fixed under both) and the fastest that must fail (both).
+DEADLINE_S = float(os.getenv("MORPH_B_DEADLINE", "2.8"))
 POOL_MAX = int(os.getenv("MORPH_B_POOL", "2"))
 PER_REQ_TIMEOUT = float(os.getenv("MORPH_B_REQ_TIMEOUT", "0.5"))
-# 4 retries, not 2: a request dies only if EVERY attempt is dropped, with
-# probability loss^(retries+1). At 2 retries that killed enough requests to
-# fail the --fixed and loss-alone legs outright, no matter the pool size.
-RETRIES = int(os.getenv("MORPH_B_RETRIES", "4"))
-N_REQUESTS = int(os.getenv("MORPH_B_N", "12"))
+# A request dies only if EVERY attempt is lost; with enough retries that
+# probability is negligible for the --fixed and loss-alone legs, while the
+# pooled variant still pays a read timeout per retry, which is the cascade.
+RETRIES = int(os.getenv("MORPH_B_RETRIES", "5"))
+N_REQUESTS = int(os.getenv("MORPH_B_N", "16"))
 SERVER_DELAY_S = float(os.getenv("MORPH_B_SERVER_DELAY", "0.08"))
 
-# Real network conditions, injected by Morph's user-space TCP proxy rather than
-# faked in the server. The proxy relays chunks and genuinely drops them, so a
-# lost response never arrives and the client's read timeout fires on a real
-# connection. It also delays each direction, so round-trip grows by ~2x the
-# configured latency -- the same doubling real netem shows on loopback.
-#
 # MORPH_B_PROXY_* are per-app overrides; absent those, Morph's runtime passes
 # the isolated conditions through the generic MORPH_NET_* vars (see
 # apps/netshape.py). None here means "defer to the generic vars".
@@ -83,14 +76,17 @@ PROXY_LOSS_PCT = float(_ENV_LOSS) if _ENV_LOSS is not None else None
 
 
 class _Handler(http.server.BaseHTTPRequestHandler):
+    # Buffer the response so headers and body leave in ONE write: one proxy
+    # chunk, one loss event. Two writes would make the per-request loss
+    # probability depend on socket timing instead of on the loss rate.
+    wbufsize = -1
+
     def do_GET(self) -> None:
         time.sleep(SERVER_DELAY_S)
         try:
             self.send_response(200)
-            # Content-Length is required here, not cosmetic: without it the
-            # client can only detect the end of the body by connection EOF, and
-            # a relaying proxy that does not forward half-close will hang the
-            # request until the read timeout fires.
+            # Content-Length is required, not cosmetic: without it the client
+            # can only detect the end of the body by connection EOF.
             self.send_header("Content-Length", "2")
             self.end_headers()
             self.wfile.write(b"ok")
@@ -115,12 +111,11 @@ class _QuietServer(http.server.ThreadingHTTPServer):
 
 
 # A bare `timeout=PER_REQ_TIMEOUT` sets every httpx timeout INCLUDING the pool
-# timeout -- the wait for a free connection. With N requests queued behind
-# POOL_MAX slots, ordinary queueing then trips PoolTimeout and is indistinguishable
-# from a network stall, which both muddies the mechanism and leaves the baseline
-# riding the edge of that timeout. Only the READ timeout should model "the
-# response never arrived"; queueing is governed by the batch deadline instead.
-_TIMEOUT = httpx.Timeout(PER_REQ_TIMEOUT, pool=DEADLINE_S)
+# timeout (the wait for a free connection). With N requests queued behind
+# POOL_MAX slots, ordinary queueing would then trip PoolTimeout and be
+# indistinguishable from a network stall. Only the READ timeout models "the
+# response never arrived"; queueing is governed by the batch deadline.
+_TIMEOUT = httpx.Timeout(PER_REQ_TIMEOUT, pool=DEADLINE_S + PER_REQ_TIMEOUT)
 
 
 def _fetch(client: httpx.Client, url: str, deadline_at: float) -> bool:
@@ -132,7 +127,7 @@ def _fetch(client: httpx.Client, url: str, deadline_at: float) -> bool:
             client.get(url, timeout=_TIMEOUT)
             return True
         except httpx.HTTPError:
-            continue                          # timed out or dropped: retry
+            continue                          # timed out or reset: retry
     return False
 
 
@@ -142,32 +137,36 @@ def main(machine_mode: bool, fixed: bool) -> int:
     srv = _QuietServer(("127.0.0.1", 0), _Handler)
     thread = threading.Thread(target=srv.serve_forever, daemon=True)
     thread.start()
+    proxy_shutdown = None
+    client = None
+    try:
+        # Morph's real TCP proxy in front of our own server when a condition is
+        # set, via MORPH_B_PROXY_* (per-app override) or generic MORPH_NET_*.
+        port, proxy_shutdown = start_proxy(
+            srv.server_address[1], latency_ms=PROXY_LATENCY_MS, loss_pct=PROXY_LOSS_PCT
+        )
+        url = f"http://127.0.0.1:{port}/"
 
-    # Morph's real TCP proxy in front of our own server when a condition is set,
-    # via MORPH_B_PROXY_* (per-app override) or generic MORPH_NET_* (runtime).
-    port, proxy_shutdown = start_proxy(
-        srv.server_address[1], latency_ms=PROXY_LATENCY_MS, loss_pct=PROXY_LOSS_PCT
-    )
-    url = f"http://127.0.0.1:{port}/"
+        # Built before the timer: constructing a Client costs ~350 ms on some
+        # machines (proxy/env probing) and would otherwise be charged to the batch.
+        client = httpx.Client(
+            limits=httpx.Limits(max_connections=pool_max, max_keepalive_connections=pool_max),
+            trust_env=False,
+        )
 
-    # Built before the timer: constructing a Client costs ~350ms on some
-    # machines (proxy/env probing) and would otherwise be charged to the batch.
-    client = httpx.Client(
-        limits=httpx.Limits(max_connections=pool_max, max_keepalive_connections=pool_max),
-        trust_env=False,
-    )
-
-    t0 = time.monotonic()
-    deadline_at = t0 + DEADLINE_S
-    with ThreadPoolExecutor(max_workers=N_REQUESTS) as pool:
-        results = list(pool.map(lambda _: _fetch(client, url, deadline_at), range(N_REQUESTS)))
-    duration_ms = (time.monotonic() - t0) * 1000
-
-    client.close()
-    if proxy_shutdown is not None:
-        proxy_shutdown()
-    srv.shutdown()
-    thread.join(timeout=2)
+        t0 = time.monotonic()
+        deadline_at = t0 + DEADLINE_S
+        with ThreadPoolExecutor(max_workers=N_REQUESTS) as pool:
+            results = list(pool.map(lambda _: _fetch(client, url, deadline_at), range(N_REQUESTS)))
+        duration_ms = (time.monotonic() - t0) * 1000
+    finally:
+        if client is not None:
+            client.close()
+        if proxy_shutdown is not None:
+            proxy_shutdown()
+        srv.shutdown()
+        srv.server_close()
+        thread.join(timeout=2)
 
     succeeded = sum(results)
     over_deadline = duration_ms > DEADLINE_S * 1000

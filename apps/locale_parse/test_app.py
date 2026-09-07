@@ -2,74 +2,80 @@
 
 Run: pytest apps/locale_parse/test_app.py
 
-Unlike Failure A this fixture is fully deterministic, so the acceptance bar is
-absolute: 0% baseline failures, 100% under condition.
+Fully deterministic, so the acceptance bar is absolute: 0 % baseline failures,
+100 % under condition. The `slow` tier here is a formality (5 repeats each).
+
+The condition is injected the way every Morph adapter injects it: LC_ALL and
+LANG in the child's environment. Tests needing a generated locale skip when
+that locale is missing (GitHub's ubuntu image ships only C and en_US).
 """
 
 from __future__ import annotations
 
-import json
-import os
-import subprocess
-import sys
+import pytest
 
+from apps.conftest import locale_available, run_app
 from apps.locale_parse import app as locale_app
 
-TRIALS = 5
+APP = "locale_parse"
+TARGET = {"LC_ALL": "de_DE.UTF-8", "LANG": "de_DE.UTF-8"}   # what the adapter exports
+
+needs_de = pytest.mark.skipif(
+    not locale_available("de_DE", ","), reason="de_DE.UTF-8 is not generated on this host"
+)
 
 
-def _run(args: list[str], env_overrides: dict[str, str] | None = None) -> tuple[int, dict]:
-    env = dict(os.environ)
-    # Stop the developer's own shell locale from leaking into the fixture.
-    for var in ("LC_ALL", "LC_NUMERIC", "LANG"):
-        env.pop(var, None)
-    env.update(env_overrides or {})
+# --------------------------------------------------------------- contract tier
 
-    proc = subprocess.run(
-        [sys.executable, "-m", "apps.locale_parse", "test", *args],
-        capture_output=True, text=True, env=env, timeout=30,
-    )
-    payload = json.loads(proc.stdout.strip().splitlines()[-1])
-    return proc.returncode, payload
+def test_baseline_passes_with_no_locale_env():
+    """A plain shell (C.UTF-8 / unset): the developer's machine. Must pass."""
+    code, payload, err = run_app(APP)
+    assert code == 0 and payload["result"] == "pass", payload
+    assert err == ""
 
 
-def test_baseline_passes_deterministically():
-    """de_DE is the baseline: it must never fail, on any run."""
-    codes = {_run(["--locale", "de_DE"])[0] for _ in range(TRIALS)}
-    assert codes == {0}, f"baseline not clean: saw exit codes {codes}"
-
-
-def test_fails_under_en_US_deterministically():
-    """en_US is the condition: it must always fail, on any run."""
-    codes = {_run(["--locale", "en_US"])[0] for _ in range(TRIALS)}
-    assert codes == {1}, f"condition not reliable: saw exit codes {codes}"
-
-
-def test_failure_is_silent_corruption_not_a_crash():
-    """The demo's point: a wrong value, not an exception. 1,5 read as 15.0."""
-    code, payload = _run(["--locale", "en_US"])
-    assert code == 1
+@needs_de
+def test_fails_under_target_locale_env():
+    """LC_ALL/LANG=de_DE.UTF-8, exactly what `apply_locale` exports."""
+    code, payload, _ = run_app(APP, env=TARGET)
+    assert code == 1, payload
     assert payload["signal"] == "LocaleParseMismatch"
-    assert "15.0" in payload["detail"]
+    assert "15.0" in payload["detail"], "the point is silent 10x corruption, not a crash"
 
 
+@needs_de
+def test_fails_under_explicit_locale_arg():
+    """--locale is the Windows path (the CRT ignores LC_ALL)."""
+    code, payload, _ = run_app(APP, "--locale", "de_DE")
+    assert code == 1 and payload["signal"] == "LocaleParseMismatch"
+
+
+@needs_de
 def test_fixed_variant_survives_the_condition():
-    """The one-line fix must pass under the exact locale that breaks the app."""
-    code, payload = _run(["--fixed", "--locale", "en_US"])
-    assert code == 0 and payload["result"] == "pass"
+    code, payload, _ = run_app(APP, env=TARGET, fixed=True)
+    assert code == 0 and payload["result"] == "pass", payload
 
 
-def test_env_var_knob_works():
-    """Morph drives this with LC_ALL on Linux/macOS -- and here too."""
-    assert _run([], {"LC_ALL": "en_US.UTF-8"})[0] == 1
-    assert _run([], {"LC_ALL": "de_DE.UTF-8"})[0] == 0
+def test_period_decimal_locales_pass():
+    """en_US and en_IN share the developer's convention: no failure there."""
+    for name in ("en_US", "en_IN"):
+        if not locale_available(name, "."):
+            continue
+        code, payload, _ = run_app(APP, env={"LC_ALL": f"{name}.UTF-8", "LANG": f"{name}.UTF-8"})
+        assert code == 0, (name, payload)
 
 
-def test_unregistered_locale_is_an_invalid_trial():
-    """Exit 2, not 1: Morph must discard it rather than count it as a failure."""
-    code, payload = _run(["--locale", "zz_ZZ"])
+def test_unregistered_explicit_locale_is_an_invalid_trial():
+    """Exit 2, not 1: Morph discards it rather than counting it as a failure."""
+    code, payload, _ = run_app(APP, "--locale", "zz_ZZ")
     assert code == 2
     assert payload["signal"] == "LocaleUnavailable"
+
+
+def test_unknown_ambient_locale_is_not_invalid():
+    """A developer's own en_GB shell must not turn every run into a setup error."""
+    code, payload, _ = run_app(APP, env={"LANG": "en_GB.UTF-8"})
+    assert code in (0, 1), payload      # whatever en_GB does, it is a real trial
 
 
 def test_guard_rejects_a_locale_that_did_not_take_effect(monkeypatch):
@@ -78,8 +84,8 @@ def test_guard_rejects_a_locale_that_did_not_take_effect(monkeypatch):
     Simulates a platform that accepts the locale name but silently keeps a
     period-decimal convention (real Windows CRT behaviour for names shaped like
     ll_CC, and a Pi with no generated locales). Requesting de_DE there must be
-    an invalid trial -- never a FAIL, which would hand Morph fabricated
-    evidence that the locale caused something.
+    an invalid trial, never a PASS that hides the bug or a FAIL blamed on the
+    locale.
     """
     monkeypatch.setattr(locale_app.locale, "setlocale", lambda *a, **k: "de_DE")
     monkeypatch.setattr(locale_app.locale, "localeconv", lambda: {"decimal_point": "."})
@@ -89,10 +95,19 @@ def test_guard_rejects_a_locale_that_did_not_take_effect(monkeypatch):
     assert err is not None and "did not take effect" in err
 
 
+@needs_de
 def test_machine_mode_contract():
-    """`test` must emit a parseable JSON result line with the agreed keys."""
-    code, payload = _run(["--locale", "en_US"])
+    code, payload, err = run_app(APP, env=TARGET)
     assert code == 1
     assert payload["result"] == "fail"
     assert set(payload) >= {"result", "signal", "duration_ms", "detail"}
-    assert payload["detail"]
+    assert err == ""
+
+
+# ------------------------------------------------------------ statistical tier
+
+@pytest.mark.slow
+@needs_de
+def test_deterministic_over_repeats():
+    assert {run_app(APP)[0] for _ in range(5)} == {0}
+    assert {run_app(APP, env=TARGET)[0] for _ in range(5)} == {1}

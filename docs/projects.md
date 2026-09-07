@@ -9,7 +9,7 @@ No setup for the common case. Morph resolves a GitHub token in this order:
 
 1. an explicit `--token` / request field
 2. `MORPH_GITHUB_TOKEN`, then `GITHUB_TOKEN`, then `GH_TOKEN`
-3. `gh auth token` — whatever `gh auth login` already gave you
+3. `gh auth token`: whatever `gh auth login` already gave you
 
 Only if all three miss do you need the OAuth **device flow** (dashboard), which
 needs a `GITHUB_CLIENT_ID`.
@@ -23,6 +23,7 @@ morph connect ./my/app --name app --install
 
 morph projects                          # list
 morph projects --rm <id|name>           # remove
+morph reinstall <id|name>               # rebuild the per-project venv / node_modules
 
 morph run        --project <id>
 morph experiment --project <id> -n 5
@@ -31,17 +32,23 @@ morph threshold  --project <id> --parameter network.latency_ms --low 0 --high 40
 
 `--project` fills in the command and working directory from the registry; an
 explicit `--command` still wins. `--profile` is optional on `experiment`
-(defaults to the captured host plus a 120 ms / 18 % network) and `threshold`.
+(defaults to the captured host plus a 120 ms / 18 % network, the flagship
+operating point) and `threshold`. `morph experiment` runs in sequential mode
+by default (`--mode batch` for the fixed-N design); `morph threshold` uses
+probabilistic bisection by default (`--method bisect` for plain halving);
+`morph minimize` finds the minimal failing condition set. See
+[how-it-works.md](./how-it-works.md).
 
 `--install` (or the API's `POST /projects/{id}/install`) creates a per-project
 venv under `~/.morph/venvs/`, installs `requirements.txt` / `pyproject.toml` via
 `uv` (or stdlib `venv`) or `package.json` via `npm`, and rewrites the run
-command to use that venv.
+command to use that venv. `morph reinstall <project>` repeats that step for an
+already-connected project (after a dependency change, or a broken venv).
 
 ## TUI
 
-Home → **Projects** (`p`). Type a repo or path, tick *install deps*, **Connect**.
-Pick a project and press **Experiment** / **Monitor** / **Threshold** — that
+Home, then **Projects** (`p`). Type a repo or path, tick *install deps*, **Connect**.
+Pick a project and press **Experiment** / **Monitor** / **Threshold**: that
 screen opens with the command pre-filled and every trial running from the
 project's directory.
 

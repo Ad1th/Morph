@@ -1,79 +1,80 @@
 # Failure A: timeout under network latency
 
-**Trigger:** network latency injected on the loopback interface (`lo`).
-**Threshold:** somewhere past ~50ms added latency (response takes ~200ms, client
-deadline is 250ms) -- narrow it further with `morph threshold` once wired in.
-**Baseline fail rate:** < 5% (expect ~0/50).
-**Under condition fail rate:** > 90% (expect ~50/50) once added latency pushes
-round-trip time past the client timeout.
+**Trigger:** network latency, a round-trip time (`network.latency_ms`).
+**Threshold:** ~42 ms RTT. Measured 0/5 at 40 ms, 7/10 at 42 ms, 5/5 at 45 ms and above (5 trials per point, 5 to 120 ms).
+**Baseline fail rate:** 0/20 (~208 ms against a 250 ms deadline).
+**Under condition:** 20/20 at 120 ms RTT.
 **Classification:** environment-caused.
-**Fix:** raise `CLIENT_TIMEOUT` — the `--fixed` flag sets it to 1.0s, comfortably
-above the ~200ms response delay regardless of added latency in the demo range.
+**Fix:** raise the client deadline; `--fixed` sets it to 1.0 s, comfortably above the ~200 ms response for any latency in the demo range.
 
 ## Run it
 
 ```bash
-# human-readable
 python -m apps.timeout run
 python -m apps.timeout run --fixed
+python -m apps.timeout test                       # machine mode (JSON result line)
 
-# machine mode (JSON result line, for Morph / scripts)
-python -m apps.timeout test
+MORPH_NET_LATENCY_MS=120 python -m apps.timeout test          # the condition, as Morph injects it
+morph run -p ../../profiles/high_latency.json -c "python -m apps.timeout test"
 ```
 
-Exit codes: `0` pass, `1` engineered failure (timeout), `2` setup error.
+Exit codes: `0` pass, `1` engineered failure (`TimeoutException`), `2` setup error (connection refused, protocol error: an invalid trial, never counted).
+
+## Mechanism
+
+A client with a 250 ms deadline calls a local server that always takes ~200 ms
+to respond. Under loopback latency the response beats the deadline. Add RTT
+and the response arrives late. The server never sleeps for a latency value of
+its own: the delay comes from the network path exactly once (an older version
+also slept `MORPH_LATENCY_MS` server-side, which triple-counted the condition
+and put the flip point at 14 ms).
+
+The **only** failure path is the deadline. Under Morph's proxy a lost packet is
+delivered late after a retransmission stall of `max(200 ms, 3 x RTT)`, never
+corrupted, so under packet loss this app also fails through the same deadline:
+measured 3/10 at 18 % loss with no added latency (a 200 ms stall against 45 ms
+of headroom). That is the correct behaviour of a tight deadline, and it is why
+`pool_retry`, not this app, is the fixture that stays clean under either
+variable alone.
 
 ## Tuning knobs (env vars)
 
 | Var | Default | Meaning |
 |---|---|---|
 | `MORPH_A_RESP_DELAY_S` | `0.20` | server response delay (seconds) |
-| `MORPH_A_TIMEOUT` | `0.25` | client timeout, unfixed variant (seconds) |
-| `MORPH_A_FIXED_TIMEOUT` | `1.0` | client timeout, `--fixed` variant (seconds) |
+| `MORPH_A_TIMEOUT` | `0.25` | client deadline, unfixed variant (seconds) |
+| `MORPH_A_FIXED_TIMEOUT` | `1.0` | client deadline, `--fixed` variant (seconds) |
+| `MORPH_NET_LATENCY_MS` | unset | RTT to inject through Morph's proxy (set by the runtime) |
+| `MORPH_NET_PACKET_LOSS_PCT` | unset | loss to inject through Morph's proxy (set by the runtime) |
 
 ### Matching the threshold to the pitch
 
-The defaults above are the ones faultyapps.md specifies (200ms response vs a
-250ms deadline), which puts the flip point at only **~50ms** of added latency.
-
-But [PRD §19](../../docs/Morph_PRD.md) and [Design Spec §28](../../docs/Morph_Design_Spec.md)
-both narrate a threshold of **~150–200ms** ("100ms PASS, 150ms PASS, 200ms FAIL").
-If a judge watches the threshold search run against the defaults, it will bottom
-out at ~50ms and will not match the slide.
-
-To put the flip point in the band the pitch claims, drop the response delay so
-the deadline headroom is ~170ms:
+The flip point is ~42 ms RTT: deadline 250 ms minus response ~208 ms. The
+README's narrative ("100 ms PASS, 150 ms PASS, 200 ms FAIL") wants a flip near
+150 to 200 ms. To put it there without touching the client, shorten the
+response so the headroom is ~170 ms:
 
 ```bash
-MORPH_A_RESP_DELAY_S=0.08 python -m apps.timeout test   # flips at ~170ms added latency
+MORPH_A_RESP_DELAY_S=0.08 python -m apps.timeout test    # flips at ~170 ms RTT
 ```
 
-Decide which number the demo quotes *before* rehearsing, and remember the
-loopback doubling below: on `lo`, a `netem delay` of X adds ~2X to round-trip,
-so the netem parameter is about half the RTT threshold being reported.
+Decide which number the demo quotes before rehearsing. Whatever it is, it is an
+RTT: the profile value, the injected value and the value `morph threshold`
+reports all mean round-trip.
 
-## Manual verification protocol
-
-See [docs/faultyapps.md section 7](../../docs/faultyapps.md#7-manual-verification-protocol)
-for the full baseline/condition/teardown loop. Quick version:
+## Threshold search
 
 ```bash
-# 1. baseline -- expect ~50x exit 0
-for i in $(seq 1 50); do python -m apps.timeout test >/dev/null; echo $?; done | sort | uniq -c
-
-# 2. apply latency on loopback (Linux; see docs/faultyapps.md section 6 for macOS/Windows)
-sudo tc qdisc add dev lo root netem delay 180ms
-
-# expect ~50x exit 1
-for i in $(seq 1 50); do python -m apps.timeout test >/dev/null; echo $?; done | sort | uniq -c
-
-# 3. ALWAYS remove the condition
-sudo tc qdisc del dev lo root
+morph threshold -c "python -m apps.timeout test" --parameter network.latency_ms --low 0 --high 120
 ```
 
-## Gotcha
+Probabilistic bisection (`--method bayes`, the default) returns a credible
+interval around ~42 ms and the posterior it came from; `--method bisect` is
+the plain majority-vote halving.
 
-The server binds `127.0.0.1`. Shaping `eth0`/`wlan0` with `tc netem` does **nothing**
-to loopback traffic — you must shape `dev lo` specifically (or run client and
-server on separate machines and shape the real NIC). See
-[docs/faultyapps.md section 10](../../docs/faultyapps.md#10-pitfalls).
+## Self-check
+
+```bash
+pytest apps/timeout/test_app.py                 # contract tier
+pytest apps/timeout/test_app.py -m slow         # 20-trial rates and the two-point threshold check
+```
