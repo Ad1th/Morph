@@ -42,6 +42,7 @@ class ProjectsScreen(Screen):
             yield Button("Experiment", id="proj-experiment")
             yield Button("Monitor", id="proj-monitor")
             yield Button("Threshold", id="proj-threshold")
+            yield Button("Reinstall", id="proj-reinstall")
             yield Button("Remove", id="proj-remove", variant="error")
         yield RichLog(id="proj-log", markup=True, wrap=True)
         yield Static("", id="proj-status")
@@ -63,7 +64,10 @@ class ProjectsScreen(Screen):
         table.clear()
         for p in self._rows:
             src = p.source + (f" {p.repo}@{p.commit}" if p.repo else "")
-            table.add_row(p.id, p.name, src, p.command or "—", key=p.id)
+            cmd = p.command or "—"
+            if p.deps_failed:
+                cmd = f"[yellow]! {len(p.deps_failed)} deps[/yellow] {cmd}"
+            table.add_row(p.id, p.name, src, cmd, key=p.id)
 
     def _selected(self) -> Project | None:
         table = self.query_one("#proj-table", DataTable)
@@ -82,10 +86,37 @@ class ProjectsScreen(Screen):
             self.action_connect()
         elif bid == "proj-remove":
             self.action_remove()
+        elif bid == "proj-reinstall":
+            self.action_reinstall()
         elif bid.startswith("proj-") and bid.split("-", 1)[1] in {
             "experiment", "monitor", "threshold"
         }:
             self.action_open(bid.split("-", 1)[1])
+
+    def action_reinstall(self) -> None:
+        if self._busy:
+            return
+        proj = self._selected()
+        if proj is None:
+            return
+        self._busy = True
+        self.query_one("#proj-reinstall", Button).disabled = True
+        log = self.query_one("#proj-log", RichLog)
+        log.clear()
+        log.write(f"[dim]reinstalling {proj.name}…[/dim]")
+        self._reinstall_worker(proj.id)
+
+    @work(thread=True, exclusive=True)
+    def _reinstall_worker(self, project_id: str) -> None:
+        def emit(line: str) -> None:
+            self.app.call_from_thread(self.query_one("#proj-log", RichLog).write, f"[dim]{line}[/dim]")
+
+        try:
+            proj = projects.load(project_id)
+            updated = project_setup.reinstall(proj, logger=emit)
+            self.post_message(RunFinished(updated))
+        except Exception as exc:
+            self.post_message(RunFinished(None, exc))
 
     def action_connect(self) -> None:
         if self._busy:
@@ -115,14 +146,17 @@ class ProjectsScreen(Screen):
     def on_run_finished(self, message: RunFinished) -> None:
         self._busy = False
         self.query_one("#proj-connect", Button).disabled = False
+        self.query_one("#proj-reinstall", Button).disabled = False
         log = self.query_one("#proj-log", RichLog)
         if message.error is not None:
-            log.write(f"[red]connect failed: {message.error}[/red]")
+            log.write(f"[red]failed: {message.error}[/red]")
             return
         proj = message.result
         self._reload()
         cmd = proj.command or "[yellow]no command detected[/yellow]"
-        log.write(f"[green]connected[/green] {proj.name}  ·  {cmd}")
+        log.write(f"[green]{proj.name}[/green]  ·  {cmd}")
+        if proj.deps_failed:
+            log.write(f"[yellow]! deps still failing:[/yellow] {', '.join(proj.deps_failed)}")
         self.query_one("#proj-src", Input).value = ""
 
     # --- actions -----------------------------------------------------------

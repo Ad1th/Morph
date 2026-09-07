@@ -326,6 +326,7 @@ def _as_info(project: Project) -> ProjectInfo:
         entrypoints=project.entrypoints,
         suggested_command=project.command,
         suggested_cwd=project.cwd,
+        deps_failed=project.deps_failed,
     )
 
 
@@ -457,14 +458,15 @@ def install_project(project_id: str) -> ProjectInfo:
         raise HTTPException(status_code=410, detail=f"Project directory is gone: {project.path}")
 
     try:
-        venv = runenv.prepare(project_dir, VENVS_DIR / project.name)
+        result = runenv.prepare(project_dir, VENVS_DIR / project.name, command=project.command)
     except runenv.EnvError as exc:
-        raise HTTPException(status_code=422, detail=f"Dependency install failed: {exc}")
+        raise HTTPException(status_code=422, detail=f"Could not build the environment: {exc}")
 
-    if venv is not None:
-        project.venv = str(venv)
+    project.deps_failed = result.failed
+    if result.venv is not None:
+        project.venv = str(result.venv)
         if project.command:
-            project.command = runenv.command_in_env(project.command, venv)
+            project.command = runenv.command_in_env(project.command, str(result.venv))
     registry.save(project)
     return _as_info(project)
 

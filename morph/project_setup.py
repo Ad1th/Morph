@@ -41,47 +41,83 @@ def count_files(project_dir: Path) -> int:
     return total
 
 
+def _pyproject_scripts(project_dir: Path) -> list[str]:
+    pyproject = project_dir / "pyproject.toml"
+    if not pyproject.is_file():
+        return []
+    try:
+        import tomllib
+
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    return list((data.get("project") or {}).get("scripts", {}))
+
+
+def _pytest_target(project_dir: Path) -> str:
+    """A scoped pytest invocation: run one tests dir, stop at the first failure,
+    and drop project addopts (e.g. --doctest-modules pulls in the whole tree)."""
+    for name in ("tests", "test"):
+        if (project_dir / name).is_dir():
+            target = name
+            break
+    else:
+        target = "."
+    return f"{PYTHON} -m pytest -q -x -p no:cacheprovider -o addopts= {target}"
+
+
 def detect_command(project_dir: Path) -> tuple[str | None, str | None]:
     """Return ``(suggested_command, suggested_cwd)`` -- a detection, not a guess.
 
-    Nothing recognised -> ``(None, None)`` so the caller asks for the command
-    rather than running something known to fail.
+    Prefers running *the app* (an entrypoint / console script) over its whole
+    test suite. Nothing recognised -> ``(None, None)`` so the caller asks.
     """
     project_dir = Path(project_dir)
+    cwd = str(project_dir)
 
+    # 1. an installed console script (needs `-e .`, which --install does)
+    scripts = _pyproject_scripts(project_dir)
+    if scripts:
+        return f"{scripts[0]} --help", cwd
+
+    # 2. a runnable entrypoint at the repo root
     if (project_dir / "__main__.py").is_file():
         try:
             parts = project_dir.relative_to(REPO_ROOT).parts
-            candidate = (f"{PYTHON} -m {'.'.join(parts)}", str(REPO_ROOT))
+            if all(p.isidentifier() for p in parts):
+                return f"{PYTHON} -m {'.'.join(parts)}", str(REPO_ROOT)
         except ValueError:
-            parts = (project_dir.name,)
-            candidate = (f"{PYTHON} -m {project_dir.name}", str(project_dir.parent))
-        return candidate if all(p.isidentifier() for p in parts) else (None, None)
+            pass
+        return f"{PYTHON} __main__.py", cwd
+    for name in ("main.py", "app.py", "run.py", "server.py", "cli.py"):
+        if (project_dir / name).is_file():
+            return f"{PYTHON} {name}", cwd
 
-    cwd = str(project_dir)
+    # 3. framework / package conventions
+    if (project_dir / "manage.py").is_file():
+        return f"{PYTHON} manage.py check", cwd
+
     package_json = project_dir / "package.json"
     if package_json.is_file():
         try:
             import json
 
-            scripts = json.loads(package_json.read_text(encoding="utf-8")).get("scripts", {})
+            scripts_js = json.loads(package_json.read_text(encoding="utf-8")).get("scripts", {})
         except (OSError, ValueError):
-            scripts = {}
-        if "test" in scripts:
-            return "npm test", cwd
-        if "start" in scripts:
+            scripts_js = {}
+        if "start" in scripts_js:
             return "npm start", cwd
-    if (project_dir / "manage.py").is_file():
-        return f"{PYTHON} manage.py test", cwd
-    if (project_dir / "pytest.ini").is_file() or (project_dir / "tests").is_dir():
-        return f"{PYTHON} -m pytest -q", cwd
+        if "test" in scripts_js:
+            return "npm test", cwd
 
     top_level_py = [p for p in project_dir.glob("*.py") if p.is_file()]
     if len(top_level_py) == 1:
         return f"{PYTHON} {top_level_py[0].name}", cwd
-    for name in ("main.py", "app.py", "run.py"):
-        if (project_dir / name).is_file():
-            return f"{PYTHON} {name}", cwd
+
+    # 4. last resort: a scoped run of the test suite
+    if (project_dir / "pytest.ini").is_file() or (project_dir / "tests").is_dir() \
+            or (project_dir / "test").is_dir():
+        return _pytest_target(project_dir), cwd
 
     return None, None
 
@@ -124,12 +160,14 @@ def connect(
     command, cwd = detect_command(path)
 
     venv: str | None = None
+    deps_failed: list[str] = []
     if install:
         if logger:
             logger(f"preparing environment for {ident}…")
-        venv_path = runenv.prepare(path, VENVS_DIR / f"{ident}", logger=logger)
-        if venv_path is not None:
-            venv = str(venv_path)
+        result = runenv.prepare(path, VENVS_DIR / f"{ident}", command=command, logger=logger)
+        deps_failed = result.failed
+        if result.venv is not None:
+            venv = str(result.venv)
             command = runenv.command_in_env(command, venv) if command else command
 
     project = Project(
@@ -142,8 +180,43 @@ def connect(
         branch=branch,
         commit=commit,
         venv=venv,
+        deps_failed=deps_failed,
         entrypoints=[n for n in ENTRYPOINT_NAMES if (path / n).is_file()],
         file_count=count_files(path),
     )
     projects.save(project, base=base)
     return project
+
+
+def reinstall(project: Project, *, logger: Logger | None = None) -> Project:
+    """Re-run the dependency install for an already-connected project (no
+    re-clone). Updates the venv, command, and deps_failed on the returned copy."""
+    result = runenv.prepare(
+        Path(project.path), VENVS_DIR / project.name, command=_bare_command(project), logger=logger
+    )
+    updated = project.model_copy(deep=True)
+    updated.deps_failed = result.failed
+    if result.venv is not None:
+        updated.venv = str(result.venv)
+        base_cmd = _bare_command(project)
+        if base_cmd:
+            updated.command = runenv.command_in_env(base_cmd, updated.venv)
+    projects.save(updated)
+    return updated
+
+
+def _bare_command(project: Project) -> str | None:
+    """The project command with any venv path stripped back to `python3` /
+    the script name, so a fresh install can rewrite it cleanly."""
+    if not project.command:
+        return None
+    cmd = project.command
+    if project.venv and project.venv in cmd:
+        # "<venv>/bin/python -m pytest ..." -> "python3 -m pytest ..."
+        _quoted, _sp, rest = cmd.partition(" ")
+        if "/python" in _quoted or "\\python" in _quoted:
+            return f"python3{_sp}{rest}"
+        # "<venv>/bin/sample --help" -> re-detect instead
+        detected, _ = detect_command(Path(project.path))
+        return detected
+    return cmd
