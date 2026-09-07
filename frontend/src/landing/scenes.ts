@@ -59,7 +59,7 @@ export const SCENES: Scene[] = [
   { at: 0.46, label: 'scene 03', title: 'the memory' },
   { at: 0.6, label: 'scene 04', title: 'across the board' },
   { at: 0.74, label: 'scene 05', title: 'the morph' },
-  { at: 0.92, label: 'scene 06', title: "the machine you don't" },
+  { at: 0.92, label: 'scene 06', title: 'the machine you don’t' },
 ]
 
 export const TOTAL_FRAMES = 760
