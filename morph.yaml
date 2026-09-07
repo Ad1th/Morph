@@ -21,6 +21,14 @@ adapters:
   memory: native
   locale: native
 
+github:
+  # Sign in from the dashboard with the OAuth device flow: a GitHub page opens,
+  # you type a short code, done. Needs the PUBLIC client id of a GitHub OAuth
+  # App with "Enable Device Flow" ticked (github.com/settings/developers, one
+  # minute, no callback URL needed). Not a secret; GITHUB_CLIENT_ID overrides.
+  client_id: ""
+  scope: repo,read:user
+
 cloud:
   # Provenance only. The transport is SSH whoever supplies the box, so a GCP
   # instance, a Raspberry Pi and a laptop across the room all work the same way.

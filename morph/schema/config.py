@@ -44,6 +44,21 @@ class CloudConfig(BaseModel):
 WorkerConfig = CloudConfig
 
 
+class GithubConfig(BaseModel):
+    """GitHub sign-in for the dashboard's "Connect through GitHub" dialog.
+
+    The device flow (a page opens, you enter a code, no password or token is
+    ever typed into Morph) needs the public client id of a GitHub OAuth App
+    with "Enable Device Flow" ticked. Register one at
+    github.com/settings/developers, paste its client id here (or export
+    GITHUB_CLIENT_ID). It is not a secret. Without it Morph still works
+    through `gh auth login` or MORPH_GITHUB_TOKEN.
+    """
+
+    client_id: str | None = None
+    scope: str = "repo,read:user"
+
+
 class MorphConfig(BaseModel):
     version: str = "1.0"
     default_trials: int = 5
@@ -52,4 +67,5 @@ class MorphConfig(BaseModel):
     proxy_port: int = 9876
     adapters: AdaptersConfig = Field(default_factory=AdaptersConfig)
     cloud: CloudConfig = Field(default_factory=CloudConfig)
+    github: GithubConfig = Field(default_factory=GithubConfig)
     metadata: dict[str, str] = Field(default_factory=dict)

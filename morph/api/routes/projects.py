@@ -413,15 +413,28 @@ def delete_project(project_id: IdPath) -> dict[str, bool]:
 # --------------------------------------------------------------------------- #
 
 
+def _configured_client_id() -> str | None:
+    """`github.client_id` from morph.yaml, if the project sets one."""
+    try:
+        from morph.config import load_config
+
+        return (load_config().github.client_id or "").strip() or None
+    except Exception:  # a malformed config must not break sign-in
+        return None
+
+
 def _client_id(explicit: str | None) -> str:
-    client_id = explicit or os.environ.get("GITHUB_CLIENT_ID") or gh.DEFAULT_CLIENT_ID
+    client_id = (
+        explicit or os.environ.get("GITHUB_CLIENT_ID") or _configured_client_id() or gh.DEFAULT_CLIENT_ID
+    )
     if not client_id:
         raise HTTPException(
             status_code=400,
             detail=(
-                "No GitHub OAuth client_id. Authenticate with `gh auth login` (Morph "
-                "reads its token automatically), set MORPH_GITHUB_TOKEN, or set "
-                "GITHUB_CLIENT_ID for the device flow."
+                "GitHub sign-in is not configured on this server. The device flow needs the "
+                "public client id of a GitHub OAuth App with Device Flow enabled: put it under "
+                "`github.client_id` in morph.yaml or export GITHUB_CLIENT_ID. Alternatively run "
+                "`gh auth login` (Morph reads that token automatically) or set MORPH_GITHUB_TOKEN."
             ),
         )
     return client_id

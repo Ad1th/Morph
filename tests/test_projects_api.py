@@ -511,3 +511,39 @@ def test_nothing_written_outside_temp_home(tmp_path, _temp_home):
 
     assert str(registry.REGISTRY_DIR).startswith(str(tmp_path))
     assert str(Path.home()).startswith(str(tmp_path))
+
+
+def test_device_flow_without_client_id_explains_how_to_configure(monkeypatch):
+    monkeypatch.delenv("GITHUB_CLIENT_ID", raising=False)
+    from morph.api.routes import projects as routes
+    from morph.schema.config import MorphConfig
+
+    monkeypatch.setattr("morph.config.load_config", lambda *a, **k: MorphConfig())
+    monkeypatch.setattr(routes.gh, "DEFAULT_CLIENT_ID", "")
+    r = client.post("/projects/github/device-code", json={})
+    assert r.status_code == 400
+    assert "github.client_id" in r.json()["detail"]
+    assert "GITHUB_CLIENT_ID" in r.json()["detail"]
+
+
+def test_device_flow_reads_client_id_from_morph_yaml(monkeypatch):
+    monkeypatch.delenv("GITHUB_CLIENT_ID", raising=False)
+    from morph.api.routes import projects as routes
+    from morph.schema.config import MorphConfig
+
+    cfg = MorphConfig()
+    cfg.github.client_id = "Iv1.fromyaml"
+    monkeypatch.setattr("morph.config.load_config", lambda *a, **k: cfg)
+    monkeypatch.setattr(routes.gh, "DEFAULT_CLIENT_ID", "")
+    seen = {}
+
+    def fake_http(url, *, method, payload):
+        seen.update(url=url, payload=payload)
+        return {"device_code": "d", "user_code": "ABCD-1234", "verification_uri": "https://github.com/login/device",
+                "expires_in": 900, "interval": 5}
+
+    monkeypatch.setattr(routes, "_github_http_json", fake_http)
+    r = client.post("/projects/github/device-code", json={})
+    assert r.status_code == 200
+    assert seen["payload"]["client_id"] == "Iv1.fromyaml"
+    assert r.json()["user_code"] == "ABCD-1234"

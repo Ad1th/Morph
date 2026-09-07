@@ -11,8 +11,23 @@ No setup for the common case. Morph resolves a GitHub token in this order:
 2. `MORPH_GITHUB_TOKEN`, then `GITHUB_TOKEN`, then `GH_TOKEN`
 3. `gh auth token`: whatever `gh auth login` already gave you
 
-Only if all three miss do you need the OAuth **device flow** (dashboard), which
-needs a `GITHUB_CLIENT_ID`.
+Only if all three miss does the dashboard fall back to the OAuth **device
+flow**: "Connect through GitHub", then "Sign in with a device code". A GitHub
+page opens, you type the short code it shows, and Morph picks the token up
+in memory (never on disk, never in localStorage).
+
+GitHub requires a registered OAuth App for that flow, so set it up once per
+team:
+
+1. github.com/settings/developers, "OAuth Apps", "New OAuth App". Any name,
+   any homepage URL, the callback URL can be the homepage; tick
+   **Enable Device Flow**. No client secret is needed.
+2. Put the app's public client id under `github.client_id` in `morph.yaml`
+   (or export `GITHUB_CLIENT_ID`). It is not a secret and can be committed.
+3. `morph serve`, open the dashboard, Projects, "Connect through GitHub".
+
+Without a client id the dialog explains exactly this instead of failing
+silently.
 
 ## CLI
 
