@@ -22,6 +22,7 @@ _CARDS = [
     ("monitor", "Monitor", "slide conditions, watch performance live"),
     ("threshold", "Threshold", "binary-search a parameter's tipping point"),
     ("environment", "Environment", "capture / build a target profile"),
+    ("projects", "Projects", "add a GitHub repo or dir, then run it"),
     ("regressions", "Regressions", "browse & replay saved bundles"),
 ]
 
@@ -32,6 +33,7 @@ class HomeScreen(Screen):
         ("m", "open('monitor')", "Monitor"),
         ("t", "open('threshold')", "Threshold"),
         ("n", "open('environment')", "Environment"),
+        ("p", "open('projects')", "Projects"),
         ("r", "open('regressions')", "Regressions"),
     ]
 
@@ -60,6 +62,7 @@ class HomeScreen(Screen):
         from morph.tui.screens.environment import EnvironmentScreen
         from morph.tui.screens.experiment import ExperimentScreen
         from morph.tui.screens.monitor import MonitorScreen
+        from morph.tui.screens.projects import ProjectsScreen
         from morph.tui.screens.regressions import RegressionsScreen
         from morph.tui.screens.threshold import ThresholdScreen
 
@@ -68,6 +71,7 @@ class HomeScreen(Screen):
             "monitor": MonitorScreen,
             "threshold": ThresholdScreen,
             "environment": EnvironmentScreen,
+            "projects": ProjectsScreen,
             "regressions": RegressionsScreen,
         }
         self.app.push_screen(screens[which]())

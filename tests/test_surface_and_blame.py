@@ -67,9 +67,13 @@ def test_invariant_test_exporter():
 
 
 def test_surface_2d_heatmap_computation():
+    import sys
+
     req = SurfaceRequest(
         project_path=str(REPO_ROOT / "apps" / "timeout"),
-        command="py -3 -m apps.timeout test",
+        # `py -3` is a Windows-only launcher; use the running interpreter so the
+        # surface actually executes the app on macOS / Linux / CI.
+        command=f"{sys.executable} -m apps.timeout test",
         param_x="network.latency_ms",
         param_y="network.packet_loss_percent",
         x_values=[10.0, 100.0],

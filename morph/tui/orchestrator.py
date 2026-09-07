@@ -43,6 +43,7 @@ def make_result_runner(
     profile: EnvironmentProfile | None,
     timeout: float,
     controller: RuntimeController | None = None,
+    cwd: str | None = None,
 ) -> Callable[[], RunResult]:
     """A zero-arg callable returning the full ``RunResult`` of one run.
 
@@ -52,8 +53,8 @@ def make_result_runner(
 
     def _run() -> RunResult:
         if profile is None:
-            return execute_command(command, timeout=timeout)
-        return ctrl.run(profile=profile, command=command, timeout=timeout)
+            return execute_command(command, timeout=timeout, cwd=cwd)
+        return ctrl.run(profile=profile, command=command, timeout=timeout, cwd=cwd)
 
     return _run
 
@@ -63,24 +64,25 @@ def build_isolation_runners(
     command: str,
     timeout: float,
     controller: RuntimeController | None = None,
+    cwd: str | None = None,
 ) -> tuple[RunFn, dict[str, RunFn]]:
     """Baseline (unconstrained) + one runner per network variable the target
     actually requests, plus the full target profile."""
     ctrl = controller or RuntimeController()
-    baseline = make_result_runner(command, None, timeout, ctrl)
+    baseline = make_result_runner(command, None, timeout, ctrl, cwd)
 
     candidates: dict[str, RunFn] = {}
     net = target.network
     if net is not None and _positive(net.latency_ms):
         latency_only = target.model_copy(deep=True)
         latency_only.network.packet_loss_percent.value = 0.0
-        candidates["latency_only"] = make_result_runner(command, latency_only, timeout, ctrl)
+        candidates["latency_only"] = make_result_runner(command, latency_only, timeout, ctrl, cwd)
     if net is not None and _positive(net.packet_loss_percent):
         loss_only = target.model_copy(deep=True)
         loss_only.network.latency_ms.value = 0.0
-        candidates["loss_only"] = make_result_runner(command, loss_only, timeout, ctrl)
+        candidates["loss_only"] = make_result_runner(command, loss_only, timeout, ctrl, cwd)
 
-    candidates["full_target"] = make_result_runner(command, target, timeout, ctrl)
+    candidates["full_target"] = make_result_runner(command, target, timeout, ctrl, cwd)
     return baseline, candidates
 
 
@@ -89,12 +91,14 @@ def run_experiment_live(
     command: str,
     trials: int,
     timeout: float,
+    *,
+    cwd: str | None = None,
     on_event: OnEvent,
     controller: RuntimeController | None = None,
 ) -> ExperimentResult:
-    baseline, candidates = build_isolation_runners(target, command, timeout, controller)
+    baseline, candidates = build_isolation_runners(target, command, timeout, controller, cwd)
     if not candidates:
-        candidates = {"treatment": make_result_runner(command, target, timeout, controller)}
+        candidates = {"treatment": make_result_runner(command, target, timeout, controller, cwd)}
     return run_experiment(baseline, candidates, n=trials, on_event=on_event)
 
 
@@ -124,6 +128,8 @@ def run_threshold_live(
     high: float,
     trials: int,
     timeout: float,
+    *,
+    cwd: str | None = None,
     on_event: OnEvent,
     controller: RuntimeController | None = None,
 ) -> ThresholdResult:
@@ -131,7 +137,7 @@ def run_threshold_live(
 
     def run_at(value: float) -> RunResult:
         candidate = set_profile_parameter(base, parameter, value)
-        return ctrl.run(profile=candidate, command=command, timeout=timeout)
+        return ctrl.run(profile=candidate, command=command, timeout=timeout, cwd=cwd)
 
     return search_threshold(
         parameter=parameter, run_at=run_at, low=low, high=high, trials=trials, on_event=on_event

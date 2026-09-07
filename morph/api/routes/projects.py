@@ -33,9 +33,15 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 import morph
+from morph import github as gh
+from morph import projects as registry
+from morph import runenv
+from morph.projects import Project
 from morph.schema.project import ProjectInfo
 
 router = APIRouter()
+
+VENVS_DIR = Path.home() / ".morph" / "venvs"
 
 REPO_ROOT = Path(morph.__file__).resolve().parent.parent
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
@@ -309,6 +315,46 @@ def describe_project(project_dir: Path) -> ProjectInfo:
     )
 
 
+def _as_info(project: Project) -> ProjectInfo:
+    return ProjectInfo(
+        project_id=project.id,
+        name=project.name,
+        path=project.path,
+        file_count=project.file_count,
+        entrypoints=project.entrypoints,
+        suggested_command=project.command,
+        suggested_cwd=project.cwd,
+    )
+
+
+def _persist(
+    info: ProjectInfo,
+    *,
+    source: str,
+    repo: str | None = None,
+    branch: str | None = None,
+    commit: str | None = None,
+    venv: str | None = None,
+) -> ProjectInfo:
+    """Mirror a described project into the durable registry and return it back."""
+    project = Project(
+        id=info.project_id,
+        name=info.name,
+        source=source,
+        path=info.path,
+        command=info.suggested_command,
+        cwd=info.suggested_cwd,
+        repo=repo,
+        branch=branch,
+        commit=commit,
+        venv=venv,
+        entrypoints=info.entrypoints,
+        file_count=info.file_count,
+    )
+    registry.save(project)
+    return info
+
+
 @router.post("/upload", response_model=ProjectInfo)
 async def upload_project(files: list[UploadFile] = File(...)) -> ProjectInfo:
     """Write an uploaded project tree to a temp dir and describe it."""
@@ -342,7 +388,7 @@ async def upload_project(files: list[UploadFile] = File(...)) -> ProjectInfo:
     # real project root is that single directory rather than the temp dir.
     entries = list(temp_root.iterdir())
     project_dir = entries[0] if len(entries) == 1 and entries[0].is_dir() else temp_root
-    return describe_project(project_dir)
+    return _persist(describe_project(project_dir), source="upload")
 
 
 @router.post("/local", response_model=ProjectInfo)
@@ -362,27 +408,89 @@ def use_local_project(req: LocalProjectRequest) -> ProjectInfo:
     if not resolved.is_dir():
         raise HTTPException(status_code=400, detail=f"Path '{req.path}' is a file, not a directory")
 
-    return describe_project(resolved)
+    return _persist(describe_project(resolved), source="local")
 
 
 @router.post("/github", response_model=ProjectInfo)
 def connect_github_project(req: GithubProjectRequest) -> ProjectInfo:
-    """Clone a GitHub repository (with optional authentication) and describe it."""
-    clone_url, _, repo_name = _normalize_github_repo(req.repo, req.token)
-    cloned_dir = _clone_github_repo(clone_url, repo_name, req.branch, req.token)
-    return describe_project(cloned_dir)
+    """Clone a GitHub repository (auth: token, then env, then `gh auth token`)."""
+    token = gh.resolve_token(req.token)
+    clone_url, owner, repo_name = _normalize_github_repo(req.repo, token)
+    cloned_dir = _clone_github_repo(clone_url, repo_name, req.branch, token)
+    commit = subprocess.run(
+        ["git", "-C", str(cloned_dir), "rev-parse", "--short", "HEAD"],
+        capture_output=True, text=True,
+    ).stdout.strip() or None
+    return _persist(
+        describe_project(cloned_dir),
+        source="github", repo=f"{owner}/{repo_name}", branch=req.branch, commit=commit,
+    )
+
+
+# --- registry: list / get / delete / install ------------------------------- #
+
+
+@router.get("", response_model=list[ProjectInfo])
+def list_projects() -> list[ProjectInfo]:
+    return [_as_info(p) for p in registry.list_projects()]
+
+
+@router.post("/github/cli-token")
+def github_cli_token() -> dict[str, Any]:
+    """A token from the local `gh` CLI or environment, so the browser can skip
+    the device flow when the machine is already authenticated."""
+    return {"token": gh.resolve_token(), "source": gh.token_source()}
+
+
+@router.post("/{project_id}/install", response_model=ProjectInfo)
+def install_project(project_id: str) -> ProjectInfo:
+    """Build the project an isolated venv and install its dependencies."""
+    try:
+        project = registry.load(project_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"No project {project_id!r}")
+
+    project_dir = Path(project.path)
+    if not project_dir.is_dir():
+        raise HTTPException(status_code=410, detail=f"Project directory is gone: {project.path}")
+
+    try:
+        venv = runenv.prepare(project_dir, VENVS_DIR / project.name)
+    except runenv.EnvError as exc:
+        raise HTTPException(status_code=422, detail=f"Dependency install failed: {exc}")
+
+    if venv is not None:
+        project.venv = str(venv)
+        if project.command:
+            project.command = runenv.command_in_env(project.command, venv)
+    registry.save(project)
+    return _as_info(project)
+
+
+@router.get("/{project_id}", response_model=ProjectInfo)
+def get_project(project_id: str) -> ProjectInfo:
+    try:
+        return _as_info(registry.load(project_id))
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"No project {project_id!r}")
+
+
+@router.delete("/{project_id}")
+def delete_project(project_id: str) -> dict[str, bool]:
+    return {"deleted": registry.delete(project_id)}
 
 
 @router.post("/github/device-code")
 def request_device_code(req: DeviceCodeRequest) -> dict[str, Any]:
     """Request a device verification code from GitHub OAuth."""
-    client_id = req.client_id or os.environ.get("GITHUB_CLIENT_ID")
+    client_id = req.client_id or os.environ.get("GITHUB_CLIENT_ID") or gh.DEFAULT_CLIENT_ID
     if not client_id:
         raise HTTPException(
             status_code=400,
             detail=(
-                "GitHub Client ID is required for device flow. "
-                "Set GITHUB_CLIENT_ID or provide client_id."
+                "No GitHub OAuth client_id. Authenticate with `gh auth login` (Morph "
+                "reads its token automatically), set MORPH_GITHUB_TOKEN, or set "
+                "GITHUB_CLIENT_ID for the device flow."
             ),
         )
     return _github_http_json(
@@ -395,12 +503,9 @@ def request_device_code(req: DeviceCodeRequest) -> dict[str, Any]:
 @router.post("/github/poll-token")
 def poll_device_token(req: PollTokenRequest) -> dict[str, Any]:
     """Poll GitHub OAuth for access token completion using the device code."""
-    client_id = req.client_id or os.environ.get("GITHUB_CLIENT_ID")
+    client_id = req.client_id or os.environ.get("GITHUB_CLIENT_ID") or gh.DEFAULT_CLIENT_ID
     if not client_id:
-        raise HTTPException(
-            status_code=400,
-            detail="GitHub Client ID is required to poll for token.",
-        )
+        raise HTTPException(status_code=400, detail="GitHub client_id is required to poll for a token.")
     return _github_http_json(
         "https://github.com/login/oauth/access_token",
         method="POST",

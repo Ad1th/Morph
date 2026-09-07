@@ -363,3 +363,54 @@ RegressionsScreen .lane {
     background: $panel;
     color: $text;
 }
+
+/* ---------- Projects ---------- */
+
+#proj-bar {
+    height: auto;
+    padding: 1;
+    background: $panel;
+    align-vertical: middle;
+}
+
+#proj-bar #proj-src {
+    width: 1fr;
+}
+
+#proj-bar Checkbox {
+    margin: 0 1;
+}
+
+#proj-bar #proj-connect {
+    margin-left: 1;
+}
+
+#proj-table {
+    height: 1fr;
+    margin: 0 2;
+}
+
+#proj-actions {
+    height: auto;
+    padding: 1;
+    background: $panel;
+}
+
+#proj-actions Button {
+    margin-right: 1;
+}
+
+#proj-log {
+    height: 8;
+    border-top: solid $panel-lighten-2;
+    padding: 0 2;
+    background: $surface;
+}
+
+#proj-status {
+    dock: bottom;
+    height: 1;
+    padding: 0 2;
+    background: $panel;
+    color: $text-muted;
+}

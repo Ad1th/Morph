@@ -216,3 +216,31 @@ def test_cli_threshold(tmp_path):
     assert "Threshold Search Result" in res.stdout
 
 
+
+
+def test_cli_connect_local_and_run(tmp_path, monkeypatch):
+    import morph.projects
+
+    monkeypatch.setattr(morph.projects, "REGISTRY_DIR", tmp_path / "registry")
+
+    proj_dir = tmp_path / "demo"
+    proj_dir.mkdir()
+    (proj_dir / "main.py").write_text("print('project ran ok')\n")
+
+    connect = runner.invoke(app, ["connect", str(proj_dir)])
+    assert connect.exit_code == 0, connect.output
+    assert "Connected: demo" in connect.output
+
+    listed = runner.invoke(app, ["projects"])
+    assert "demo" in listed.output
+
+    proj = morph.projects.list_projects(base=tmp_path / "registry")[0]
+    run_res = runner.invoke(app, ["run", "--project", proj.id])
+    assert run_res.exit_code == 0, run_res.output
+    assert "project ran ok" in run_res.output
+
+
+def test_cli_run_requires_command_or_project():
+    result = runner.invoke(app, ["run"])
+    assert result.exit_code != 0
+    assert "--command or --project" in result.output

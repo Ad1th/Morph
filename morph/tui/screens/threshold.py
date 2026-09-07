@@ -36,9 +36,16 @@ class ThresholdScreen(Screen):
         super().__init__()
         self._cfg = load_config()
         self._busy = False
+        project = getattr(self.app, "active_project", None)
+        self._project_cwd = project.cwd if project else None
+        self._project_command = project.command if project else None
 
     def compose(self) -> ComposeResult:
-        yield Static(" Threshold · failure boundary ", classes="screen-title")
+        title = " Threshold · failure boundary "
+        project = getattr(self.app, "active_project", None)
+        if project:
+            title += f"·  {project.name} "
+        yield Static(title, classes="screen-title")
         with Horizontal(id="th-bar"):
             yield Select.from_values(
                 THRESHOLD_PARAMETERS, prompt="parameter", id="th-param", allow_blank=False
@@ -50,7 +57,7 @@ class ThresholdScreen(Screen):
         with Horizontal(id="th-setup2"):
             yield Input(placeholder="profile.json (blank -> host + latency/loss)", id="th-profile")
             yield Input(
-                value=self._cfg.default_command or "",
+                value=self._project_command or self._cfg.default_command or "",
                 placeholder="python -m apps.timeout",
                 id="th-command",
             )
@@ -131,7 +138,8 @@ class ThresholdScreen(Screen):
 
         try:
             result = run_threshold_live(
-                profile, command, parameter, low, high, trials, timeout=30.0, on_event=emit
+                profile, command, parameter, low, high, trials,
+                timeout=30.0, cwd=self._project_cwd, on_event=emit,
             )
             self.post_message(RunFinished(result))
         except Exception as exc:

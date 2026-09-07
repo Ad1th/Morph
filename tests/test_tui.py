@@ -335,3 +335,39 @@ async def test_experiment_screen_renders_lanes_and_verdict():
 
         baseline = screen._lanes["baseline"]
         assert baseline._failures == 0
+
+
+@pytest.mark.asyncio
+async def test_projects_screen_connects_and_opens_experiment(tmp_path, monkeypatch):
+    import morph.projects
+
+    monkeypatch.setattr(morph.projects, "REGISTRY_DIR", tmp_path / "registry")
+
+    proj_dir = tmp_path / "tuiproj"
+    proj_dir.mkdir()
+    (proj_dir / "main.py").write_text("print('ran')\n")
+
+    app = MorphApp(demo=True)
+    async with app.run_test() as pilot:
+        await pilot.press("p")
+        await pilot.pause()
+        screen = app.screen
+        assert screen.__class__.__name__ == "ProjectsScreen"
+
+        screen.query_one("#proj-src").value = str(proj_dir)
+        screen.query_one("#proj-install").value = False
+        screen.action_connect()
+        for _ in range(80):
+            await pilot.pause(0.05)
+            if not screen._busy and screen._rows:
+                break
+        assert [r.name for r in screen._rows] == ["tuiproj"]
+        assert screen._rows[0].command == "python3 main.py"
+
+        screen.action_open("experiment")
+        await pilot.pause()
+        exp = app.screen
+        assert exp.__class__.__name__ == "ExperimentScreen"
+        assert app.active_project.name == "tuiproj"
+        assert exp.query_one("#in-command").value == "python3 main.py"
+        assert exp._project_cwd == str(proj_dir)

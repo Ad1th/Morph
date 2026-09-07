@@ -12,9 +12,19 @@ python -m morph.tui
 
 ## Home
 
-Five ways in, keyboard-first. `e` Experiment · `m` Monitor · `t` Threshold ·
-`n` Environment · `r` Regressions · `esc` back · `F2` light/dark ·
+Six ways in, keyboard-first. `e` Experiment · `m` Monitor · `t` Threshold ·
+`n` Environment · `p` Projects · `r` Regressions · `esc` back · `F2` light/dark ·
 `Ctrl+P` command palette.
+
+## Projects — add a repo, then run it
+
+Type a GitHub repo (`owner/repo` or a URL) or a local path, optionally tick
+*install deps*, and **Connect**. Auth is automatic if you've run `gh auth
+login`. The connected project is remembered under `~/.morph/projects/`.
+
+Select one and press **Experiment** / **Monitor** / **Threshold**: that screen
+opens with the project's command pre-filled and every trial running from its
+directory. See [`projects.md`](projects.md).
 
 ## Experiment — causal isolation
 
