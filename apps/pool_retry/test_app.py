@@ -23,9 +23,10 @@ import pytest
 
 TRIALS = 8
 # Real conditions, injected by morph's TCP proxy. Latency is per direction, so
-# 90ms here is ~180ms round-trip.
-LATENCY = {"MORPH_B_PROXY_LATENCY_MS": "90"}
-LOSS = {"MORPH_B_PROXY_LOSS_PCT": "12"}
+# 120ms here is ~240ms round-trip. 120/18 is the validated operating point
+# (see README): neither leg alone moves the rate, the pair pins it near 100%.
+LATENCY = {"MORPH_B_PROXY_LATENCY_MS": "120"}
+LOSS = {"MORPH_B_PROXY_LOSS_PCT": "18"}
 BOTH = {**LATENCY, **LOSS}
 
 

@@ -51,6 +51,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 
+from apps.netshape import start_proxy
+
 # Tuned so that each condition ALONE stays inside the deadline and only the
 # combination cascades past it. The deadline is placed in the measured gap
 # between the slowest passing leg (latency alone, max 2298ms) and the fastest
@@ -70,8 +72,14 @@ SERVER_DELAY_S = float(os.getenv("MORPH_B_SERVER_DELAY", "0.08"))
 # lost response never arrives and the client's read timeout fires on a real
 # connection. It also delays each direction, so round-trip grows by ~2x the
 # configured latency -- the same doubling real netem shows on loopback.
-PROXY_LATENCY_MS = float(os.getenv("MORPH_B_PROXY_LATENCY_MS", "0"))
-PROXY_LOSS_PCT = float(os.getenv("MORPH_B_PROXY_LOSS_PCT", "0"))
+#
+# MORPH_B_PROXY_* are per-app overrides; absent those, Morph's runtime passes
+# the isolated conditions through the generic MORPH_NET_* vars (see
+# apps/netshape.py). None here means "defer to the generic vars".
+_ENV_LAT = os.getenv("MORPH_B_PROXY_LATENCY_MS")
+_ENV_LOSS = os.getenv("MORPH_B_PROXY_LOSS_PCT")
+PROXY_LATENCY_MS = float(_ENV_LAT) if _ENV_LAT is not None else None
+PROXY_LOSS_PCT = float(_ENV_LOSS) if _ENV_LOSS is not None else None
 
 
 class _Handler(http.server.BaseHTTPRequestHandler):
@@ -128,34 +136,6 @@ def _fetch(client: httpx.Client, url: str, deadline_at: float) -> bool:
     return False
 
 
-def _start_proxy(upstream_port: int) -> tuple[int, object]:
-    """Runs Morph's TCP proxy in front of the server, on its own event loop thread.
-
-    Imported lazily so the app still runs standalone when no conditions are set.
-    Returns (proxy_port, shutdown_callable).
-    """
-    import asyncio
-
-    from morph.runtime.adapters.proxy import ProxyServer
-
-    loop = asyncio.new_event_loop()
-    threading.Thread(target=loop.run_forever, daemon=True).start()
-
-    proxy = ProxyServer(
-        upstream_host="127.0.0.1",
-        upstream_port=upstream_port,
-        latency_ms=PROXY_LATENCY_MS,
-        packet_loss_percent=PROXY_LOSS_PCT,
-    )
-    asyncio.run_coroutine_threadsafe(proxy.start(), loop).result(timeout=5)
-
-    def shutdown() -> None:
-        asyncio.run_coroutine_threadsafe(proxy.stop(), loop).result(timeout=5)
-        loop.call_soon_threadsafe(loop.stop)
-
-    return proxy.port, shutdown
-
-
 def main(machine_mode: bool, fixed: bool) -> int:
     pool_max = N_REQUESTS if fixed else POOL_MAX
 
@@ -163,9 +143,11 @@ def main(machine_mode: bool, fixed: bool) -> int:
     thread = threading.Thread(target=srv.serve_forever, daemon=True)
     thread.start()
 
-    port, proxy_shutdown = srv.server_address[1], None
-    if PROXY_LATENCY_MS or PROXY_LOSS_PCT:
-        port, proxy_shutdown = _start_proxy(srv.server_address[1])
+    # Morph's real TCP proxy in front of our own server when a condition is set,
+    # via MORPH_B_PROXY_* (per-app override) or generic MORPH_NET_* (runtime).
+    port, proxy_shutdown = start_proxy(
+        srv.server_address[1], latency_ms=PROXY_LATENCY_MS, loss_pct=PROXY_LOSS_PCT
+    )
     url = f"http://127.0.0.1:{port}/"
 
     # Built before the timer: constructing a Client costs ~350ms on some

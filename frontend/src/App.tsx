@@ -3,6 +3,7 @@ import { DesktopCorners } from './components/DesktopCorners'
 import { OsSwitcher } from './components/OsSwitcher'
 import type { EnvironmentProfile, ProjectInfo, RunResult } from './api/types'
 import { Desktop } from './screens/Desktop'
+import { Experiment } from './screens/Experiment'
 import { ParameterConfiguration } from './screens/ParameterConfiguration'
 import { Preparing } from './screens/Preparing'
 import { Verdict } from './screens/Verdict'
@@ -16,6 +17,7 @@ type ScreenState =
      separate state that could drift out of sync with the profile. */
   | { name: 'preparing'; profile: EnvironmentProfile; command: string; cwd?: string; target: string }
   | { name: 'verdict'; result: RunResult }
+  | { name: 'experiment' }
 
 export default function App() {
   const { os, setOs } = useOsTheme()
@@ -47,7 +49,12 @@ export default function App() {
           onOpenChange={setProjectOpen}
           onProject={setProject}
           onStart={() => setScreen({ name: 'config' })}
+          onExperiment={() => setScreen({ name: 'experiment' })}
         />
+      )}
+
+      {screen.name === 'experiment' && (
+        <Experiment os={os} onBack={() => setScreen({ name: 'desktop' })} />
       )}
 
       {screen.name === 'config' && (

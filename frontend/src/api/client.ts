@@ -1,6 +1,7 @@
 import type {
   DifferentialBlameResult,
   EnvironmentProfile,
+  ExperimentResult,
   ExportInvariantRequest,
   ExportInvariantResponse,
   ParameterMetadata,
@@ -121,4 +122,25 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(req),
     }),
+
+  startExperimentStream: (payload: {
+    command: string
+    target_profile?: EnvironmentProfile
+    trials?: number
+    timeout_sec?: number
+  }) =>
+    request<{ experiment_id: string; status: string }>('/experiments/stream', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getExperiment: (id: string) => request<ExperimentResult>(`/experiments/${id}`),
 }
+
+// Open the progress WebSocket for a running experiment. Vite proxies /ws to the
+// API in dev; in a bundled deploy it is same-origin.
+export function openExperimentSocket(experimentId: string): WebSocket {
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  return new WebSocket(`${proto}://${window.location.host}/ws/experiment/${experimentId}`)
+}
+

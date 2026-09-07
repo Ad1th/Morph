@@ -14,6 +14,7 @@ export function Desktop({
   onOpenChange,
   onProject,
   onStart,
+  onExperiment,
 }: {
   os: OsName
   /** Controlled by App so the desktop folder icon can reopen this dialog from
@@ -22,6 +23,7 @@ export function Desktop({
   onOpenChange: (open: boolean) => void
   onProject: (project: ProjectInfo | null) => void
   onStart: () => void
+  onExperiment: () => void
 }) {
   const [view, setView] = useState<DialogView>('choose')
   const [repo, setRepo] = useState('')
@@ -464,6 +466,9 @@ export function Desktop({
                 <div className="desktop__dialog-actions">
                   <button className="desktop__btn bevel-raised" onClick={() => setView('choose')}>
                     Back
+                  </button>
+                  <button className="desktop__btn bevel-raised" onClick={onExperiment}>
+                    Run experiment
                   </button>
                   <button
                     className="desktop__btn desktop__btn--primary bevel-raised"
