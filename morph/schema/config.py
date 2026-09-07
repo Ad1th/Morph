@@ -13,7 +13,7 @@ class AdaptersConfig(BaseModel):
 
 
 class CloudConfig(BaseModel):
-    """A remote worker Morph can hand a run to when this host is too small.
+    """A remote worker Morph can hand a run to when this host cannot honour a profile.
 
     Transport is plain SSH whoever the provider is: the worker runs the SAME
     `morph run` against the SAME profile, so there is no second execution
@@ -21,19 +21,27 @@ class CloudConfig(BaseModel):
     box came from (it appears in run provenance); it does not change the code
     path.
 
-    Nothing here is required until `enabled` is set. Credentials may equally
-    come from the environment, so a config file can be committed without them:
+    Nothing here is required until a host is set. Credentials may equally come
+    from the environment, so a config file can be committed without them:
         MORPH_CLOUD_HOST, MORPH_CLOUD_USER, MORPH_CLOUD_SSH_KEY
+    (`MORPH_WORKER_*` are accepted as aliases.)
+
+    Dispatch is always explicit (`morph run --cloud`, `run_anywhere`): a
+    configured worker never causes a plain local run to leave the machine.
     """
 
     enabled: bool = False
-    provider: str = "gcp"  # "gcp" | "ssh" -- provenance only
+    provider: str = "ssh"  # "ssh" | "gcp" | "pi" -- provenance only
     host: str | None = None  # external IP or hostname of the worker
     user: str | None = None  # SSH login
     ssh_key: str | None = None  # path to the private key
     python: str = "python3"  # interpreter on the worker
     workdir: str = "~/morph"  # Morph checkout on the worker
     connect_timeout: float = 15.0
+
+
+# Backwards-compatible name: there is exactly one worker configuration.
+WorkerConfig = CloudConfig
 
 
 class MorphConfig(BaseModel):

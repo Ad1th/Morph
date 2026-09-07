@@ -114,6 +114,7 @@ def test_search_threshold_returns_none_when_high_bound_passes():
     assert result.safe_value == 400
     assert result.failure_value is None
     assert result.boundary_estimate is None
+    assert result.outcome == "never_fails"
 
 
 def test_search_threshold_returns_none_when_low_bound_fails():
@@ -124,6 +125,7 @@ def test_search_threshold_returns_none_when_low_bound_fails():
     assert result.safe_value is None
     assert result.failure_value == 100
     assert result.boundary_estimate is None
+    assert result.outcome == "always_fails"
 
 
 
@@ -136,7 +138,8 @@ def test_search_threshold_search_points_recorded():
 
     result = search_threshold("param", run_at, low=0, high=200, trials=1, precision=10)
     assert len(result.search_points) > 0
-    assert all("value" in p and "failure_rate" in p for p in result.search_points)
+    assert all(p.value is not None and p.failure_rate is not None for p in result.search_points)
+    assert result.method == "bisection" and result.trials == 1 and result.outcome == "boundary_found"
 
 
 def test_classify_application_internal_when_baseline_already_flaky():

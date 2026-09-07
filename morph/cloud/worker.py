@@ -18,7 +18,7 @@ import shlex
 import subprocess
 from dataclasses import dataclass
 
-from morph.schema.config import CloudConfig
+from morph.schema.config import CloudConfig, WorkerConfig
 from morph.schema.profile import EnvironmentProfile
 from morph.schema.telemetry import RunResult
 
@@ -65,13 +65,13 @@ class WorkerInfo:
         return self.reachable and self.morph_importable
 
 
-def resolve_config(config: CloudConfig | None) -> CloudConfig:
+def resolve_config(config: WorkerConfig | CloudConfig | None) -> WorkerConfig:
     """Fill a config from the environment, so credentials need not be committed."""
-    cfg = (config or CloudConfig()).model_copy(deep=True)
-    cfg.host = cfg.host or os.environ.get("MORPH_CLOUD_HOST")
-    cfg.user = cfg.user or os.environ.get("MORPH_CLOUD_USER")
-    cfg.ssh_key = cfg.ssh_key or os.environ.get("MORPH_CLOUD_SSH_KEY")
-    if os.environ.get("MORPH_CLOUD_HOST"):
+    cfg = (config or WorkerConfig()).model_copy(deep=True)
+    cfg.host = cfg.host or os.environ.get("MORPH_WORKER_HOST") or os.environ.get("MORPH_CLOUD_HOST")
+    cfg.user = cfg.user or os.environ.get("MORPH_WORKER_USER") or os.environ.get("MORPH_CLOUD_USER")
+    cfg.ssh_key = cfg.ssh_key or os.environ.get("MORPH_WORKER_SSH_KEY") or os.environ.get("MORPH_CLOUD_SSH_KEY")
+    if os.environ.get("MORPH_WORKER_HOST") or os.environ.get("MORPH_CLOUD_HOST"):
         cfg.enabled = True
     return cfg
 
@@ -79,8 +79,9 @@ def resolve_config(config: CloudConfig | None) -> CloudConfig:
 class RemoteWorker:
     """Runs Morph commands on another machine over SSH."""
 
-    def __init__(self, config: CloudConfig | None = None) -> None:
+    def __init__(self, config: WorkerConfig | CloudConfig | None = None) -> None:
         self.config = resolve_config(config)
+
 
     # ---------------------------------------------------------------- wiring
 
@@ -138,7 +139,7 @@ class RemoteWorker:
     def probe_command(self) -> str:
         """Shell run by `check`. Separate so a test can read it."""
         return (
-            f"{shlex.quote(self.config.python)} -c {shlex.quote(_PROBE_PY)} 2>/dev/null; "
+            f"{_remote_path(self.config.python)} -c {shlex.quote(_PROBE_PY)} 2>/dev/null; "
             # tc lives in /sbin, which is frequently absent from a non-login PATH.
             "(sudo -n /sbin/tc qdisc show dev lo >/dev/null 2>&1 && echo TC_OK || echo TC_NO)"
         )
@@ -188,10 +189,11 @@ class RemoteWorker:
             "trap 'rm -f \"$f\"' EXIT; "
             'cat > "$f"; '
             f"cd {_remote_path(self.config.workdir)} 2>/dev/null || true; "
-            f"{shlex.quote(self.config.python)} -m morph.cli.main run "
+            f"{_remote_path(self.config.python)} -m morph.cli.main run "
             f'--profile "$f" --command {shlex.quote(command)} '
             f"--timeout {float(timeout):g} --json"
         )
+
 
     def run(
         self,

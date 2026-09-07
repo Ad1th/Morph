@@ -12,14 +12,16 @@ from morph.runtime.adapters.base import BaseAdapter, ProxyAdapter
 class LinuxAdapter(BaseAdapter):
     """Adapter for Linux environment condition simulation."""
 
-    _CGROUP_CPU_MAX = "/sys/fs/cgroup/cpu.max"
+    _CGROUP_CPU_PATHS = ("/sys/fs/cgroup/morph/cpu.max", "/sys/fs/cgroup/cpu.max")
+    _CGROUP_MEM_PATHS = ("/sys/fs/cgroup/morph/memory.max", "/sys/fs/cgroup/memory.max")
 
     def __init__(self, interface: str = "lo") -> None:
         super().__init__()
         self.interface = interface
         self._proxy: ProxyAdapter | None = None
         self._used_tc: bool = False
-        self._used_cgroup_quota: bool = False
+        self._used_cgroup_quota_path: str | None = None
+        self._used_cgroup_mem_path: str | None = None
 
     def capabilities(self) -> dict[str, bool]:
         return {
@@ -38,18 +40,19 @@ class LinuxAdapter(BaseAdapter):
         if latency_ms <= 0.0 and packet_loss_percent <= 0.0:
             return
 
+        has_tc = shutil.which("tc") is not None or os.path.exists("/sbin/tc") or os.path.exists("/usr/sbin/tc")
+        tc_bin = shutil.which("tc") or ("/sbin/tc" if os.path.exists("/sbin/tc") else "tc")
         is_root = os.name != "nt" and os.geteuid() == 0
-        has_tc = shutil.which("tc") is not None
 
-        if is_root and has_tc:
+        if has_tc:
+            cmd = [tc_bin, "qdisc", "add", "dev", self.interface, "root", "netem"]
+            if not is_root:
+                cmd = ["sudo", "-n", *cmd]
+            if latency_ms > 0:
+                cmd.extend(["delay", f"{latency_ms}ms"])
+            if packet_loss_percent > 0:
+                cmd.extend(["loss", f"{packet_loss_percent}%"])
             try:
-                cmd = [
-                    "tc", "qdisc", "add", "dev", self.interface, "root", "netem"
-                ]
-                if latency_ms > 0:
-                    cmd.extend(["delay", f"{latency_ms}ms"])
-                if packet_loss_percent > 0:
-                    cmd.extend(["loss", f"{packet_loss_percent}%"])
                 subprocess.run(cmd, check=True, capture_output=True)
                 self._used_tc = True
                 return
@@ -65,28 +68,52 @@ class LinuxAdapter(BaseAdapter):
         )
         self._env_overrides.update(self._proxy.get_env_overrides())
 
+    def _write_cgroup(self, path: str, value: str) -> bool:
+        """Write a value to a cgroup control file, falling back to passwordless sudo if unprivileged."""
+        try:
+            with open(path, "w") as f:
+                f.write(value)
+            return True
+        except (PermissionError, OSError):
+            if os.name != "nt":
+                try:
+                    res = subprocess.run(
+                        ["sudo", "-n", "sh", "-c", f"echo '{value}' > '{path}'"],
+                        check=False,
+                        capture_output=True,
+                    )
+                    return res.returncode == 0
+                except OSError:
+                    pass
+        return False
+
     def apply_cpu(self, max_cores: int | None = None, quota_percent: float | None = None) -> None:
         if max_cores is not None and max_cores > 0:
             self._env_overrides["MORPH_MAX_CORES"] = str(max_cores)
 
         if quota_percent is not None and quota_percent > 0:
             applied = False
-            if os.name != "nt" and os.geteuid() == 0:
-                try:
-                    period_us = 100_000
-                    quota_us = int(period_us * quota_percent / 100)
-                    with open(self._CGROUP_CPU_MAX, "w") as f:
-                        f.write(f"{quota_us} {period_us}")
-                    self._used_cgroup_quota = True
+            period_us = 100_000
+            quota_us = int(period_us * quota_percent / 100)
+            for path in self._CGROUP_CPU_PATHS:
+                if self._write_cgroup(path, f"{quota_us} {period_us}"):
+                    self._used_cgroup_quota_path = path
                     applied = True
-                except OSError:
-                    pass
+                    break
             if not applied:
                 self._env_overrides["MORPH_CPU_QUOTA_PERCENT"] = str(quota_percent)
 
     def apply_memory(self, limit_mb: int | None = None) -> None:
         if limit_mb is not None and limit_mb > 0:
-            self._env_overrides["MORPH_MEMORY_LIMIT_MB"] = str(limit_mb)
+            applied = False
+            limit_bytes = limit_mb * 1024 * 1024
+            for path in self._CGROUP_MEM_PATHS:
+                if self._write_cgroup(path, str(limit_bytes)):
+                    self._used_cgroup_mem_path = path
+                    applied = True
+                    break
+            if not applied:
+                self._env_overrides["MORPH_MEMORY_LIMIT_MB"] = str(limit_mb)
 
     def apply_locale(
         self, locale_str: str | None = None, timezone: str | None = None
@@ -102,18 +129,23 @@ class LinuxAdapter(BaseAdapter):
             self._proxy.cleanup()
             self._proxy = None
 
-        if self._used_cgroup_quota:
-            try:
-                with open(self._CGROUP_CPU_MAX, "w") as f:
-                    f.write("max 100000")
-            except OSError:
-                pass
-            self._used_cgroup_quota = False
+        if self._used_cgroup_quota_path:
+            self._write_cgroup(self._used_cgroup_quota_path, "max 100000")
+            self._used_cgroup_quota_path = None
+
+        if self._used_cgroup_mem_path:
+            self._write_cgroup(self._used_cgroup_mem_path, "max")
+            self._used_cgroup_mem_path = None
+
 
         if self._used_tc:
+            tc_bin = shutil.which("tc") or ("/sbin/tc" if os.path.exists("/sbin/tc") else "tc")
+            cmd = [tc_bin, "qdisc", "del", "dev", self.interface, "root"]
+            if os.name != "nt" and os.geteuid() != 0:
+                cmd = ["sudo", "-n", *cmd]
             try:
                 subprocess.run(
-                    ["tc", "qdisc", "del", "dev", self.interface, "root"],
+                    cmd,
                     check=False,
                     capture_output=True,
                 )
@@ -122,3 +154,4 @@ class LinuxAdapter(BaseAdapter):
             self._used_tc = False
 
         self._env_overrides.clear()
+

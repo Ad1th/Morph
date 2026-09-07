@@ -42,7 +42,12 @@ def test_differential_blame_analysis():
         project_dir=REPO_ROOT / "apps" / "timeout",
     )
 
-    assert blame.culpable_file in ("app.py", "api_client.py")
+    # No traceback in either output: nothing may be blamed, and nothing is invented.
+    assert blame.culpable_file is None
+    assert blame.culpable_line is None
+    assert blame.culpable_code is None
+    assert blame.suggested_fix is None
+    assert "no stack trace" in blame.explanation
     assert blame.pass_trace is not None
     assert blame.fail_trace is not None
     assert blame.pass_trace.run_type == "PASS"
@@ -57,13 +62,15 @@ def test_invariant_test_exporter():
         project_name="checkout-service",
         command="python3 -m apps.timeout test",
         safe_latency_ms=160.0,
-        safe_packet_loss=0.01,
+        safe_packet_loss=1.0,  # percent, like network.packet_loss_percent
         boundary_estimate=180.0,
     )
     assert "test_checkout_service_environment_tolerance" in code
     assert "with morph.environment(" in code
     assert "latency_ms=160.0" in code
-    assert "packet_loss=0.01" in code
+    assert "packet_loss=1.0" in code
+    assert "network.latency_ms <= 160" in code
+    compile(code, "test_morph_invariant.py", "exec")
 
 
 def test_surface_2d_heatmap_computation():
@@ -86,6 +93,11 @@ def test_surface_2d_heatmap_computation():
     assert len(result.grid[0]) == 2
     assert result.passing_count >= 1
     assert result.failing_count >= 1
+    # The blamed pair is adjacent on the grid, never two arbitrary cells.
+    hp, lf = result.highest_passing_point, result.lowest_failing_point
+    if hp is not None and lf is not None:
+        assert hp.passed and not lf.passed
+        assert (hp.x == lf.x) != (hp.y == lf.y)  # share exactly one coordinate
 
 
 def test_surface_api_endpoints():
@@ -118,6 +130,11 @@ def test_surface_api_endpoints():
     blame_data = res_blame.json()
     assert blame_data["pass_trace"]["run_type"] == "PASS"
     assert blame_data["fail_trace"]["run_type"] == "FAIL"
+    # Plain-text outputs carry no trace: the API must not fabricate app.py:89.
+    assert blame_data["culpable_file"] is None
+    assert blame_data["culpable_line"] is None
+    assert blame_data["culpable_code"] is None
+    assert "TimeoutException" in blame_data["fail_trace"]["status_or_exception"]
 
     res_export = client.post(
         "/export/invariant",
@@ -125,7 +142,7 @@ def test_surface_api_endpoints():
             "project_name": "timeout",
             "command": "python3 -m apps.timeout test",
             "safe_latency_ms": 160.0,
-            "safe_packet_loss": 0.01,
+            "safe_packet_loss": 1.0,
             "param_name": "network.latency_ms",
             "boundary_estimate": 180.0,
         },

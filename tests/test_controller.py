@@ -193,3 +193,38 @@ def test_runtime_controller_process_timeout_overrides_argument():
     assert res.passed is False
     assert res.error_type == "TimeoutExpired"
     assert res.duration_ms < 5000
+
+
+def test_controller_dispatches_to_worker_on_capability_gap(monkeypatch):
+    from morph.cloud import capability as cap_mod
+    monkeypatch.setattr(cap_mod.platform, "system", lambda: "Darwin")
+
+    profile = make_test_profile()
+    profile.cpu.quota_percent = ProfileField(value=10.0, status=FieldStatus.REQUESTED)
+
+    class FakeRemoteWorker:
+        configured = True
+        target = "rbpi@rbpi.local"
+
+        def __init__(self):
+            self.dispatched = False
+
+        def run(self, profile, command, timeout=30.0):
+            self.dispatched = True
+            return RunResult(
+                exit_code=0,
+                passed=True,
+                stdout="dispatched to worker",
+                stderr="",
+                duration_ms=100.0,
+            )
+
+    fake_worker = FakeRemoteWorker()
+    controller = RuntimeController(adapter=MockAdapter(), worker=fake_worker)
+
+    result = controller.run(profile, "python -m apps.race test")
+
+    assert fake_worker.dispatched is True
+    assert result.passed is True
+    assert result.stdout == "dispatched to worker"
+

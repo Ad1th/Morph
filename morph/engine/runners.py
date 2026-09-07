@@ -12,14 +12,20 @@ the identical experiment.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
+from morph.engine.progress import RunAtFn, RunFn
 from morph.runtime.controller import RuntimeController
 from morph.runtime.runner import execute_command
 from morph.schema.profile import EnvironmentProfile, FieldStatus, NetworkInfo, ProfileField
 
-RunFn = Callable[[], bool]
-RunAtFn = Callable[[float], bool]
+__all__ = [
+    "RunAtFn",
+    "RunFn",
+    "build_baseline_and_candidates",
+    "make_run_fn",
+    "make_threshold_run_fn",
+    "set_profile_parameter",
+    "with_unconstrained_network",
+]
 
 
 def _field_is_positive(field: object) -> bool:
@@ -119,7 +125,10 @@ def set_profile_parameter(
     """Return a deep copy of ``profile`` with one field's value replaced.
 
     ``dotted_path`` addresses a ProfileField by section and name, e.g.
-    ``network.latency_ms``, ``cpu.cores``, ``memory.total_mb``.
+    ``network.latency_ms``, ``cpu.cores``, ``memory.total_mb``. The field's
+    status becomes ``REQUESTED``: the value is now something we are asking the
+    runtime to reproduce, not something that was captured from a host, so the
+    platform-restriction checks (which key on ``REQUESTED``) still apply.
     """
     updated = profile.model_copy(deep=True)
     parts = dotted_path.split(".")
@@ -139,6 +148,7 @@ def set_profile_parameter(
         raise ValueError(f"'{dotted_path}' is not a settable profile field")
 
     leaf.value = value
+    leaf.status = FieldStatus.REQUESTED
     return updated
 
 

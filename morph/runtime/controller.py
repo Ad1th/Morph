@@ -95,11 +95,26 @@ class RuntimeController:
     """Master controller managing adapter lifecycles and application execution."""
 
     def __init__(
-        self, adapter: BaseAdapter | None = None, force_proxy: bool = False
+        self,
+        adapter: BaseAdapter | None = None,
+        force_proxy: bool = False,
+        worker: RemoteWorker | None = None,
     ) -> None:
         self.adapter = adapter or get_default_adapter(force_proxy=force_proxy)
+        if worker is not None:
+            self.worker = worker
+        else:
+            try:
+                from morph.cloud.worker import RemoteWorker as _RemoteWorker
+                from morph.config import load_config
+                cfg = load_config()
+                worker_cfg = cfg.worker if cfg.worker.host else cfg.cloud
+                self.worker = _RemoteWorker(worker_cfg)
+            except Exception:
+                self.worker = None
 
     def apply_conditions(self, profile: EnvironmentProfile) -> None:
+
         """Apply all relevant conditions from the environment profile via the active adapter."""
         # 1. Network conditions
         if profile.network:
@@ -158,10 +173,28 @@ class RuntimeController:
     ) -> RunResult:
         """Apply environment conditions, execute the command, capture telemetry, and guarantee cleanup.
 
-        `profile.process.timeout_s`, if requested, overrides the `timeout`
-        argument; `max_processes`/`fd_limit` are POSIX-only rlimits applied
-        to the child (see `morph.telemetry.collector.run_with_telemetry`).
+        If this host cannot reproduce the requested profile and a remote worker is configured,
+        the trial is dispatched to the worker over SSH.
         """
+        effective_timeout = timeout
+        if profile.process:
+            if (
+                profile.process.timeout_s
+                and profile.process.timeout_s.value is not None
+                and float(profile.process.timeout_s.value) > 0
+            ):
+                effective_timeout = float(profile.process.timeout_s.value)
+
+        # Check for local capability gap and dispatch to worker if configured
+        if self.worker and self.worker.configured:
+            try:
+                from morph.cloud.capability import assess_locally
+                cap = assess_locally(profile)
+                if not cap.reproducible_locally:
+                    return self.worker.run(profile=profile, command=command, timeout=effective_timeout)
+            except Exception:
+                pass
+
         try:
             self.apply_conditions(profile)
             env_overrides = self.adapter.get_env_overrides()
@@ -170,15 +203,8 @@ class RuntimeController:
                 # adapter's own (locale/proxy) overrides.
                 env_overrides = {**env_overrides, **profile.env_vars}
 
-            effective_timeout = timeout
             max_processes = fd_limit = None
             if profile.process:
-                if (
-                    profile.process.timeout_s
-                    and profile.process.timeout_s.value is not None
-                    and float(profile.process.timeout_s.value) > 0
-                ):
-                    effective_timeout = float(profile.process.timeout_s.value)
                 if profile.process.max_processes and profile.process.max_processes.value is not None:
                     max_processes = int(profile.process.max_processes.value)
                 if profile.process.fd_limit and profile.process.fd_limit.value is not None:
@@ -190,3 +216,4 @@ class RuntimeController:
             )
         finally:
             self.adapter.cleanup()
+

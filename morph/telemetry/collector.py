@@ -116,14 +116,21 @@ def _kill_tree(pid: int) -> None:
 
 
 def _limit_resources(max_processes: int | None, fd_limit: int | None) -> None:
-    """preexec_fn: applies POSIX rlimits in the child, before exec. Never
-    called on Windows -- subprocess.Popen rejects preexec_fn there outright."""
+    """preexec_fn: applies POSIX rlimits and attaches to cgroup in child before exec.
+    Never called on Windows -- subprocess.Popen rejects preexec_fn there outright."""
     import resource
 
     if max_processes is not None:
         resource.setrlimit(resource.RLIMIT_NPROC, (max_processes, max_processes))
     if fd_limit is not None:
         resource.setrlimit(resource.RLIMIT_NOFILE, (fd_limit, fd_limit))
+
+    if os.path.exists("/sys/fs/cgroup/morph/cgroup.procs"):
+        try:
+            with open("/sys/fs/cgroup/morph/cgroup.procs", "w") as f:
+                f.write(str(os.getpid()))
+        except OSError:
+            pass
 
 
 def _early_result(*, exit_code: int, stderr: str, duration_ms: float,
@@ -167,8 +174,9 @@ def run_with_telemetry(
     popen_kwargs = dict(
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=cwd, env=env
     )
-    if os.name != "nt" and (max_processes is not None or fd_limit is not None):
+    if os.name != "nt":
         popen_kwargs["preexec_fn"] = lambda: _limit_resources(max_processes, fd_limit)
+
 
     if os.name == "nt":
         # Windows' CreateProcess takes the whole command line as one string

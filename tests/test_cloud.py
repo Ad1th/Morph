@@ -254,3 +254,36 @@ def test_the_profile_sent_to_the_worker_is_the_one_requested(host):
     worker.run = capture_run
     run_anywhere(profile, "true", worker=worker)
     assert captured["mem"] == 65536
+
+
+def test_worker_config_roundtrip():
+    from morph.schema.config import MorphConfig, WorkerConfig
+
+    w_cfg = WorkerConfig(
+        enabled=True,
+        provider="pi",
+        host="rbpi.local",
+        user="rbpi",
+        python="~/morph/.venv/bin/python",
+        workdir="~/morph",
+        connect_timeout=10.0,
+    )
+    raw = w_cfg.model_dump()
+    reconstructed = WorkerConfig.model_validate(raw)
+    assert reconstructed == w_cfg
+
+    m_cfg = MorphConfig(worker=w_cfg)
+    m_raw = m_cfg.model_dump()
+    m_reconstructed = MorphConfig.model_validate(m_raw)
+    assert m_reconstructed.worker.host == "rbpi.local"
+    assert m_reconstructed.worker.user == "rbpi"
+
+
+def test_worker_config_env_vars(monkeypatch):
+    monkeypatch.setenv("MORPH_WORKER_HOST", "192.168.1.100")
+    monkeypatch.setenv("MORPH_WORKER_USER", "pi_user")
+    cfg = resolve_config(None)
+    assert cfg.host == "192.168.1.100"
+    assert cfg.user == "pi_user"
+    assert cfg.enabled is True
+

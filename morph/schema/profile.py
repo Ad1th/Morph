@@ -40,8 +40,12 @@ class MemoryInfo(BaseModel):
 
 
 class LocaleInfo(BaseModel):
+    # POSIX locale name usable as LC_ALL ("en_US.UTF-8"); timezone is an IANA
+    # zone name ("Asia/Kolkata") that a child can interpret via TZ.
     locale: ProfileField
     timezone: ProfileField
+    # BCP-47 companion of `locale` ("en-US"), for display and Windows targets.
+    language_tag: ProfileField | None = None
 
 
 class FilesystemInfo(BaseModel):

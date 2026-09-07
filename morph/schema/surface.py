@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+
+from morph.schema.blame import DifferentialBlameResult
 
 
 class SurfaceGridPoint(BaseModel):
@@ -34,14 +36,20 @@ class SurfaceRequest(BaseModel):
     y_max: float | None = 5.0
     y_steps: int | None = 6
     runs_per_point: int = 1
+    # A point "passes" when its failure rate is <= this (same rule as the
+    # threshold search), so the two tools agree on what passing means.
+    failure_rate_threshold: float = 0.5
+    # "proxy" (environment variables only), "system" (host-native adapter),
+    # or an explicit "macos" / "linux" / "windows".
     adapter_name: str = "proxy"
+    timeout: float = 30.0
     supplied_profile: dict[str, Any] | None = None
 
 
 class SafeBoundaryPoint(BaseModel):
     x: float
     y: float
-    status: str = "boundary"  # "safe" | "boundary" | "failing"
+    status: Literal["safe", "boundary", "failing"] = "boundary"
 
 
 class SurfaceResult(BaseModel):
@@ -61,5 +69,5 @@ class SurfaceResult(BaseModel):
     total_points: int = 0
     highest_passing_point: SurfaceGridPoint | None = None
     lowest_failing_point: SurfaceGridPoint | None = None
-    blame: Any | None = None
+    blame: DifferentialBlameResult | None = None
     summary: str = ""
