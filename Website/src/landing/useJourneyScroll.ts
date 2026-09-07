@@ -28,7 +28,7 @@ export function useJourneyScroll(
     /* `?static` drops Lenis so automated screenshots can jump with a plain
        window.scrollTo; ScrollTrigger reads native scroll either way. */
     const useLenis = !window.location.search.includes('static')
-    const lenis = useLenis ? new Lenis({ lerp: 0.12, wheelMultiplier: 0.9 }) : null
+    const lenis = useLenis ? new Lenis({ lerp: 0.1, wheelMultiplier: 0.7 }) : null
     lenis?.on('scroll', ScrollTrigger.update)
 
     const tickerFn = (time: number) => lenis?.raf(time * 1000)
@@ -50,7 +50,7 @@ export function useJourneyScroll(
 
     let raf = 0
     const loop = () => {
-      progress.current += (target - progress.current) * 0.075
+      progress.current += (target - progress.current) * 0.06
       onFrameRef.current(progress.current)
       raf = requestAnimationFrame(loop)
     }
