@@ -14,8 +14,16 @@ import type {
   ThresholdResult,
 } from './types'
 
-// Vite dev proxy rewrites /api/* -> http://127.0.0.1:8000/* (see vite.config.ts).
-const BASE = '/api'
+// Same origin by default: the Vite dev proxy rewrites /api/* -> 127.0.0.1:8000
+// and strips the /api prefix (see vite.config.ts), so a bundled deploy where
+// the API is served alongside the static build needs nothing else. Set
+// VITE_API_URL (no trailing slash, e.g. https://api.morph.dev) when the
+// frontend is deployed separately from the backend — such as the static build
+// on Vercel talking to a Morph Fleet worker — and requests go straight to the
+// API's real paths (no /api prefix; there is no proxy to strip it for you).
+// See frontend/.env.example.
+const API_URL = import.meta.env.VITE_API_URL?.replace(/\/+$/, '')
+const BASE = API_URL ?? '/api'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   // Content-Type is conditional: a FormData body must be left alone so the
@@ -151,9 +159,15 @@ export const api = {
   getExperiment: (id: string) => request<ExperimentResult>(`/experiments/${id}`),
 }
 
-// Open the progress WebSocket for a running experiment. Vite proxies /ws to the
-// API in dev; in a bundled deploy it is same-origin.
+// Open the progress WebSocket for a running experiment. Vite proxies /ws to
+// the API in dev, and a bundled same-origin deploy needs nothing else. When
+// VITE_API_URL points at a separate host, derive the socket's host from it
+// (http -> ws, https -> wss) instead of window.location.
 export function openExperimentSocket(experimentId: string): WebSocket {
+  if (API_URL) {
+    const wsUrl = API_URL.replace(/^http/, 'ws')
+    return new WebSocket(`${wsUrl}/ws/experiment/${experimentId}`)
+  }
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
   return new WebSocket(`${proto}://${window.location.host}/ws/experiment/${experimentId}`)
 }
