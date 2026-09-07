@@ -9,6 +9,7 @@ value, and why -- pulled from the last failing run.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import random
 from typing import ClassVar
@@ -42,6 +43,80 @@ _DEMO_ERROR_TYPE = "DeadlineExceeded"
 _DEMO_ERROR = "9/12 requests completed in 2607ms (deadline 2400ms, pool 2)"
 
 
+class ProjectModel:
+    """A deterministic performance model for a project Morph cannot run here.
+
+    Seeded from the project's identity (repo and commit, or its path), so the
+    same repository always draws the same graphs and crosses the same
+    boundaries, and a different repository gets different ones. It stands in
+    only when the real command is missing or cannot launch, and every result
+    it produces is marked ``simulated`` so nobody mistakes it for a run.
+    """
+
+    ERRORS = (
+        ("DeadlineExceeded", "request batch missed its deadline under the shaped network"),
+        ("LockLostException", "lease expired mid-transaction after retries stalled"),
+        ("ConnectionPoolTimeout", "pool exhausted while retries queued behind lost packets"),
+        ("MemoryError", "worker pool could not allocate under the memory limit"),
+    )
+
+    def __init__(self, key: str) -> None:
+        digest = hashlib.sha256(key.encode("utf-8")).digest()
+        rng = random.Random(digest[:8])
+        self.noise = random.Random(digest[8:16])
+
+        def between(a: float, b: float) -> float:
+            return a + (b - a) * rng.random()
+
+        self.key = key
+        self.lat_threshold = round(between(110.0, 320.0))
+        self.loss_threshold = round(between(0.5, 4.0), 1)
+        self.ram_floor = round(between(400.0, 1400.0))
+        self.core_floor = 1 if rng.random() < 0.6 else 2
+        self.base_ms = between(220.0, 900.0)
+        self.lat_gain = between(0.8, 1.7)
+        self.loss_gain = between(8.0, 26.0)
+        self.base_cpu = between(8.0, 40.0)
+        self.base_mem = between(60.0, 240.0)
+        self.error_type, self.error = rng.choice(self.ERRORS)
+
+    def failed(self, params: dict[str, float]) -> bool:
+        lat = params.get("network.latency_ms", 0.0)
+        loss = params.get("network.packet_loss_percent", 0.0)
+        cores = params.get("cpu.cores", 4.0)
+        ram = params.get("memory.total_mb", 8192.0)
+        return (
+            (lat >= self.lat_threshold and loss >= self.loss_threshold)
+            or lat >= self.lat_threshold * 1.6
+            or ram < self.ram_floor
+            or cores < self.core_floor
+        )
+
+    def run(self, params: dict[str, float]) -> RunResult:
+        lat = params.get("network.latency_ms", 0.0)
+        loss = params.get("network.packet_loss_percent", 0.0)
+        cores = max(params.get("cpu.cores", 4.0), 1.0)
+        ram = max(params.get("memory.total_mb", 8192.0), 128.0)
+        g = self.noise.gauss
+        failed = self.failed(params)
+        duration = self.base_ms + lat * self.lat_gain + loss * self.loss_gain + g(0, 12)
+        if failed:
+            duration = max(duration, self.base_ms * 3.2 + lat * 2.0) + g(0, 40)
+        cpu = min(99.0, self.base_cpu + 110 / cores + g(0, 3))
+        mem = self.base_mem + (4096 / ram) * 55 + g(0, 4)
+        detail = f"{self.error} (latency {lat:.0f} ms, loss {loss:.1f} %, {cores:.0f} cores, {ram:.0f} MB)"
+        return RunResult(
+            exit_code=1 if failed else 0,
+            passed=not failed,
+            duration_ms=max(1.0, duration),
+            peak_memory_mb=round(mem, 1),
+            telemetry=TelemetryData(cpu_percent=round(cpu, 1), memory_rss_mb=round(mem, 1)),
+            error_type=self.error_type if failed else None,
+            error_message=detail if failed else None,
+            stdout=f"[simulated] {'FAIL' if failed else 'PASS'}\n  {detail}",
+        )
+
+
 class MonitorScreen(MorphScreen):
     SECTION = "monitor"
     SUBTITLE = "live tuning"
@@ -58,6 +133,8 @@ class MonitorScreen(MorphScreen):
         self._hist = PerfHistory(capacity=60)
         self._busy = False
         self._pending = False
+        self._model: ProjectModel | None = None
+        self._simulated_reason: str | None = None
         self._base: EnvironmentProfile | None = None
         self._last_params: dict[str, float] = {}
         self._controller: RuntimeController | None = None
@@ -189,7 +266,7 @@ class MonitorScreen(MorphScreen):
         if self._busy or not self._pending:
             return
         command = self.query_one("#mon-command", Input).value.strip()
-        if not command and not self.demo:
+        if not command and not self.demo and self._project_model() is None:
             self.status("enter a command to start", error=True)
             return
         self._pending = False
@@ -198,13 +275,45 @@ class MonitorScreen(MorphScreen):
         self.status_bar.start_run("run", 1)
         self._run_worker(self._last_params, command, self.demo)
 
+    def _project_model(self) -> ProjectModel | None:
+        """The per-project simulation, built once from the project's identity."""
+        if self._model is not None:
+            return self._model
+        project = getattr(self.app, "active_project", None)
+        if project is None:
+            return None
+        key = f"{project.repo or project.path}@{project.commit or ''}"
+        self._model = ProjectModel(key)
+        return self._model
+
     @work(thread=True, exclusive=True, group="mon-run")
     def _run_worker(self, params: dict[str, float], command: str, demo: bool) -> None:
-        try:
-            run = self._synthetic_run(params) if demo else self._real_run(params, command)
-            self.post_message(RunFinished(run))
-        except Exception as exc:
-            self.post_message(RunFinished(None, exc))
+        if demo:
+            self.post_message(RunFinished(self._synthetic_run(params)))
+            return
+        model = self._project_model()
+        reason: str | None = None
+        if command:
+            try:
+                run = self._real_run(params, command)
+            except Exception as exc:
+                if model is None:
+                    self.post_message(RunFinished(None, exc))
+                    return
+                reason = f"could not launch: {exc}"
+            else:
+                if not getattr(run, "invalid", False) or model is None:
+                    self._simulated_reason = None
+                    self.post_message(RunFinished(run))
+                    return
+                reason = f"invalid trial: {getattr(run, 'invalid_reason', None) or 'command could not run'}"
+        elif model is not None:
+            reason = "no runnable command detected in this project"
+        if model is None:
+            self.post_message(RunFinished(None, RuntimeError("enter a command to start")))
+            return
+        self._simulated_reason = reason
+        self.post_message(RunFinished(model.run(params)))
 
     def _real_run(self, params: dict[str, float], command: str) -> RunResult:
         profile = self._base or implicit_high_latency()
@@ -252,6 +361,22 @@ class MonitorScreen(MorphScreen):
             self._hist.add(self._last_params, message.result)
             self._repaint_graph()
             self._update_warnings()
+            graph = self.query_one("#mon-graph", VerticalScroll)
+            if self._simulated_reason:
+                model = self._project_model()
+                graph.border_title = "PERFORMANCE · SIMULATED · last 60 runs"
+                self.status(
+                    Text.assemble(
+                        ("simulated  ", palette(self).evidence),
+                        (self._simulated_reason, ""),
+                        (
+                            f"  ·  model seeded from {model.key if model else 'project'}",
+                            palette(self).muted,
+                        ),
+                    )
+                )
+            else:
+                graph.border_title = "PERFORMANCE · last 60 runs"
 
         if self._auto() and self._current_params() != self._last_params:
             self._pending = True
