@@ -90,6 +90,41 @@
   color: var(--text-secondary);
 }
 
+.param-config__tabs {
+  display: flex;
+  gap: 6px;
+  margin: 10px 14px 0 14px;
+  border-bottom: 1px solid var(--window-border);
+  padding-bottom: 8px;
+}
+
+.param-config__tab {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.param-config__tab:hover {
+  color: var(--text-primary);
+  background: var(--input-bg);
+}
+
+.param-config__tab--active {
+  color: #fff !important;
+  background: #1f6feb !important;
+  border-color: #388bfd !important;
+}
+
 /* Takes whatever height is left over rather than a fixed 60vh, which used to
    push the panel past the viewport on a short window. min-height:0 is required
    -- without it a flex child refuses to shrink below its content and scrolls

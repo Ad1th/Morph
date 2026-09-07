@@ -123,6 +123,8 @@ class ProxyAdapter(BaseAdapter):
             self._env_overrides["MORPH_PROXY_PORT"] = str(self.listen_port)
             self._env_overrides["MORPH_PROXY_HOST"] = self.listen_host
             self._env_overrides["MORPH_UPSTREAM_PORT"] = str(self.upstream_port)
+            self._env_overrides["MORPH_LATENCY_MS"] = str(latency_ms)
+            self._env_overrides["MORPH_PACKET_LOSS"] = str(packet_loss_percent)
             self._is_running = True
             ready_event.set()
             self._loop.run_forever()

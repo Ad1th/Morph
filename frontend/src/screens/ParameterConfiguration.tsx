@@ -10,6 +10,7 @@ import type {
 import { EnvVarsEditor } from '../components/EnvVarsEditor'
 import { ParamGroup } from '../components/ParamGroup'
 import { ParameterRow } from '../components/ParameterRow'
+import { SurfaceHeatmapPanel } from '../components/SurfaceHeatmapPanel'
 import { ThresholdPanel } from '../components/ThresholdPanel'
 import type { OsName } from '../theme/useOsTheme'
 import { PARAM_GROUPS } from './paramGroups'
@@ -63,6 +64,8 @@ export function ParameterConfiguration({
       .catch((err) => setPlatformError(err instanceof Error ? err.message : String(err)))
   }, [])
 
+  const [activeTab, setActiveTab] = useState<'params' | 'threshold' | 'surface'>('params')
+
   const filter = search.trim().toLowerCase()
 
   function updateField(fieldPath: string, value: unknown) {
@@ -98,79 +101,117 @@ export function ParameterConfiguration({
 
         <div className="param-config__summary">{summary || 'All parameters at host defaults'}</div>
 
-        <input
-          className="param-config__search"
-          placeholder="Search parameters…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-
-        <div className="param-config__groups">
-          {PARAM_GROUPS.map((group) => {
-            const visibleKeys = group.keys.filter((key) => {
-              const meta = catalog[key]
-              if (!meta) return false
-              if (!filter) return true
-              return meta.name.toLowerCase().includes(filter) || key.includes(filter)
-            })
-            if (filter && visibleKeys.length === 0) return null
-
-            const nonDefault = group.keys.filter((key) => {
-              const meta = catalog[key]
-              const field = meta && getField(profile, meta.field_path)
-              return field && field.status === 'requested'
-            }).length
-
-            return (
-              <ParamGroup
-                key={group.name}
-                name={group.name}
-                nonDefaultCount={nonDefault}
-                defaultOpen={group.name === 'Network' || Boolean(filter)}
-              >
-                {visibleKeys.map((key) => {
-                  const meta = catalog[key]
-                  const field = getField(profile, meta.field_path)
-                  return (
-                    <ParameterRow
-                      key={key}
-                      paramKey={key}
-                      meta={meta}
-                      field={field}
-                      os={os}
-                      onChange={(value) => updateField(meta.field_path, value)}
-                      onReset={() => resetField(meta.field_path, meta.default ?? null)}
-                    />
-                  )
-                })}
-              </ParamGroup>
-            )
-          })}
-
-          {(!filter || 'environment variables'.includes(filter)) && (
-            <ParamGroup
-              name="Environment Variables"
-              nonDefaultCount={Object.keys(profile.env_vars).length}
-            >
-              <EnvVarsEditor
-                vars={profile.env_vars}
-                onChange={(next) => setProfile((prev) => (prev ? { ...prev, env_vars: next } : prev))}
-              />
-            </ParamGroup>
-          )}
-
-          {(!filter || 'threshold search'.includes(filter)) && (
-            <ParamGroup name="Threshold Search">
-              <ThresholdPanel
-                catalog={catalog}
-                profile={profile}
-                command={command}
-                cwd={project?.suggested_cwd ?? undefined}
-                target={target}
-              />
-            </ParamGroup>
-          )}
+        <div className="param-config__tabs">
+          <button
+            className={`param-config__tab ${activeTab === 'params' ? 'param-config__tab--active' : ''}`}
+            onClick={() => setActiveTab('params')}
+          >
+            ⚙️ Environment Parameters
+          </button>
+          <button
+            className={`param-config__tab ${activeTab === 'threshold' ? 'param-config__tab--active' : ''}`}
+            onClick={() => setActiveTab('threshold')}
+          >
+            📈 1D Threshold Search
+          </button>
+          <button
+            className={`param-config__tab ${activeTab === 'surface' ? 'param-config__tab--active' : ''}`}
+            onClick={() => setActiveTab('surface')}
+          >
+            🗺️ 2D Failure Surface & Blame
+          </button>
         </div>
+
+        {activeTab === 'params' && (
+          <>
+            <input
+              className="param-config__search"
+              placeholder="Search parameters…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+
+            <div className="param-config__groups">
+              {PARAM_GROUPS.map((group) => {
+                const visibleKeys = group.keys.filter((key) => {
+                  const meta = catalog[key]
+                  if (!meta) return false
+                  if (!filter) return true
+                  return meta.name.toLowerCase().includes(filter) || key.includes(filter)
+                })
+                if (filter && visibleKeys.length === 0) return null
+
+                const nonDefault = group.keys.filter((key) => {
+                  const meta = catalog[key]
+                  const field = meta && getField(profile, meta.field_path)
+                  return field && field.status === 'requested'
+                }).length
+
+                return (
+                  <ParamGroup
+                    key={group.name}
+                    name={group.name}
+                    nonDefaultCount={nonDefault}
+                    defaultOpen={group.name === 'Network' || Boolean(filter)}
+                  >
+                    {visibleKeys.map((key) => {
+                      const meta = catalog[key]
+                      const field = getField(profile, meta.field_path)
+                      return (
+                        <ParameterRow
+                          key={key}
+                          paramKey={key}
+                          meta={meta}
+                          field={field}
+                          os={os}
+                          onChange={(value) => updateField(meta.field_path, value)}
+                          onReset={() => resetField(meta.field_path, meta.default ?? null)}
+                        />
+                      )
+                    })}
+                  </ParamGroup>
+                )
+              })}
+
+              {(!filter || 'environment variables'.includes(filter)) && (
+                <ParamGroup
+                  name="Environment Variables"
+                  nonDefaultCount={Object.keys(profile.env_vars).length}
+                >
+                  <EnvVarsEditor
+                    vars={profile.env_vars}
+                    onChange={(next) => setProfile((prev) => (prev ? { ...prev, env_vars: next } : prev))}
+                  />
+                </ParamGroup>
+              )}
+            </div>
+          </>
+        )}
+
+        {activeTab === 'threshold' && (
+          <div className="param-config__groups">
+            <ThresholdPanel
+              catalog={catalog}
+              profile={profile}
+              command={command}
+              cwd={project?.suggested_cwd ?? undefined}
+              target={target}
+            />
+          </div>
+        )}
+
+        {activeTab === 'surface' && (
+          <div className="param-config__groups">
+            <SurfaceHeatmapPanel
+              catalog={catalog}
+              profile={profile}
+              command={command}
+              cwd={project?.suggested_cwd ?? undefined}
+              projectPath={project?.path}
+              projectName={project?.name}
+            />
+          </div>
+        )}
 
         <div className="param-config__run">
           <label className="param-config__run-field">

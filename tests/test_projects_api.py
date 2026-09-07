@@ -219,12 +219,14 @@ def test_threshold_returns_contract_shape_with_captured_profile():
 
 
 def test_threshold_accepts_supplied_profile_without_network_section():
-    # The config screen posts back exactly what /profiles/capture returned, and
-    # on this host that carries "network": null. An absent section means
-    # unconstrained, so the search must still run instead of answering 400.
+    # Captured profiles now collect baseline host network conditions.
     profile = client.post("/profiles/capture").json()
-    assert profile["network"] is None
+    assert profile["network"] is not None
+    assert profile["network"]["latency_ms"]["status"] == "captured"
 
+    # If a supplied profile has an absent network section, threshold search
+    # treats it as unconstrained and still runs without answering 400.
+    profile["network"] = None
     res = client.post(
         "/threshold",
         json={
@@ -240,6 +242,7 @@ def test_threshold_accepts_supplied_profile_without_network_section():
     )
     assert res.status_code == 200, res.text
     assert res.json()["parameter"] == "network.latency_ms"
+
 
 
 def test_threshold_rejects_non_local_target():
@@ -353,5 +356,53 @@ def test_github_project_redacts_token_on_clone_error(monkeypatch):
     )
     assert res.status_code in (400, 401)
     assert "ghp_supersecret" not in res.text
+
+
+def test_github_device_code_and_poll(monkeypatch):
+    from morph.api.routes import projects
+
+    def fake_http_json(url, method="GET", payload=None, token=None):
+        if "device/code" in url:
+            return {
+                "device_code": "dev-1234",
+                "user_code": "ABCD-5678",
+                "verification_uri": "https://github.com/login/device",
+                "expires_in": 900,
+                "interval": 5,
+            }
+        if "oauth/access_token" in url:
+            return {"access_token": "gho_access_token_123", "token_type": "bearer"}
+        if "user/repos" in url:
+            return [
+                {
+                    "full_name": "Ad1th/Morph",
+                    "name": "Morph",
+                    "private": False,
+                    "default_branch": "main",
+                    "description": "Cross-environment testing",
+                    "html_url": "https://github.com/Ad1th/Morph",
+                }
+            ]
+        return {}
+
+    monkeypatch.setattr(projects, "_github_http_json", fake_http_json)
+
+    res_code = client.post("/projects/github/device-code", json={"client_id": "client_123"})
+    assert res_code.status_code == 200
+    assert res_code.json()["user_code"] == "ABCD-5678"
+
+    res_poll = client.post(
+        "/projects/github/poll-token",
+        json={"client_id": "client_123", "device_code": "dev-1234"},
+    )
+    assert res_poll.status_code == 200
+    assert res_poll.json()["access_token"] == "gho_access_token_123"
+
+    res_repos = client.post("/projects/github/repos", json={"token": "gho_access_token_123"})
+    assert res_repos.status_code == 200
+    repos = res_repos.json()
+    assert len(repos) == 1
+    assert repos[0]["full_name"] == "Ad1th/Morph"
+
 
 

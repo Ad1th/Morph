@@ -22,4 +22,6 @@ def collect_cpu() -> CPUInfo:
             value=psutil.cpu_count(logical=True), status=FieldStatus.CAPTURED
         ),
         clock_mhz=ProfileField(value=clock_mhz, status=FieldStatus.CAPTURED),
+        quota_percent=ProfileField(value=100.0, status=FieldStatus.CAPTURED),
     )
+

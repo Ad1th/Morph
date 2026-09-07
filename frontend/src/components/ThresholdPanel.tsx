@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react'
 import { api } from '../api/client'
-import type { EnvironmentProfile, ParameterMetadata, ThresholdResult } from '../api/types'
+import type {
+  EnvironmentProfile,
+  ExportInvariantResponse,
+  ParameterMetadata,
+  ThresholdResult,
+} from '../api/types'
 import './ThresholdPanel.css'
 
 /** Binary-searches the value of one numeric parameter at which the run flips
@@ -34,6 +39,8 @@ export function ThresholdPanel({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ThresholdResult | null>(null)
+  const [exportResult, setExportResult] = useState<ExportInvariantResponse | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const meta = numeric.find((m) => m.field_path === parameter)
   const canRun =
@@ -135,10 +142,29 @@ export function ThresholdPanel({
 
       {result && (
         <div className="threshold__result">
-          <p>
-            Boundary estimate: <strong>{result.boundary_estimate}</strong> (safe {result.safe_value},
-            fails at {result.failure_value})
-          </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <p style={{ margin: 0 }}>
+              Boundary estimate: <strong>{result.boundary_estimate ?? 'None'}</strong> (safe {result.safe_value ?? 'None'},
+              fails at {result.failure_value ?? 'None'})
+            </p>
+            <button
+              className="param-config__btn"
+              style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem', background: '#1f6feb', color: '#fff' }}
+              onClick={async () => {
+                const exp = await api.exportInvariant({
+                  project_name: 'service',
+                  command: command.trim(),
+                  safe_latency_ms: result.safe_value ?? 160,
+                  safe_packet_loss: 0.01,
+                  param_name: result.parameter,
+                  boundary_estimate: result.boundary_estimate,
+                })
+                setExportResult(exp)
+              }}
+            >
+              ⚡ Export Invariant Guardrail
+            </button>
+          </div>
           <table className="threshold__table">
             <thead>
               <tr>
@@ -157,6 +183,28 @@ export function ThresholdPanel({
               ))}
             </tbody>
           </table>
+
+          {exportResult && (
+            <div style={{ marginTop: '0.75rem', background: '#161b22', border: '1px solid #238636', borderRadius: '6px', padding: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#3fb950' }}>{exportResult.filename}</span>
+                <button
+                  className="param-config__btn"
+                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
+                  onClick={() => {
+                    navigator.clipboard.writeText(exportResult.code)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
+                  }}
+                >
+                  {copied ? '✓ Copied' : 'Copy Code'}
+                </button>
+              </div>
+              <pre style={{ margin: 0, fontSize: '0.72rem', background: '#0d1117', padding: '0.5rem', borderRadius: '4px', maxHeight: '180px', overflowY: 'auto', color: '#79c0ff' }}>
+                <code>{exportResult.code}</code>
+              </pre>
+            </div>
+          )}
         </div>
       )}
     </div>

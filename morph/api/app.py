@@ -13,6 +13,7 @@ from morph.api.routes import (
     projects,
     regressions,
     runs,
+    surface,
     threshold,
     ws,
 )
@@ -47,6 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(projects.router, prefix="/projects", tags=["projects"])
     app.include_router(platform.router, prefix="/platform", tags=["platform"])
     app.include_router(threshold.router, prefix="/threshold", tags=["threshold"])
+    app.include_router(surface.router, tags=["surface"])
     app.include_router(ws.router, prefix="/ws", tags=["websocket"])
 
     return app

@@ -230,15 +230,24 @@ def threshold(
         trials=trials,
     )
 
+    safe_str = f"{thresh.safe_value:.2f}" if thresh.safe_value is not None else "None"
+    fail_str = f"{thresh.failure_value:.2f}" if thresh.failure_value is not None else "None"
+    est_str = (
+        f"{thresh.boundary_estimate:.2f}"
+        if thresh.boundary_estimate is not None
+        else "None (no threshold in range)"
+    )
+
     console.print(Panel(
         f"Parameter: {thresh.parameter}\n"
-        f"Safe Bound: {thresh.safe_value:.2f}\n"
-        f"Failing Bound: {thresh.failure_value:.2f}\n"
-        f"Boundary Estimate: {thresh.boundary_estimate:.2f}\n"
+        f"Safe Bound: {safe_str}\n"
+        f"Failing Bound: {fail_str}\n"
+        f"Boundary Estimate: {est_str}\n"
         f"Probed Points: {len(thresh.search_points)}",
         title="Threshold Search Result",
         border_style="bold green",
     ))
+
 
 
 @app.command()

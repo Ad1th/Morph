@@ -22,8 +22,12 @@ import re
 import shutil
 import subprocess
 import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
 import uuid
 from pathlib import Path, PurePosixPath
+from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
@@ -52,6 +56,56 @@ class GithubProjectRequest(BaseModel):
     repo: str
     token: str | None = None
     branch: str | None = None
+
+
+class DeviceCodeRequest(BaseModel):
+    client_id: str | None = None
+    scope: str = "repo,read:user"
+
+
+class PollTokenRequest(BaseModel):
+    device_code: str
+    client_id: str | None = None
+
+
+class GithubReposRequest(BaseModel):
+    token: str
+
+
+def _github_http_json(
+    url: str,
+    method: str = "GET",
+    payload: dict[str, Any] | None = None,
+    token: str | None = None,
+) -> Any:
+    headers = {
+        "User-Agent": "Morph-App/1.0",
+        "Accept": "application/json",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token.strip()}"
+
+    data_bytes = None
+    if payload is not None:
+        headers["Content-Type"] = "application/json"
+        data_bytes = json.dumps(payload).encode("utf-8")
+
+    req = urllib.request.Request(url, data=data_bytes, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            raw = resp.read().decode("utf-8")
+            return json.loads(raw)
+    except urllib.error.HTTPError as exc:
+        err_text = exc.read().decode("utf-8", errors="replace")
+        try:
+            parsed = json.loads(err_text)
+            msg = parsed.get("message") or parsed.get("error_description") or err_text
+        except Exception:
+            msg = err_text
+        raise HTTPException(status_code=exc.code, detail=f"GitHub request failed ({exc.code}): {msg}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to connect to GitHub: {exc}")
+
 
 
 def _normalize_github_repo(repo: str, token: str | None = None) -> tuple[str, str, str]:
@@ -216,6 +270,7 @@ def _detect_command(project_dir: Path) -> tuple[str | None, str | None]:
         # nothing rather than a command that is known to fail on sight.
         return candidate if all(p.isidentifier() for p in parts) else (None, None)
 
+
     cwd = str(project_dir)
     package_json = project_dir / "package.json"
     if package_json.is_file() and _has_npm_test_script(package_json):
@@ -316,4 +371,69 @@ def connect_github_project(req: GithubProjectRequest) -> ProjectInfo:
     clone_url, _, repo_name = _normalize_github_repo(req.repo, req.token)
     cloned_dir = _clone_github_repo(clone_url, repo_name, req.branch, req.token)
     return describe_project(cloned_dir)
+
+
+@router.post("/github/device-code")
+def request_device_code(req: DeviceCodeRequest) -> dict[str, Any]:
+    """Request a device verification code from GitHub OAuth."""
+    client_id = req.client_id or os.environ.get("GITHUB_CLIENT_ID")
+    if not client_id:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "GitHub Client ID is required for device flow. "
+                "Set GITHUB_CLIENT_ID or provide client_id."
+            ),
+        )
+    return _github_http_json(
+        "https://github.com/login/device/code",
+        method="POST",
+        payload={"client_id": client_id, "scope": req.scope},
+    )
+
+
+@router.post("/github/poll-token")
+def poll_device_token(req: PollTokenRequest) -> dict[str, Any]:
+    """Poll GitHub OAuth for access token completion using the device code."""
+    client_id = req.client_id or os.environ.get("GITHUB_CLIENT_ID")
+    if not client_id:
+        raise HTTPException(
+            status_code=400,
+            detail="GitHub Client ID is required to poll for token.",
+        )
+    return _github_http_json(
+        "https://github.com/login/oauth/access_token",
+        method="POST",
+        payload={
+            "client_id": client_id,
+            "device_code": req.device_code,
+            "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+        },
+    )
+
+
+@router.post("/github/repos")
+def list_github_repositories(req: GithubReposRequest) -> list[dict[str, Any]]:
+    """Fetch repositories accessible by the authorized GitHub token."""
+    raw_repos = _github_http_json(
+        "https://api.github.com/user/repos?per_page=100&sort=updated",
+        method="GET",
+        token=req.token,
+    )
+    if not isinstance(raw_repos, list):
+        return []
+
+    return [
+        {
+            "full_name": repo.get("full_name", ""),
+            "name": repo.get("name", ""),
+            "private": bool(repo.get("private")),
+            "default_branch": repo.get("default_branch", "main"),
+            "description": repo.get("description") or "",
+            "html_url": repo.get("html_url", ""),
+        }
+        for repo in raw_repos
+        if isinstance(repo, dict) and repo.get("full_name")
+    ]
+
 

@@ -253,7 +253,8 @@
   margin-bottom: 5px;
 }
 
-.desktop__input {
+.desktop__input,
+.desktop__select {
   width: 100%;
   padding: 6px 7px;
   font-family: var(--font-ui);
@@ -262,3 +263,50 @@
   color: var(--text-primary);
   outline: none;
 }
+
+.desktop__tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.desktop__tab {
+  flex: 1;
+  padding: 5px 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.desktop__tab--active {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.desktop__device-box {
+  background: var(--input-bg);
+  padding: 12px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.desktop__device-code {
+  font-family: monospace;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  margin: 8px 0;
+  user-select: all;
+  color: var(--text-primary);
+}
+
+.desktop__auth-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: var(--input-bg);
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
