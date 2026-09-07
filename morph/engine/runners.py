@@ -154,7 +154,7 @@ def make_threshold_run_fn(
     ``value`` on the profile, run the command once, and report pass/fail.
 
     ``cwd`` is the working directory for every trial, needed when the command
-    is a module form (``py -3 -m apps.timeout test``) that only resolves from
+    is a module form (``python3 -m apps.timeout test``) that only resolves from
     the project's root.
     """
     ctrl = controller or RuntimeController()

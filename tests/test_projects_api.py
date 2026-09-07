@@ -129,7 +129,7 @@ def test_local_project_unrecognised_returns_null_command(tmp_path):
 
 def test_module_command_is_null_when_dir_name_is_not_importable(tmp_path):
     # "morph-project-8jodbogg" (an upload temp dir) cannot be imported, so
-    # "py -3 -m morph-project-8jodbogg" would fail every time it ran.
+    # "python3 -m morph-project-8jodbogg" would fail every time it ran.
     project = tmp_path / "morph-project-8jodbogg"
     project.mkdir()
     (project / "__main__.py").write_text("print(1)\n", encoding="utf-8")
@@ -195,7 +195,7 @@ def test_threshold_returns_contract_shape_with_captured_profile():
     res = client.post(
         "/threshold",
         json={
-            "command": "py -3 -c \"print(1)\"",
+            "command": "python3 -c \"print(1)\"",
             "parameter": "network.latency_ms",
             "low": 0,
             "high": 400,
@@ -230,7 +230,7 @@ def test_threshold_accepts_supplied_profile_without_network_section():
     res = client.post(
         "/threshold",
         json={
-            "command": "py -3 -c \"print(1)\"",
+            "command": "python3 -c \"print(1)\"",
             "parameter": "network.latency_ms",
             "low": 0,
             "high": 400,

@@ -59,7 +59,7 @@ def compute_failure_surface(
         proj_dir = (repo_root / proj_dir).resolve()
 
     cwd = req.cwd or (str(repo_root) if repo_root and proj_dir.is_relative_to(repo_root) else str(proj_dir))
-    cmd = req.command or "py -3 -m apps.timeout test"
+    cmd = req.command or "python3 -m apps.timeout test"
 
     # Compute grid coordinate axes
     if req.x_values:

@@ -55,7 +55,7 @@ def test_differential_blame_analysis():
 def test_invariant_test_exporter():
     code = generate_invariant_test_code(
         project_name="checkout-service",
-        command="py -3 -m apps.timeout test",
+        command="python3 -m apps.timeout test",
         safe_latency_ms=160.0,
         safe_packet_loss=0.01,
         boundary_estimate=180.0,
@@ -93,7 +93,7 @@ def test_surface_api_endpoints():
         "/surface",
         json={
             "project_path": "apps/timeout",
-            "command": "py -3 -m apps.timeout test",
+            "command": "python3 -m apps.timeout test",
             "param_x": "network.latency_ms",
             "param_y": "network.packet_loss_percent",
             "x_values": [10.0, 120.0],
@@ -123,7 +123,7 @@ def test_surface_api_endpoints():
         "/export/invariant",
         json={
             "project_name": "timeout",
-            "command": "py -3 -m apps.timeout test",
+            "command": "python3 -m apps.timeout test",
             "safe_latency_ms": 160.0,
             "safe_packet_loss": 0.01,
             "param_name": "network.latency_ms",
