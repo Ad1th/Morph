@@ -1,371 +1,117 @@
 # Morph Build Progress
 
 > Living status file. Update this after any future work on this codebase so a
-> fresh agent or session can pick up with full context. Re-run `/graphify`
-> after structural changes to refresh `graphify-out/`.
+> fresh agent or session can pick up with full context.
 
-## Task scope (per user request, kept intentionally narrow)
+## Where things stand (2026-09-07, branch `feat/production-hardening`)
 
-Only these were in scope for this pass:
+A full audit-and-fix pass was run over every layer (engine, runtime, API, CLI,
+TUI, GUI, demo apps, docs) ahead of the hackathon's first review
+(1:00 to 5:00 am on 2026-09-08). Work lives on `feat/production-hardening`,
+built in a git worktree so the landing-page session on `feat/landing-page`
+was never disturbed. Commit identity: `Ad1th <adith2505@outlook.com>`, no AI
+attribution trailers, no em dashes in docs or UI copy.
 
-1. `morph/profiler/`: environment collectors for CPU, RAM, OS, Locale, Filesystem
-2. `morph/engine/`: experiment loop, baseline/treatment runner, threshold search,
-   Fisher exact test, causal classification
-3. `morph/runtime/adapters/proxy.py`: async TCP proxy for cross-platform latency
-   and packet-loss simulation
-4. `tests/test_profiler.py`, `tests/test_engine.py`, `tests/test_comparison.py`
+**Verified state:** `pytest tests` 465 passed / 1 skipped; `pytest apps -m
+"not slow"` 40 passed (slow statistical tier 17 passed, 1 Linux-only skip);
+`ruff check morph tests apps` clean; `npm run build` and `oxlint` clean;
+`morph demo` runs end to end in 1 min 46 s on macOS with no root and reaches
+`environment_caused` (E = 102 after 9 pairs, anytime p = 0.0098).
 
-Everything else in `docs/architecture.md` (CLI, API server, frontend, telemetry
-subprocess runner, regression artifacts, macOS/Windows/Linux native adapters,
-network.py/runtime_env.py collectors) is explicitly OUT of scope for this pass.
-A minimal `morph/schema/` layer was added anyway since profiler/engine cannot
-type their data without it; that is a required dependency, not scope creep.
+### Research-grade engine additions (`morph/engine/`)
 
-Git identity for all commits: `parth-garg01` / `parth.garg2024@vitstudent.ac.in`,
-no Claude co-author line (per the user's global CLAUDE.md instruction).
+- `anytime.py`: exact paired e-values (Robbins' Beta-mixture against the
+  fair-coin conditional null). Monte Carlo: 2.1 % false positives under
+  continuous monitoring at alpha 5 %, power 1.0 at 30 pairs for 5 % vs 70 %.
+- `sequential.py`: paired round-robin isolation with a K/alpha evidence
+  budget (family-wise error at alpha) and early stopping. Default mode for
+  `morph experiment`, the API, the TUI and the GUI.
+- `boundary.py`: probabilistic bisection (Horstein; Waeber, Frazier and
+  Henderson) with a logistic dose-response model, learned floor/ceiling, two
+  no-boundary hypotheses, credible intervals, `increasing=False` for
+  parameters that hurt when smaller (fd limits). 40 noisy runs: median error
+  4 ms vs 21 ms for plain bisection, worst 24 ms vs 150 ms.
+- `comparison.py`: one-sided Fisher, Holm-Bonferroni across candidates,
+  risk difference with Newcombe intervals, `minimum_trials_for_significance`.
+- `experiment.py`: Bayesian 2x2 interaction test (`interaction_probability`,
+  Jeffreys posteriors, confirmed only above 0.95 with weaker singles).
+- `minimize.py`: ddmin over conditions, `batch_oracle`.
+- `errors.py`: `InvalidTrialError`; invalid trials (exit 2, 126, 127, launch
+  failures) are retried three times then reported as a setup problem, never a
+  failure. `blame.py` no longer fabricates file/line/fix.
 
-## Status: COMPLETE (this pass's scope)
+### Runtime (`morph/runtime`, `morph/telemetry`, `morph/cloud`)
 
-All four features are built, tested, linted clean, and committed. 25/25 tests
-pass (`py -3 -m pytest tests/ -q`), the proxy self-check passes
-(`py -3 -m morph.runtime.adapters.proxy`), and `ruff check morph/ tests/`
-reports no findings. A `code-review` pass was also run and its one real
-finding (see below) was fixed with a regression test. `graphify-out/` has been
-regenerated to include this pass's `morph/` modules and doc changes (269
-nodes, 330 edges, 45 communities as of this write-up). Use `python` (system
-default) for graphify's own tooling; use `py -3` specifically for anything
-touching this project's code, since that is the interpreter with
-psutil/pydantic/pytest/scipy/ruff/distro installed on this machine.
+- Proxy rewritten: per-direction delay line (latency_ms is RTT), loss as a
+  retransmission stall (max(200 ms, 3 x RTT), doubling), never corruption;
+  bandwidth token bucket, jitter, `seed`/`MORPH_SEED`. `tests/test_proxy.py`.
+- Adapters: per-field fidelity report (`fidelity_report()`), crash-safe
+  shaping state in `~/.morph/state/shaping.json` (`morph/runtime/state.py`),
+  `tc qdisc replace`, real pf anchor on macOS root path, honest capabilities.
+- Controller never dispatches to a worker; `--cloud` goes through
+  `morph/cloud/dispatch.py` and fails loudly. One `cloud:` config block
+  (`WorkerConfig` is an alias). `MORPH_NO_NETWORK=1` keeps tests offline.
+- Collector: process-group kill, bounded 2 MB capture, `errors="replace"`,
+  rlimits clamped, provenance (`seed`, `morph_version`, `host_fingerprint`,
+  `profile_hash`, `adapter`, `fidelity`) on every `RunResult`.
+- Security: regression ids validated and store-confined; GitHub token only via
+  `GIT_CONFIG_*` env, never argv or `.git/config`; SSH `BatchMode`,
+  `StrictHostKeyChecking=accept-new`.
+- Profiler: IANA timezone, POSIX locale plus BCP-47 `language_tag`.
 
-### What exists
+### API and CLI (`morph/api`, `morph/cli`)
 
-- `morph/schema/`: `profile.py` (`EnvironmentProfile` and friends, with
-  per-field `FieldStatus`), `telemetry.py` (`RunResult`), `comparison.py`
-  (`ComparisonResult`, `ThresholdResult`), `experiment.py` (`TrialBatch`,
-  `ExperimentResult`). Minimal dependency layer, not part of the requested
-  scope but required by it.
-- `morph/profiler/collectors/`: `cpu.py`, `memory.py`, `os_info.py` (uses
-  `distro` for Linux distribution version, not kernel version),
-  `locale_info.py` (uses Win32 `GetUserDefaultLocaleName` on Windows for a
-  proper BCP-47 tag like `en-IN`, since stdlib `locale.getlocale()` only
-  returns a Windows display name there), `filesystem.py` (case-sensitivity
-  probe via a temp file).
-- `morph/profiler/capture.py`: orchestrates the five collectors into one
-  `EnvironmentProfile` (`network` field left `None`: no network collector is
-  in this pass's scope, that's `runtime/adapters/proxy.py`'s job instead).
-- `morph/runtime/adapters/proxy.py`: `ProxyServer` class (asyncio
-  `start_server`/`open_connection`, bidirectional relay with injected
-  `asyncio.sleep` latency and probabilistic chunk drop for packet loss).
-  Supports `async with`. Has an inline `if __name__ == "__main__":`
-  self-check (ponytail's "non-trivial logic needs one runnable check" rule)
-  since no separate `test_proxy.py` was requested; run it directly with
-  `py -3 -m morph.runtime.adapters.proxy`.
-- `morph/engine/comparison.py`: `compare_failure_rates()`, Fisher's exact
-  test via `scipy.stats.fisher_exact`, returns a `ComparisonResult` with
-  `effect_label` in `{no_effect, significant_increase, significant_decrease}`.
-- `morph/engine/threshold.py`: `search_threshold()`, binary search over a
-  continuous parameter range given a known-safe and known-failing bound.
-- `morph/engine/classifier.py`: `classify_failure()`, the three-way rule from
-  `architecture.md` section 5.3 (`application_internal` / `environment_caused`
-  / `environment_exposed`), plus a fourth `no_effect` outcome for when the
-  comparison was not significant or treatment did not actually exceed
-  baseline (see the bug fix below).
-- `morph/engine/experiment.py`: `run_trials()` (batches N calls to a
-  caller-supplied `run_fn: Callable[[], bool]` into a `TrialBatch`),
-  `isolate_variables()` (baseline plus N candidate treatments, each compared),
-  `detect_interaction()` (2x2 design: neither/A/B/both, confirms an
-  interaction only when A alone and B alone show no effect but A+B does),
-  and `run_experiment()` (orchestrates isolation, picks the strongest
-  significant condition, classifies it). Deliberately takes `run_fn`
-  callbacks rather than depending on subprocess/telemetry plumbing:
-  `morph/telemetry/` and `morph/runtime/controller.py` are out of scope for
-  this pass, and coupling the engine to real subprocess execution would make
-  it untestable without a real target app. Wire a real trial runner in when
-  the runtime controller exists.
-- `tests/test_profiler.py`, `tests/test_comparison.py`, `tests/test_engine.py`:
-  25 tests total, all passing.
-- `.gitattributes`: normalizes source files to LF (was causing a CRLF
-  warning on every commit under Git for Windows).
-- `pyproject.toml`: formalizes `pytest` testpaths and `ruff` config (line
-  length 110, target py311, rule selection E/F/W/I/UP/RUF). Previously both
-  tools ran on implicit defaults.
+- `service.py` is the single orchestration path for CLI, API and TUI.
+- CORS restricted to localhost origins, `allow_credentials=False`,
+  TrustedHost, loopback bind by default; `/projects/github/cli-token` removed;
+  ids validated; upload symlink/size guards; setup errors are HTTP 422 / CLI
+  exit 2; lifespan cancels jobs and cleans shaping on shutdown.
+- New: `/api/v1` prefix (old paths kept), `/health`, `/version`,
+  `POST /threshold/stream` + `/ws/threshold/{id}`, `DELETE /threshold/{id}`,
+  `POST /minimize`, `POST /profiles/fidelity`, `GET/DELETE /experiments`.
+- CLI: `--mode sequential|batch`, `--max-rounds`, `--alpha`, `threshold
+  --method bayes|bisect`, `minimize`, `doctor`, `demo`, `--version`, pure
+  `--json` on every path, documented exit codes (0/1/2/3/124).
+- CI: frontend job, ubuntu + macOS matrix, blocking apps fast tier.
 
-### Bug fixed during the sanity-check pass
+### TUI (`morph/tui`)
 
-`classify_failure()` accepted a `treatment: TrialBatch` parameter but never
-actually read it: classification was decided purely from `baseline.failure_rate`
-and the caller-supplied `is_significant` flag. The one production call site
-(`run_experiment`) happened to only pass already-filtered `significant_increase`
-comparisons, which masked the defect, but the public function itself had no
-such guarantee. A future or different caller passing `is_significant=True` for
-a *decrease* (for example, verifying a fix) would have been mislabeled
-`environment_caused`. Fixed to require `treatment.failure_rate >
-baseline.failure_rate` before considering `environment_caused` or
-`environment_exposed`; added
-`test_classify_no_effect_when_treatment_did_not_actually_increase` as a
-regression test. See commit `32c62ea`.
+Redesigned on a wine-palette Textual theme (`theme.py`): sequential evidence
+tracks, DECISIVE stamps, Bayesian gauge with credible band, help overlay,
+command palette, cancel, evidence pane, responsive at 80x24 and up. See
+`docs/tui.md`.
 
-### Also fixed along the way
+### GUI (`frontend/`)
 
-- `.gitignore` had `/morph` under a leftover "# Go" section from before the
-  team settled on Python (per `requirements.txt`). That would have silently
-  blocked every commit in this task. Removed.
-- `locale_info.py` originally used `locale.getlocale()[0]` everywhere, which
-  on Windows returns a display name like `English_India` rather than a BCP-47
-  tag. Every example profile in the PRD and architecture doc uses tags like
-  `en-IN`. Fixed to call `GetUserDefaultLocaleName` via `ctypes` on Windows.
-- `os_info.py` originally used `platform.release()` for the Linux version
-  field, which is the kernel version, not the distribution version the PRD's
-  example profiles show (`"22.04"`). Fixed to use the already-declared but
-  previously unused `distro` dependency.
+Rebuilt on one design system (`src/theme/tokens.css`): rail + router,
+persistent run draft, Projects / Run / Experiment / Threshold / Regressions /
+Environment screens, live evidence tracks, dose-response chart, honest
+fidelity chips, no OS skins (the OS switcher is now the run-target badge).
+The landing page (`/`) belongs to the `feat/landing-page` branch; `main.tsx`
+is structured so it can claim `/` without touching the app.
 
-## Resuming or extending this work
+### Demo apps (`apps/`) and docs
 
-1. Read this file, then `git log --oneline` for the authoritative commit list.
-2. The "Not yet done" items below are the next things `architecture.md`
-   describes that were explicitly out of scope for this pass. Do not start
-   them without the user asking; this file exists to give a future session
-   context, not a standing backlog.
-3. If asked to extend the engine to run real subprocess trials, that is where
-   `morph/telemetry/collector.py` and `morph/runtime/controller.py` from
-   `architecture.md` would plug in as the `run_fn` implementation.
-4. Keep committing with the `parth-garg01` / `parth.garg2024@vitstudent.ac.in`
-   identity, no Claude co-author trailer, and no em dashes anywhere in
-   generated content (global CLAUDE.md rule: use commas, parentheses, or
-   colons instead).
-5. Re-run `/graphify` after any structural change so `graphify-out/` stays
-   current.
+Six apps (`timeout`, `pool_retry`, `race`, `locale_parse`, `fd_limit`,
+`tz_dst`), shared `apps/conftest.py`, markers `slow`/`needs_linux`/
+`needs_root`, `profiles/` for each. Docs rewritten: `docs/how-it-works.md`
+(new, the maths with citations), `architecture.md`, `faultyapps.md`,
+`cloud.md`, `projects.md`, `ui-spec.md`, `tui.md`, README. Pitch deck at
+`docs/deck/morph-deck.html`.
 
-## Track 2 Status: COMPLETE (Phases 1-6)
+## Known gaps
 
-Track 2 (Platform, Runtime, Flight Recorder, API, CLI, and E2E Integration) has been fully completed by Adith:
+- CPU/memory shaping only enforces on Linux cgroups (reported UNAVAILABLE
+  elsewhere); `apps/race` uses a yield knob off-Linux.
+- `tc netem` on the Raspberry Pi and real-cgroup race rates are unmeasured.
+- The 2D surface heatmap has no GUI screen (API and TUI only).
+- `PROFILES_DIR` and the regressions dir are CWD-relative.
+- Audit reports from this pass were kept outside the repo; the findings are
+  reflected in tests.
 
-- **Phase 1 (Shared Pydantic Schemas)**: `morph/schema/` (`profile.py`, `telemetry.py`, `experiment.py`, `regression.py`, `comparison.py`).
-- **Phase 2 (Telemetry & Runner)**: `morph/telemetry/` (`collector.py`, `parser.py`) and `morph/runtime/runner.py`.
-- **Phase 3 (OS Adapters & Controller)**: `morph/runtime/adapters/` (`base.py`, `macos.py`, `linux.py`, `windows.py`) and `morph/runtime/controller.py`.
-- **Phase 4 (Flight Recorder & CI Regression Engine)**: `morph/regression/` (`artifact.py`, `replay.py`, `exporter.py`).
-- **Phase 5 (FastAPI Backend & Typer CLI)**: `morph/api/` (`app.py`, `routes/profiles.py`, `runs.py`, `experiments.py`, `regressions.py`) and `morph/cli/main.py`.
-- **Phase 6 (End-to-End Integration & Verification)**: `tests/test_e2e_integration.py` validating the full loop:
-  1. Environment capture and reconciliation
-  2. Subprocess execution under simulated conditions with telemetry
-  3. Automated causal isolation experiments
-  4. Flight recorder `.morph/regressions/` directory bundles
-  5. Regression replay against expected invariants
-  6. Standalone pytest CI test generation and direct subprocess verification
-  7. Full FastAPI REST API workflow
-  8. Full Typer CLI workflow
+## Resuming
 
-**Total Test Suite**: 92 tests passing with 100% success rate across all components.
-
----
-
-## Sanity-check pass over Phases 3-6 (Parth)
-
-Integrating Track 2 surfaced 4 Windows-specific bugs (117/117 tests fixed, up
-from 113/117), plus a CLI crash on bad input. See commit `b7af641`:
-
-- `morph/telemetry/collector.py`: commands built as raw Windows-path strings
-  (the actual convention used by the new CLI/API/e2e code) were being mangled
-  by `shlex.split(posix=True)`. Fixed by skipping shlex entirely on Windows —
-  `Popen` there accepts a command-line string directly and parses it natively.
-- `morph/regression/exporter.py`: `morph export` generated an uncompilable
-  file for any regression whose command referenced a Windows path (`\Users`
-  read as a broken unicode escape). Fixed with a raw docstring + `repr()`.
-- `morph/cli/main.py`: `morph run` on a not-found command crashed with an
-  unhandled `TypeError` instead of showing the error (peak_memory_mb is None
-  in that case; `:.1f` doesn't accept None).
-
-Also completed a merge (`13558df`) that landed mid-session: `docs/ui-spec.md`
-(UI & parameter-control spec) from origin, pulled in via a `git pull` that
-started elsewhere while tests were running. Doc-only, no conflicts.
-
-Verified the new flagship demo app, `apps/pool_retry` (Failure B: latency +
-packet loss interaction), empirically against real injected proxy conditions:
-baseline PASS, latency-alone PASS, loss-alone PASS, combined 8/10 FAIL,
-`--fixed` under the same combined conditions 10/10 PASS. Matches the
-documented interaction claim exactly.
-
-## Threshold checker + parameter metadata (per docs/ui-spec.md)
-
-Cross-referenced `docs/ui-spec.md` against the codebase per its own
-contract (section 6: "the frontend renders entirely from this metadata").
-Three things it implies were checked:
-
-- **Profiler**: every MVP parameter's host-detected default (section 2) is
-  already covered by `morph/profiler/` — host cores, RAM, locale, timezone.
-  Nothing added.
-- **Threshold checker**: did NOT exist — nothing validated a requested
-  profile against min/max bounds or the cross-field rules in section 5.
-  Added `morph/schema/parameters.py` (`MVP_PARAMETERS`: the metadata catalog
-  from section 6, scoped to the 7 MVP params that map to existing
-  `EnvironmentProfile` fields) and `morph/engine/validator.py`
-  (`check_thresholds`, `check_worker_required`, `check_platform_restrictions`,
-  `validate_profile`). Two of section 5's rules are NOT implemented —
-  `jitter <= latency` and `CPU quota <= cores * 100%` — because neither
-  `jitter` nor `cpu_quota` exists as an `EnvironmentProfile` field, and
-  adding them is a schema change affecting every phase, not something to do
-  unilaterally inside a validator.
-- **Tester**: `tests/test_parameters.py` (4 tests) and `tests/test_validator.py`
-  (12 tests), all passing.
-
-108/108 core tests pass (`tests/` + these 16 new ones), ruff clean.
-
-## Integration pass: end-to-end network shaping + live dashboard (Adith)
-
-Context: `morph experiment` had never actually shaped a network for the demo
-apps. The runtime's proxy adapter started a proxy pointed at `127.0.0.1:80`
-that nothing connected to; the apps only honoured their own `MORPH_B_PROXY_*` /
-`MORPH_A_*` knobs, which nothing in the runtime set. So every isolation run
-came back `no_effect`. Also `/ws/experiment/{id}` was a handshake-only stub and
-`morph define -t high-latency` silently produced `network: null`.
-
-### Fixed
-
-- **Interpreter pin** (`morph/telemetry/collector.py`): a command whose first
-  token is a bare `python` / `python3` / `python3.x` now runs under
-  `sys.executable`. Removes the "wrong interpreter has no deps" failure class
-  (system Python 3.14 here is PEP-668 locked, no httpx). Explicit paths pass
-  through untouched. POSIX + Windows.
-- **`define -t high-latency`** (`morph/cli/main.py`): synthesizes a
-  `NetworkInfo` section (capture never populates `network`), set to the
-  validated flagship operating point **120 ms / 18 %**.
-- **Generic condition hand-off** (`morph/runtime/adapters/base.py`): the
-  unprivileged `ProxyAdapter.apply_network` now also exports
-  `MORPH_NET_LATENCY_MS` / `MORPH_NET_PACKET_LOSS_PCT`. The three OS adapters
-  already copy `ProxyAdapter`'s overrides on their fallback path, so all inherit
-  it; native `tc`/`dnctl` paths return earlier and never set them.
-- **`apps/netshape.py`** (new): `net_conditions()` + `start_proxy(upstream_port)`.
-  `apps/timeout` and `apps/pool_retry` call it to front their own localhost
-  server with morph's real `ProxyServer` when a condition is set. `MORPH_B_PROXY_*`
-  / `MORPH_A_*` still override.
-- **Streaming experiments** (`morph/api/routes/experiments.py`,
-  `morph/api/routes/ws.py`): new `POST /experiments/stream` runs the engine in
-  a worker thread and forwards every `TrialEvent` to `/ws/experiment/{id}` as
-  `{"type":"event",...}`, closing with `{"type":"done","result":...}` /
-  `{"type":"error",...}`. `ConnectionManager` gained a per-experiment replay
-  log (late subscribers get the whole run) and `emit_threadsafe` /
-  `bind_loop` (worker thread -> server loop; self-heals across test clients,
-  the `asyncio.Lock` is recreated with the loop). Blocking `POST /experiments`
-  and `GET /experiments/{id}` unchanged.
-- **React dashboard** (`frontend/src/screens/Experiment.tsx` + `.css`, new;
-  `App.tsx`, `Desktop.tsx`, `api/client.ts`, `api/types.ts`): "Run experiment"
-  on the desktop dialog opens a live causal-isolation view — one lane per
-  condition, per-trial pass/fail ticks, failure-rate bar, `p`-value +
-  `SIGNIFICANT ↑` stamp, and a verdict card. Consumes `/experiments/stream` +
-  the WebSocket. `openExperimentSocket()` in `api/client.ts`.
-
-### Verified
-
-- `pytest tests/` — **161 pass** (159 + `tests/test_ws_stream.py`), ruff clean.
-- `apps/pool_retry`, `apps/timeout`, `apps/locale_parse` self-tests — **19 pass**
-  at 120/18. `apps/race` self-tests fail on macOS (CPU-throttle sim, needs the
-  Pi) — pre-existing, unrelated to this pass.
-- End to end through `POST /experiments/stream` + the WebSocket, flagship
-  profile 120/18: baseline 0/12, latency_only 0/12, loss_only 1/12,
-  full_treatment **12/12 (p ≈ 7e-7)** -> `environment_caused`.
-- `frontend`: `npm run build` + `oxlint` clean.
-
-### Still not done (unchanged from before this pass)
-
-- CPU / memory shaping on macOS is still unenforced env-var stubs; Failure C
-  (race) needs the Pi's real cgroup `cpu.max`.
-- No cloud / remote-worker backend wired (the "beyond local specs" routing is
-  designed in `architecture.md` §12 but not implemented).
-- `@app.on_event` was removed in favour of per-request `bind_loop()`; if a
-  lifespan handler is added later for other reasons, fold the bind into it.
----
-
-# Session handoff: frontend/backend connection (2026-09-07)
-
-Base at session start: `b22ec2a` (teammate PR #19). Nine commits added, **nothing pushed**.
-
-## Done and verified
-
-Four disconnects between the working backend and the finished UI were closed.
-
-| Was | Now |
-|---|---|
-| `handleFiles` counted files and threw them away | `POST /projects/upload` (multipart) and `POST /projects/local`, real folder upload via `webkitdirectory` |
-| `Preparing` ran a hardcoded `python -c "print(1)"` | Runs the selected project with its detected command and cwd |
-| OS switcher changed theme only | `GET /platform` plus a run-target selector, unavailable targets disabled with an honest reason |
-| `search_threshold` unreachable from HTTP/UI | `POST /threshold` plus a threshold panel |
-
-Commits (all authored `parth-garg01 <parth.garg2024@vitstudent.ac.in>`, no co-author trailers):
-`562f85a` project endpoints, `9e1ccc4` platform, `b36b8f9` threshold, `aab0acd` router registration + run target gate,
-`d61c4a5` frontend client/types, `e01615d` desktop dialog wiring, `25586ba` run target + threshold UI,
-`34fd351` filesystem test flake fix, `0d958fd` em dash sweep.
-
-Verified: 188 tests pass, `npm run build` green, `oxlint src` clean.
-Live HTTP confirmed `/projects/local` on `apps/timeout` returns a runnable command,
-`/platform` reports real adapter capabilities, and `/run` genuinely executes the demo app
-(exit 0, real JSON stdout).
-
-## BLOCKER: threshold verification produces fabricated numbers
-
-This is the most important open item. It is not a cosmetic bug.
-
-A real search against the timeout app, `network.latency_ms`, low 0, high 300, 3 trials, returned:
-
-```
-boundary_estimate: 295.3125     safe: 290.625   fails at: 300.0
-  {'value': 150.0,    'failure_rate': 0.0, 'passed': True}
-  {'value': 225.0,    'failure_rate': 0.0, 'passed': True}
-  {'value': 262.5,    'failure_rate': 0.0, 'passed': True}
-  {'value': 281.25,   'failure_rate': 0.0, 'passed': True}
-  {'value': 290.625,  'failure_rate': 0.0, 'passed': True}
-```
-
-**Every probe passed, yet it reported a confident boundary.** The documented flip point is ~50ms.
-
-Two independent root causes:
-
-1. **`morph/engine/threshold.py: search_threshold` trusts `high` without probing it.**
-   It takes "high is a known-failing value" on faith. When nothing fails, it still converges on
-   the upper bound and emits a number. It must probe `high` first and return "no threshold in
-   range" when `high` passes. Note the CLI `morph threshold` shares this function, so a fix
-   reaches both. This is fabricated precision and contradicts the project's own honesty rule.
-
-2. **Injected latency never reaches the timeout app.** `apps/timeout/app.py:71` binds its own
-   server on `127.0.0.1:<ephemeral port>` and line 88 connects straight to it, so it never
-   traverses Morph's TCP proxy. `apps/README.md` already concedes this: timeout's condition was
-   "simulated, server-side delay", still needing "real injection".
-
-   The app is fine. Proof, using its own documented knob:
-   `MORPH_A_RESP_DELAY_S=0.5 py -3 -m apps.timeout test` -> `{"result": "fail",
-   "signal": "TimeoutException", "detail": "deadline 250ms exceeded"}`; baseline passes.
-
-   Fix direction: make the app honour a proxy endpoint Morph controls, or have the adapter
-   intercept loopback connections. Until then no latency threshold for this app is trustworthy.
-
-## Not done
-
-- **Playwright MCP end-to-end run of the faulty apps.** Not completed. The API-level finding
-  above supersedes it: fix the threshold blocker first, or the browser test just re-renders a
-  fabricated number.
-- **race app cannot be tested on this machine at all.** It needs cgroup `cpu.max`, which is
-  Linux-only. `apps/race/README.md` is explicit that core pinning is not a substitute and can
-  even suppress the race. This is genuinely blocked on the Raspberry Pi, not on code.
-- **Threshold panel defaults are placeholders** (low 0, high 1, trials 1), which is how the
-  meaningless "boundary 0.5" screenshot arose. Defaults should follow the selected parameter,
-  and the UI should warn when `high` was never shown to fail.
-- **Not pushed.** Committing was authorized, pushing was not.
-- **GitHub OAuth device flow** is mid-flight from another workstream, uncommitted.
-
-## Owned by another agent, do not touch
-
-`morph/profiler/collectors/network.py` (new), `morph/profiler/capture.py`,
-`frontend/src/components/StateChip.tsx`. Context: the profiler has no network collector, so
-`capture_environment()` returns `network = None` and every network row renders `unavailable`.
-The profiler is not buggy, the collector was simply never written. Separately, the word
-`unavailable` conflates "not detected" with "not supported", which is why it sits confusingly
-beside a green `local` control badge.
-
-## Cautions for whoever continues
-
-- `stash@{0}` holds parked Linux redesign work. Do not pop or drop it.
-- `pytest-randomly` is active, so ordering varies. Run the suite several times before trusting green.
-- The GitHub clone embeds the token in the clone URL, so it appears in the process argv.
-  It is redacted from error output and uses an argv list (no shell injection), but the argv
-  exposure is worth closing.
-- Commit identity is mandatory: `parth-garg01 <parth.garg2024@vitstudent.ac.in>`, never any
-  Claude or AI attribution. No em dashes anywhere in UI copy or commits.
+1. `git log --oneline` on `feat/production-hardening` is authoritative.
+2. `morph doctor`, then `morph demo`, then `pytest -q` before trusting a change.
+3. Keep the honesty rules: no fabricated numbers, invalid trials are not
+   failures, every field carries its fidelity.
